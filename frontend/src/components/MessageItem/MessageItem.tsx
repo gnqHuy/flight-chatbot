@@ -41,12 +41,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
         />
       </div>
 
-      <div className={`flex flex-col max-w-[75%] ${isUser ? "mr-3 items-end" : "ml-3 items-start"}`}>
+      <div className={`flex flex-col max-w-[65%] ${isUser ? "mr-3 items-end" : "ml-3 items-start"}`}>
         <div
           className={`px-4 py-2 rounded-2xl shadow-sm ${
             isUser 
               ? "bg-blue-600 text-white rounded-tr-none" 
-              : "bg-white border text-gray-800 rounded-tl-none"
+              : "bg-gray-100 text-gray-800 rounded-tl-none"
           }`}
         >
           {isTyping ? (
@@ -61,7 +61,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         </div>
 
         {timestamp && (
-          <span className="text-[10px] text-gray-400 mt-1 px-1">
+          <span className="text-[12px] text-gray-400 mt-1 px-1">
             {timestamp}
           </span>
         )}

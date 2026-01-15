@@ -40,7 +40,7 @@ const ChatWindow = () => {
       const botMsg: MessageItemProps = {
         id: (Date.now() + 1).toString(),
         from: "bot",
-        text: data.reply,
+        text: data.intent,
         timestamp: new Date().toLocaleTimeString(),
       };
 
@@ -58,7 +58,7 @@ const ChatWindow = () => {
   };
 
   return (
-    <div className="w-[1200px] h-[700px] mx-auto flex flex-col overflow-hidden">
+    <div className="w-full h-screen mx-auto py-4 px-[5%] flex flex-col overflow-hidden bg-white">
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         {messages.map((msg) => (
           <MessageItem key={msg.id} {...msg} />
@@ -68,7 +68,7 @@ const ChatWindow = () => {
 
       <div className="p-3 flex gap-2">
         <input
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 text-black border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           placeholder="Nhập tin nhắn..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -77,7 +77,7 @@ const ChatWindow = () => {
 
         <button
           onClick={handleSend}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         >
           Gửi
         </button>

@@ -8,6 +8,9 @@ Thumbs.db
 .env.development
 .env.production
 
+venv
+__pycache__/
+
 # =========================
 # Node / Next.js (frontend)
 # =========================
