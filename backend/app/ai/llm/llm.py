@@ -1,8 +1,8 @@
 from langchain_openai import ChatOpenAI
-import os
+from app.core.config import OPENAI_API_KEY
 
 llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0.3,
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=OPENAI_API_KEY,
 )

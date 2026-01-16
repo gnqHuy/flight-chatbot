@@ -40,7 +40,7 @@ const ChatWindow = () => {
       const botMsg: MessageItemProps = {
         id: (Date.now() + 1).toString(),
         from: "bot",
-        text: data.intent,
+        text: JSON.stringify(data),
         timestamp: new Date().toLocaleTimeString(),
       };
 
@@ -49,7 +49,7 @@ const ChatWindow = () => {
       const errorMsg: MessageItemProps = {
         id: (Date.now() + 2).toString(),
         from: "bot",
-        text: "❌ Không thể kết nối đến server!",
+        text: "Không thể kết nối đến server!",
         timestamp: new Date().toLocaleTimeString(),
       };
 
