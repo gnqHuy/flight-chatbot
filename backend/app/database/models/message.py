@@ -1,6 +1,11 @@
 from sqlmodel import SQLModel, Field, Relationship
-from datetime import datetime
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
+from typing import Optional
+
+from app.core.enums import ChatRole
 
 class Message(SQLModel, table=True):
     __tablename__ = "messages"
@@ -12,8 +17,11 @@ class Message(SQLModel, table=True):
         index=True
     )
 
-    role: str
+    role: ChatRole = Field(index=True)
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    action: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     conversation: "Conversation" = Relationship(back_populates="messages")

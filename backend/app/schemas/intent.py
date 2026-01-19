@@ -1,16 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
+from app.core.enums import ChatIntent
 class IntentResult(BaseModel):
-    intent: Literal[
-        "search_flight",
-        "provide_info",
-        "filter_result",
-        "compare_flights",
-        "ask_detail",
-        "general_question",
-        "out_of_scope"
-    ]
+    intent: ChatIntent = Field(index=True)
     origin: Optional[str]
     destination: Optional[str]
     departureDate: Optional[str]
