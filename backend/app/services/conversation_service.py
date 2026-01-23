@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List
 from fastapi import HTTPException
 
@@ -13,6 +13,10 @@ class ConversationService:
                  message_repo: MessageRepository):
         self.conversation_repo = conversation_repo
         self.message_repo = message_repo
+
+    def create_conversation(self, user_id: UUID, title: str) -> ConversationRead:
+        convo = self.conversation_repo.create(id=uuid4(), user_id=user_id, title=title)
+        return convo
 
     def get_user_conversations(self, user_id: UUID, limit: int = 20, offset: int = 0) -> List[ConversationRead]:
         return self.conversation_repo.get_by_user(user_id, limit, offset)

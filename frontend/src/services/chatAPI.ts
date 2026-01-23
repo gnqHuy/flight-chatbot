@@ -1,15 +1,16 @@
-import axios from "axios";
+import { ChatMessage } from '@/types/ChatMessage';
+import api from '@/utils/api';
 
-export async function sendMessageToBackend(message: string) {
-  const res = await axios.post(
-    "http://127.0.0.1:8000/chat",
-    { message },
-    {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
+export const chatAPI = {
+  getHistory: async (conversationId: string) => {
+    const res = await api.get<ChatMessage[]>(`/conversations/${conversationId}/messages`);
+    return res.data;
+  },
 
-  return res.data;
-}
+  sendMessage: async (conversationId: string, content: string) => {
+    const res = await api.post(`/conversations/${conversationId}/messages`, {
+      content: content,
+    });
+    return res.data;
+  },
+};
