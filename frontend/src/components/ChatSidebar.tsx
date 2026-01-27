@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Menu, PanelLeft, SquarePen, MessageSquare } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import UserMenu from './UserMenu';
 import api from '@/utils/api';
 import { Conversation } from '@/types/Conversation';
+import { chatAPI } from '@/services/chatAPI';
 
 type Props = {
   onToggle?: (isOpen: boolean) => void;
@@ -19,6 +20,8 @@ const ChatSidebar = ({ onToggle }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
   const router = useRouter();
+  const params = useParams();
+  const currentId = params?.id;
 
   const toggleSidebar = () => {
     const newState = !isSidebarOpen;
@@ -38,12 +41,13 @@ const ChatSidebar = ({ onToggle }: Props) => {
     const handleGetConversations = async () => {
       try {
         setIsLoading(true);
-        const res = await api.get<Conversation[]>('/conversations');
+        const data = await chatAPI.getConversations();
 
-        const sortedList = res.data.sort((a, b) => {
-          const dateA = new Date(a.updated_at || a.created_at).getTime();
-          const dateB = new Date(b.updated_at || b.created_at).getTime();
-          return dateB - dateA;
+        const sortedList = data.sort((a: any, b: any) => {
+          const timeA = new Date(a.updated_at || a.created_at).getTime();
+          const timeB = new Date(b.updated_at || b.created_at).getTime();
+
+          return timeB - timeA;
         });
 
         setConversationList(sortedList);
@@ -64,7 +68,15 @@ const ChatSidebar = ({ onToggle }: Props) => {
   }, []);
 
   const handleNewChat = async () => {
-    router.push('/');
+    try {
+      setIsLoading(true);
+      const newChat = await chatAPI.createConversation('New Chat');
+      router.push(`/chat/${newChat.id}`);
+    } catch (error) {
+      console.error('Lỗi khi tạo chat mới:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSelectChat = (id: string) => {
@@ -112,18 +124,28 @@ const ChatSidebar = ({ onToggle }: Props) => {
       <div className="flex-1 overflow-y-auto">
         {isSidebarOpen ? (
           <>
-            <div className="px-2 py-2 text-xs font-medium text-gray-400">Recent</div>
+            <div className="px-2 py-2 text-xs font-medium text-gray-400">Gần đây</div>
             <div className="flex flex-col gap-1">
-              {conversationList.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  onClick={() => handleSelectChat(conversation.id)}
-                  className="group flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2 text-sm font-medium text-gray-700 transition-all hover:bg-gray-200 hover:text-blue-600"
-                  title={conversation.title}
-                >
-                  <span className="truncate">{conversation.title || 'New chat'}</span>
-                </button>
-              ))}
+              {conversationList.map((conversation) => {
+                const isActive = currentId === conversation.id;
+
+                return (
+                  <button
+                    key={conversation.id}
+                    onClick={() => handleSelectChat(conversation.id)}
+                    className={`group flex w-full items-center gap-3 rounded-md border px-3 py-2 text-sm font-medium transition-all ${
+                      isActive
+                        ? 'border-blue-200 bg-blue-100 text-blue-700'
+                        : 'border-transparent bg-transparent text-gray-700 hover:bg-gray-200 hover:text-gray-900'
+                    } `}
+                    title={conversation.title}
+                  >
+                    <span className={`truncate ${isActive ? 'font-semibold' : ''}`}>
+                      {conversation.title || 'Đoạn chat không tên'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </>
         ) : (

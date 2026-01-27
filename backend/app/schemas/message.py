@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import BaseModel, Field
 from sqlmodel import SQLModel
 from uuid import UUID
 from datetime import datetime
@@ -16,3 +16,6 @@ class MessageRead(SQLModel):
     role: ChatRole = Field(index=True)
     content: str
     created_at: datetime
+
+class MessageCreateBody(BaseModel):
+    message: str

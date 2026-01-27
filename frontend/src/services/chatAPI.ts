@@ -9,8 +9,18 @@ export const chatAPI = {
 
   sendMessage: async (conversationId: string, content: string) => {
     const res = await api.post(`/conversations/${conversationId}/messages`, {
-      content: content,
+      message: content,
     });
+    return res.data;
+  },
+
+  createConversation: async (title: string = 'New Chat') => {
+    const res = await api.post('/conversations/', { title });
+    return res.data;
+  },
+
+  getConversations: async () => {
+    const res = await api.get('/conversations/');
     return res.data;
   },
 };

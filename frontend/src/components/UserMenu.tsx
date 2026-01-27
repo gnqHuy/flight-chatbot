@@ -42,7 +42,7 @@ export default function UserMenu({ collapsed = false }: UserMenuProps) {
         {user.full_name ? user.full_name[0].toUpperCase() : 'U'}
       </div>
       <div className="flex-1 overflow-hidden">
-        <p className="truncate text-sm font-medium text-white">{user.full_name || 'Người dùng'}</p>
+        <p className="truncate text-sm font-medium text-black">{user.full_name || 'Người dùng'}</p>
         <p className="truncate text-xs text-gray-500">{user.email}</p>
       </div>
       <button
