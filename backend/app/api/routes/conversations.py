@@ -1,3 +1,4 @@
+import traceback
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from uuid import UUID
@@ -72,7 +73,7 @@ async def send_message(
     body: MessageCreateBody, 
     db: Session = Depends(get_session)
 ):
-    """Gửi tin nhắn đến Bot và nhận phản hồi (Logic Chat cũ)"""
+    """Gửi tin nhắn đến Bot và nhận phản hồi"""
     conv_repo = ConversationRepository(db)
     msg_repo = MessageRepository(db)
     
@@ -89,5 +90,10 @@ async def send_message(
             slots=result["slots"],
             action=result["action"]
         )
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print("\n🔴🔴🔴 --- CHI TIẾT LỖI (TRACEBACK) ---")
+        traceback.print_exc()
+        print("🔴🔴🔴 --------------------------------\n")
+        
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")

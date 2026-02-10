@@ -13,3 +13,7 @@ passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
 argon2-cffi
+
+langgraph-checkpoint-postgres 
+psycopg-pool
+psycopg[binary]
