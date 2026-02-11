@@ -55,7 +55,12 @@ class ChatService:
             action_type = "flight_list"
             action_payload = final_state.get("flight_offers") or final_state.get("search_results")
 
-        client_action = ClientAction(type=action_type, payload=action_payload or {})
+        formatted_payload = {"flights": action_payload} if action_payload else {}
+
+        client_action = ClientAction(
+            type=action_type, 
+            payload=formatted_payload
+        )
 
         if final_state.get("search_results"):
             client_action = ClientAction(type="search_flight", payload=final_state.get("search_results"))

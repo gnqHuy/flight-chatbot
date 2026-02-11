@@ -11,3 +11,4 @@ class ChatState(BaseModel):
     adults: Optional[int] = None
     flight_offers: Optional[List[Dict]] = None
     response_text: Optional[str] = None
+    language: Optional[str] = "vi"

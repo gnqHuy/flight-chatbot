@@ -1,0 +1,22 @@
+{
+  "HAN": {
+    "vi": "Hà Nội",
+    "en": "Hanoi"
+  },
+  "SGN": {
+    "vi": "Hồ Chí Minh",
+    "en": "Ho Chi Minh City"
+  },
+  "DAD": {
+    "vi": "Đà Nẵng",
+    "en": "Da Nang"
+  },
+  "PQC": {
+    "vi": "Phú Quốc",
+    "en": "Phu Quoc"
+  },
+  "CXR": {
+    "vi": "Nha Trang",
+    "en": "Nha Trang"
+  }
+}

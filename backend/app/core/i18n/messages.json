@@ -1,0 +1,27 @@
+{
+  "ask_missing_info": {
+    "vi": "Để tìm chuyến bay, bạn vui lòng cho mình biết thêm: {missing_str} nhé.",
+    "en": "To find flights, please provide: {missing_str}."
+  },
+  "searching_flights": {
+    "vi": "Tuyệt vời! Đang tìm chuyến bay từ {origin} đi {dest} vào ngày {date}. Bạn đợi một chút nhé...",
+    "en": "Great! Searching for flights from {origin} to {dest} on {date}. Please wait a moment..."
+  },
+  "flight_not_found": {
+    "vi": "Xin lỗi, mình không tìm thấy chuyến bay nào từ {origin} đi {dest} vào ngày {date}.",
+    "en": "Sorry, I couldn't find any flights from {origin} to {dest} on {date}."
+  },
+  "flight_found": {
+    "vi": "Mình tìm thấy {count} chuyến bay từ {origin} đi {dest} ngày {date} cho bạn đây!",
+    "en": "I found {count} flights from {origin} to {dest} on {date} for you!"
+  },
+  "search_error": {
+    "vi": "Hệ thống tìm vé đang gặp chút sự cố, bạn vui lòng thử lại sau vài phút nhé.",
+    "en": "The flight search system is experiencing issues, please try again in a few minutes."
+  },
+  "fields": {
+    "origin": { "vi": "điểm đi", "en": "departure city" },
+    "destination": { "vi": "điểm đến", "en": "destination city" },
+    "departureDate": { "vi": "ngày đi", "en": "departure date" }
+  }
+}
