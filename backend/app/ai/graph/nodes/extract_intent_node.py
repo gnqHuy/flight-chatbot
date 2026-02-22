@@ -4,7 +4,7 @@ from app.ai.llm.intent_extractor import extract_intent_and_slots
 
 def extract_intent_node(state: ChatState) -> ChatState:
     print("\n--- NODE: EXTRACTING INTENT AND SLOTS ---", state, "\n")   
-    result = extract_intent_and_slots(state.user_message)
+    result = extract_intent_and_slots(state.user_message, state.language)
 
     return state.copy(update={
         "intent": result.intent,
