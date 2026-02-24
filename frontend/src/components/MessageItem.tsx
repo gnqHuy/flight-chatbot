@@ -23,7 +23,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   className,
   flights,
 }) => {
-  const isUser = role === Role.USER;
+  const isUser = String(role).toLowerCase() === 'user';
 
   return (
     <div

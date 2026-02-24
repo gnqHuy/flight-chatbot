@@ -1,6 +1,6 @@
 export enum ComponentType {
-  NONE,
-  DATE_PICKER,
-  FLIGHT_LIST,
-  CONFIRM_FORM,
+  NONE = 'none',
+  DATE_PICKER = 'date_picker',
+  FLIGHT_LIST = 'flight_list',
+  CONFIRM_FORM = 'confirm_form',
 }

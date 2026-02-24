@@ -1,10 +1,12 @@
 'use client';
 
 import { chatAPI } from '@/services/chatAPI';
-import { ChatMessage } from '@/types/ChatMessage';
+import { ChatMessage } from '@/types/ChatMessage'; // Trỏ đúng tới file chứa type của bạn
 import { Role } from '@/types/enums/Role';
+import { ComponentType } from '@/types/enums/ComponentType'; // Import enum ComponentType
 import { useState, useRef, useEffect } from 'react';
 import MessageItem from './MessageItem';
+import FlightOfferCard from './FlightOfferCard'; // Nhớ import component thẻ vé
 
 type Props = {
   conversationId?: string;
@@ -45,9 +47,12 @@ const ChatWindow = ({ conversationId }: Props) => {
     if (!input.trim() || !conversationId) return;
 
     const userMsg: ChatMessage = {
-      id: Date.now().toString(),
+      conversation_id: conversationId,
+      message_id: Date.now().toString(),
       content: input,
-      role: 'user',
+      role: Role.USER,
+      intent: '',
+      action: null,
       created_at: new Date().toISOString(),
     };
 
@@ -59,18 +64,24 @@ const ChatWindow = ({ conversationId }: Props) => {
       const data = await chatAPI.sendMessage(conversationId, prompt);
 
       const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: data.content || data.answer || JSON.stringify(data),
-        role: 'assistant',
-        created_at: new Date().toISOString(),
+        conversation_id: conversationId,
+        message_id: data.message_id || (Date.now() + 1).toString(),
+        content: data.content,
+        role: data.role || Role.ASSISTANT,
+        intent: data.intent || '',
+        action: data.action || null,
+        created_at: data.created_at || new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
       const errorMsg: ChatMessage = {
-        id: (Date.now() + 2).toString(),
+        conversation_id: conversationId,
+        message_id: (Date.now() + 2).toString(),
         content: 'Lỗi kết nối server',
-        role: 'assistant',
+        role: Role.ASSISTANT,
+        intent: 'error',
+        action: null,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -88,15 +99,30 @@ const ChatWindow = ({ conversationId }: Props) => {
           </div>
         ) : (
           messages.map((msg) => (
-            <MessageItem
-              key={msg.id}
-              role={msg.role === 'user' ? Role.USER : Role.SYSTEM}
-              text={msg.content}
-              timestamp={new Date(msg.created_at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            />
+            <div key={msg.message_id} className="flex w-full flex-col">
+              <MessageItem
+                role={msg.role}
+                text={msg.content}
+                timestamp={new Date(msg.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              />
+
+              {msg.action?.type === ComponentType.FLIGHT_LIST && msg.action.payload?.flights && (
+                <div className="mt-2 flex w-full flex-col gap-3 pr-4 pl-12">
+                  {msg.action.payload.flights.map((flight) => (
+                    <FlightOfferCard
+                      key={flight.id}
+                      flight={flight}
+                      onSelectFlight={(selected) => {
+                        console.log('User vừa chọn vé: ', selected);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ))
         )}
         <div ref={bottomRef} />

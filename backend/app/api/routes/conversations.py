@@ -85,7 +85,8 @@ async def send_message(
         return ChatResponse(
             conversation_id=result["conversation_id"],
             message_id=result["message_id"],
-            reply=result["reply"],
+            role=result["role"],
+            content=result["content"],
             intent=result["intent"],
             slots=result["slots"],
             action=result["action"]

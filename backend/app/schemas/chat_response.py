@@ -3,7 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
-from app.core.enums import ChatIntent, ComponentType
+from app.core.enums import ChatIntent, ChatRole, ComponentType
 
 class ClientAction(BaseModel):
     type: ComponentType = ComponentType.NONE
@@ -15,7 +15,8 @@ class ChatResponse(BaseModel):
         default=None, 
         description="ID của cuộc hội thoại (Session ID)"
     )
-    reply: str
+    role: ChatRole
+    content: str
     intent: ChatIntent
     
     action: Optional[ClientAction] = None

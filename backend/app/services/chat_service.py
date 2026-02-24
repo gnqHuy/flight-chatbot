@@ -77,7 +77,8 @@ class ChatService:
         return {
             "conversation_id": conversation_id,
             "message_id": saved_bot_msg.id,
-            "reply": bot_message_content,
+            "role": saved_bot_msg.role,
+            "content": bot_message_content,
             "intent": final_state.get("intent", "unknown"),
             "slots": extracted_slots,
             "action": client_action
