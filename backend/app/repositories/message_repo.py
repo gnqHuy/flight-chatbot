@@ -9,7 +9,7 @@ class MessageRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def create(self, conversation_id: UUID, role: str, content: str, id: UUID | None = None) -> Message:
+    def create(self, conversation_id: UUID, role: str, content: str, id: UUID | None = None, action: dict = None) -> Message:
         if id is None:
             id = uuid.uuid4()
             
@@ -18,7 +18,8 @@ class MessageRepository:
             conversation_id=conversation_id,
             role=role,
             content=content,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc),
+            action=action
         )
         self.session.add(msg)
         self.session.commit()

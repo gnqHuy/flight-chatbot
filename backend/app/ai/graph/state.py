@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
 class ChatState(BaseModel):
@@ -9,6 +9,7 @@ class ChatState(BaseModel):
     departureDate: Optional[str] = None
     returnDate: Optional[str] = None
     adults: Optional[int] = None
-    flight_offers: Optional[List[Dict]] = None
-    response_text: Optional[str] = None
     language: Optional[str] = "vi"
+    response_text: Optional[str] = None
+    error_msg: Optional[str] = None 
+    action: Optional[Dict[str, Any]] = None

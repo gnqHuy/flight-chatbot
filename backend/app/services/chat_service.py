@@ -30,12 +30,9 @@ class ChatService:
         )
 
         config = {"configurable": {"thread_id": conversation_id}}
-        inputs = {
-            "user_message": user_content
-        }
-
+        inputs = {"user_message": user_content}
+        
         final_state = await run_in_threadpool(bot_app.invoke, inputs, config=config)
-
         print("--- FINAL STATE ---", final_state)
 
         bot_message_content = final_state.get("response_text")
@@ -45,33 +42,30 @@ class ChatService:
         extracted_slots = {
             "origin": final_state.get("origin"),
             "destination": final_state.get("destination"),
-            "departureDate ": final_state.get("departureDate") or final_state.get("departureDate"),
+            "departureDate": final_state.get("departureDate"), 
         }
 
-        action_type = "none" 
-        action_payload = None
+        action_dict = final_state.get("action")
+        error_msg = final_state.get("error_msg")
 
-        if final_state.get("flight_offers") or final_state.get("search_results"):
-            action_type = "flight_list"
-            action_payload = final_state.get("flight_offers") or final_state.get("search_results")
+        if error_msg:
+            action_dict = {
+                "type": "error",
+                "payload": {"msg": error_msg}
+            }
 
-        formatted_payload = {"flights": action_payload} if action_payload else {}
-
-        client_action = ClientAction(
-            type=action_type, 
-            payload=formatted_payload
-        )
-
-        if final_state.get("search_results"):
-            client_action = ClientAction(type="search_flight", payload=final_state.get("search_results"))
-            
-        elif final_state.get("error_msg"):
-            client_action = ClientAction(type="error", payload={"msg": final_state.get("error_msg")})
+        client_action = None
+        if action_dict:
+            client_action = ClientAction(
+                type=action_dict.get("type", "unknown"),
+                payload=action_dict.get("payload", {})
+            )
 
         saved_bot_msg = self.message_repo.create(
             conversation_id=conversation_id,
             role=ChatRole.ASSISTANT,
             content=bot_message_content,
+            action=action_dict,
         )
 
         return {

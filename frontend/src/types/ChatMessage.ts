@@ -22,14 +22,17 @@ export interface FlightOffer {
   arrival: FlightLocation;
 }
 
-export interface ActionPayload {
-  flights: FlightOffer[];
+export interface FlightListPayload {
+  search_id: string;
 }
 
-export interface ChatAction {
-  type: ComponentType;
-  payload: ActionPayload;
+export interface ErrorPayload {
+  msg: string;
 }
+
+export type ChatAction =
+  | { type: ComponentType.FLIGHT_LIST | 'flight_list'; payload: FlightListPayload }
+  | { type: ComponentType.ERROR | 'error'; payload: ErrorPayload };
 
 export interface ChatMessage {
   conversation_id: string;

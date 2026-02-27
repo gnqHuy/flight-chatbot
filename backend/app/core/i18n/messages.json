@@ -23,5 +23,13 @@
     "origin": { "vi": "điểm đi", "en": "departure city" },
     "destination": { "vi": "điểm đến", "en": "destination city" },
     "departureDate": { "vi": "ngày đi", "en": "departure date" }
+  },
+  "unknown_intent": {
+    "vi": "Mình chưa hiểu ý bạn lắm, bạn có thể nói lại được không?",
+    "en": "I didn't quite understand that, could you please rephrase?"
+  },
+  "greeting_response": {
+    "vi": "Xin chào! Mình có thể giúp gì cho bạn hôm nay?",
+    "en": "Hello! How can I assist you today?"
   }
 }

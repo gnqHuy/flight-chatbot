@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/types/ChatMessage';
+import { ChatMessage, FlightOffer } from '@/types/ChatMessage'; // Nhớ import thêm FlightOffer nếu file đó chứa type
 import api from '@/utils/api';
 
 export const chatAPI = {
@@ -21,6 +21,11 @@ export const chatAPI = {
 
   getConversations: async () => {
     const res = await api.get('/conversations/');
+    return res.data;
+  },
+
+  getCachedFlights: async (searchId: string) => {
+    const res = await api.get<{ flights: FlightOffer[] }>(`/flights/cache/${searchId}`);
     return res.data;
   },
 };

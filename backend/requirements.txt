@@ -17,3 +17,5 @@ argon2-cffi
 langgraph-checkpoint-postgres 
 psycopg-pool
 psycopg[binary]
+
+redis

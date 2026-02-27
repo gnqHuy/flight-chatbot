@@ -16,6 +16,7 @@ class MessageRead(SQLModel):
     role: ChatRole = Field(index=True)
     content: str
     created_at: datetime
+    action: dict | None = None
 
 class MessageCreateBody(BaseModel):
     message: str

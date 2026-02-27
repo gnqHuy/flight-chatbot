@@ -1,12 +1,11 @@
 'use client';
 
 import { chatAPI } from '@/services/chatAPI';
-import { ChatMessage } from '@/types/ChatMessage'; // Trỏ đúng tới file chứa type của bạn
+import { ChatMessage } from '@/types/ChatMessage'; 
 import { Role } from '@/types/enums/Role';
-import { ComponentType } from '@/types/enums/ComponentType'; // Import enum ComponentType
 import { useState, useRef, useEffect } from 'react';
 import MessageItem from './MessageItem';
-import FlightOfferCard from './FlightOfferCard'; // Nhớ import component thẻ vé
+import ActionRenderer from './ActionRenderer'; // 🔴 Đã import Nhà máy
 
 type Props = {
   conversationId?: string;
@@ -109,19 +108,8 @@ const ChatWindow = ({ conversationId }: Props) => {
                 })}
               />
 
-              {msg.action?.type === ComponentType.FLIGHT_LIST && msg.action.payload?.flights && (
-                <div className="mt-2 flex w-full flex-col gap-3 pr-4 pl-12">
-                  {msg.action.payload.flights.map((flight) => (
-                    <FlightOfferCard
-                      key={flight.id}
-                      flight={flight}
-                      onSelectFlight={(selected) => {
-                        console.log('User vừa chọn vé: ', selected);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+              <ActionRenderer action={msg.action} />
+
             </div>
           ))
         )}
