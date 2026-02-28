@@ -11,5 +11,6 @@ class ChatState(BaseModel):
     adults: Optional[int] = None
     language: Optional[str] = "vi"
     response_text: Optional[str] = None
+    context: Optional[str] = None
     error_msg: Optional[str] = None 
     action: Optional[Dict[str, Any]] = None

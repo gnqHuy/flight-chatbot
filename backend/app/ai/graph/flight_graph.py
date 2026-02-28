@@ -2,18 +2,16 @@ from langgraph.graph import StateGraph, END
 from app.ai.graph.nodes.final_response_node import final_response_node
 from app.ai.graph.nodes.extract_intent_node import extract_intent_node
 from app.ai.graph.nodes.search_flight_node import search_flights_node
+from app.ai.graph.nodes.rag_node import rag_node
 from app.ai.graph.state import ChatState
 from app.database.checkpointer import get_checkpointer
-
-INTENT_REQUIRED_SLOTS = {
-    "search_flight": ["origin", "destination", "departureDate"],
-    "filter_result": ["max_price"], 
-    "compare_flights": ["flight_id_1", "flight_id_2"],
-}
 
 def route_check_slots(state: ChatState) -> str:
     if state.intent in ["greeting", "out_of_scope"]:
         return "final_response"
+        
+    if state.intent == "general_question":
+        return "rag_node"
         
     if state.intent in ["search_flight", "provide_info"]:
         required_slots = ["origin", "destination", "departureDate"]
@@ -32,6 +30,7 @@ def build_flight_graph():
 
     graph.add_node("extract_intent", extract_intent_node)
     graph.add_node("search_flights", search_flights_node)
+    graph.add_node("rag_node", rag_node)
     graph.add_node("final_response", final_response_node)
 
     graph.set_entry_point("extract_intent")
@@ -41,9 +40,11 @@ def build_flight_graph():
         {
             "final_response": "final_response",
             "search_flights": "search_flights",
+            "rag_node": "rag_node"
         }
     )
     graph.add_edge("search_flights", "final_response")
+    graph.add_edge("rag_node", "final_response")
     graph.add_edge("final_response", END)
 
     return graph.compile(checkpointer=checkpointer)

@@ -31,9 +31,12 @@ TASK: Classify the user's message into one of the following Intents:
 1. 'search_flight': Searching for flights, checking prices.
 2. 'provide_info': Providing departure/destination or dates.
 3. 'greeting': Basic greetings, thanks (e.g., Hello, thank you, bye).
-4. 'out_of_scope': STRICTLY FOR NON-AVIATION TOPICS. (e.g., weather forecasts, coding, math, recipes, news...).
+4. 'general_question': Questions about flight policies, luggage, documents, pregnant passengers, or airline regulations. (Use this for RAG).
+5. 'out_of_scope': STRICTLY FOR NON-AVIATION TOPICS. (e.g., weather forecasts, coding, math, recipes, news...).
 
-CRITICAL: If the query is completely unrelated to flights or aviation, you MUST return 'out_of_scope'."""
+CRITICAL: 
+- If the user asks about rules, baggage, or "can I...", use 'general_question'.
+- If the query is completely unrelated to flights or aviation, you MUST return 'out_of_scope'."""
 
 def extract_intent_and_slots(message: str) -> IntentExtractionResult:
     try:

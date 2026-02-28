@@ -19,3 +19,8 @@ psycopg-pool
 psycopg[binary]
 
 redis
+
+langchain-postgres 
+psycopg 
+pgvector
+pypdf
