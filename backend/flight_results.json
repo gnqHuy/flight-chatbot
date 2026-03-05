@@ -1,0 +1,482 @@
+[
+    {
+        "type": "flight-offer",
+        "id": "1",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "isUpsellOffer": false,
+        "lastTicketingDate": "2026-03-15",
+        "lastTicketingDateTime": "2026-03-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+            {
+                "duration": "PT2H10M",
+                "segments": [
+                    {
+                        "departure": {
+                            "iataCode": "HAN",
+                            "terminal": "1",
+                            "at": "2026-03-15T05:30:00"
+                        },
+                        "arrival": {
+                            "iataCode": "SGN",
+                            "terminal": "1",
+                            "at": "2026-03-15T07:40:00"
+                        },
+                        "carrierCode": "VJ",
+                        "number": "197",
+                        "aircraft": {
+                            "code": "320"
+                        },
+                        "operating": {
+                            "carrierCode": "VJ"
+                        },
+                        "duration": "PT2H10M",
+                        "id": "1",
+                        "numberOfStops": 0,
+                        "blacklistedInEU": false
+                    }
+                ]
+            }
+        ],
+        "price": {
+            "currency": "EUR",
+            "total": "47.07",
+            "base": "40.00",
+            "fees": [
+                {
+                    "amount": "0.00",
+                    "type": "SUPPLIER"
+                },
+                {
+                    "amount": "0.00",
+                    "type": "TICKETING"
+                }
+            ],
+            "grandTotal": "47.07"
+        },
+        "pricingOptions": {
+            "fareType": [
+                "PUBLISHED"
+            ],
+            "includedCheckedBagsOnly": true
+        },
+        "validatingAirlineCodes": [
+            "GP"
+        ],
+        "travelerPricings": [
+            {
+                "travelerId": "1",
+                "fareOption": "STANDARD",
+                "travelerType": "ADULT",
+                "price": {
+                    "currency": "EUR",
+                    "total": "47.07",
+                    "base": "40.00"
+                },
+                "fareDetailsBySegment": [
+                    {
+                        "segmentId": "1",
+                        "cabin": "ECONOMY",
+                        "fareBasis": "ESP",
+                        "class": "E",
+                        "includedCheckedBags": {
+                            "weight": 20,
+                            "weightUnit": "KG"
+                        },
+                        "includedCabinBags": {
+                            "weight": 7,
+                            "weightUnit": "KG"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "type": "flight-offer",
+        "id": "2",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "isUpsellOffer": false,
+        "lastTicketingDate": "2026-03-15",
+        "lastTicketingDateTime": "2026-03-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+            {
+                "duration": "PT2H10M",
+                "segments": [
+                    {
+                        "departure": {
+                            "iataCode": "HAN",
+                            "terminal": "1",
+                            "at": "2026-03-15T06:00:00"
+                        },
+                        "arrival": {
+                            "iataCode": "SGN",
+                            "terminal": "1",
+                            "at": "2026-03-15T08:10:00"
+                        },
+                        "carrierCode": "VJ",
+                        "number": "121",
+                        "aircraft": {
+                            "code": "320"
+                        },
+                        "operating": {
+                            "carrierCode": "VJ"
+                        },
+                        "duration": "PT2H10M",
+                        "id": "2",
+                        "numberOfStops": 0,
+                        "blacklistedInEU": false
+                    }
+                ]
+            }
+        ],
+        "price": {
+            "currency": "EUR",
+            "total": "47.07",
+            "base": "40.00",
+            "fees": [
+                {
+                    "amount": "0.00",
+                    "type": "SUPPLIER"
+                },
+                {
+                    "amount": "0.00",
+                    "type": "TICKETING"
+                }
+            ],
+            "grandTotal": "47.07"
+        },
+        "pricingOptions": {
+            "fareType": [
+                "PUBLISHED"
+            ],
+            "includedCheckedBagsOnly": true
+        },
+        "validatingAirlineCodes": [
+            "GP"
+        ],
+        "travelerPricings": [
+            {
+                "travelerId": "1",
+                "fareOption": "STANDARD",
+                "travelerType": "ADULT",
+                "price": {
+                    "currency": "EUR",
+                    "total": "47.07",
+                    "base": "40.00"
+                },
+                "fareDetailsBySegment": [
+                    {
+                        "segmentId": "2",
+                        "cabin": "ECONOMY",
+                        "fareBasis": "ESP",
+                        "class": "E",
+                        "includedCheckedBags": {
+                            "weight": 20,
+                            "weightUnit": "KG"
+                        },
+                        "includedCabinBags": {
+                            "weight": 7,
+                            "weightUnit": "KG"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "type": "flight-offer",
+        "id": "3",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "isUpsellOffer": false,
+        "lastTicketingDate": "2026-03-15",
+        "lastTicketingDateTime": "2026-03-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+            {
+                "duration": "PT2H10M",
+                "segments": [
+                    {
+                        "departure": {
+                            "iataCode": "HAN",
+                            "terminal": "1",
+                            "at": "2026-03-15T07:40:00"
+                        },
+                        "arrival": {
+                            "iataCode": "SGN",
+                            "terminal": "1",
+                            "at": "2026-03-15T09:50:00"
+                        },
+                        "carrierCode": "VJ",
+                        "number": "125",
+                        "aircraft": {
+                            "code": "321"
+                        },
+                        "operating": {
+                            "carrierCode": "VJ"
+                        },
+                        "duration": "PT2H10M",
+                        "id": "3",
+                        "numberOfStops": 0,
+                        "blacklistedInEU": false
+                    }
+                ]
+            }
+        ],
+        "price": {
+            "currency": "EUR",
+            "total": "47.07",
+            "base": "40.00",
+            "fees": [
+                {
+                    "amount": "0.00",
+                    "type": "SUPPLIER"
+                },
+                {
+                    "amount": "0.00",
+                    "type": "TICKETING"
+                }
+            ],
+            "grandTotal": "47.07"
+        },
+        "pricingOptions": {
+            "fareType": [
+                "PUBLISHED"
+            ],
+            "includedCheckedBagsOnly": true
+        },
+        "validatingAirlineCodes": [
+            "GP"
+        ],
+        "travelerPricings": [
+            {
+                "travelerId": "1",
+                "fareOption": "STANDARD",
+                "travelerType": "ADULT",
+                "price": {
+                    "currency": "EUR",
+                    "total": "47.07",
+                    "base": "40.00"
+                },
+                "fareDetailsBySegment": [
+                    {
+                        "segmentId": "3",
+                        "cabin": "ECONOMY",
+                        "fareBasis": "ESP",
+                        "class": "E",
+                        "includedCheckedBags": {
+                            "weight": 20,
+                            "weightUnit": "KG"
+                        },
+                        "includedCabinBags": {
+                            "weight": 7,
+                            "weightUnit": "KG"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "type": "flight-offer",
+        "id": "4",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "isUpsellOffer": false,
+        "lastTicketingDate": "2026-03-15",
+        "lastTicketingDateTime": "2026-03-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+            {
+                "duration": "PT2H10M",
+                "segments": [
+                    {
+                        "departure": {
+                            "iataCode": "HAN",
+                            "terminal": "1",
+                            "at": "2026-03-15T10:20:00"
+                        },
+                        "arrival": {
+                            "iataCode": "SGN",
+                            "terminal": "1",
+                            "at": "2026-03-15T12:30:00"
+                        },
+                        "carrierCode": "VJ",
+                        "number": "133",
+                        "aircraft": {
+                            "code": "321"
+                        },
+                        "operating": {
+                            "carrierCode": "VJ"
+                        },
+                        "duration": "PT2H10M",
+                        "id": "4",
+                        "numberOfStops": 0,
+                        "blacklistedInEU": false
+                    }
+                ]
+            }
+        ],
+        "price": {
+            "currency": "EUR",
+            "total": "47.07",
+            "base": "40.00",
+            "fees": [
+                {
+                    "amount": "0.00",
+                    "type": "SUPPLIER"
+                },
+                {
+                    "amount": "0.00",
+                    "type": "TICKETING"
+                }
+            ],
+            "grandTotal": "47.07"
+        },
+        "pricingOptions": {
+            "fareType": [
+                "PUBLISHED"
+            ],
+            "includedCheckedBagsOnly": true
+        },
+        "validatingAirlineCodes": [
+            "GP"
+        ],
+        "travelerPricings": [
+            {
+                "travelerId": "1",
+                "fareOption": "STANDARD",
+                "travelerType": "ADULT",
+                "price": {
+                    "currency": "EUR",
+                    "total": "47.07",
+                    "base": "40.00"
+                },
+                "fareDetailsBySegment": [
+                    {
+                        "segmentId": "4",
+                        "cabin": "ECONOMY",
+                        "fareBasis": "ESP",
+                        "class": "E",
+                        "includedCheckedBags": {
+                            "weight": 20,
+                            "weightUnit": "KG"
+                        },
+                        "includedCabinBags": {
+                            "weight": 7,
+                            "weightUnit": "KG"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "type": "flight-offer",
+        "id": "5",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "isUpsellOffer": false,
+        "lastTicketingDate": "2026-03-15",
+        "lastTicketingDateTime": "2026-03-15",
+        "numberOfBookableSeats": 9,
+        "itineraries": [
+            {
+                "duration": "PT2H10M",
+                "segments": [
+                    {
+                        "departure": {
+                            "iataCode": "HAN",
+                            "terminal": "1",
+                            "at": "2026-03-15T11:05:00"
+                        },
+                        "arrival": {
+                            "iataCode": "SGN",
+                            "terminal": "1",
+                            "at": "2026-03-15T13:15:00"
+                        },
+                        "carrierCode": "VJ",
+                        "number": "131",
+                        "aircraft": {
+                            "code": "321"
+                        },
+                        "operating": {
+                            "carrierCode": "VJ"
+                        },
+                        "duration": "PT2H10M",
+                        "id": "5",
+                        "numberOfStops": 0,
+                        "blacklistedInEU": false
+                    }
+                ]
+            }
+        ],
+        "price": {
+            "currency": "EUR",
+            "total": "47.07",
+            "base": "40.00",
+            "fees": [
+                {
+                    "amount": "0.00",
+                    "type": "SUPPLIER"
+                },
+                {
+                    "amount": "0.00",
+                    "type": "TICKETING"
+                }
+            ],
+            "grandTotal": "47.07"
+        },
+        "pricingOptions": {
+            "fareType": [
+                "PUBLISHED"
+            ],
+            "includedCheckedBagsOnly": true
+        },
+        "validatingAirlineCodes": [
+            "GP"
+        ],
+        "travelerPricings": [
+            {
+                "travelerId": "1",
+                "fareOption": "STANDARD",
+                "travelerType": "ADULT",
+                "price": {
+                    "currency": "EUR",
+                    "total": "47.07",
+                    "base": "40.00"
+                },
+                "fareDetailsBySegment": [
+                    {
+                        "segmentId": "5",
+                        "cabin": "ECONOMY",
+                        "fareBasis": "ESP",
+                        "class": "E",
+                        "includedCheckedBags": {
+                            "weight": 20,
+                            "weightUnit": "KG"
+                        },
+                        "includedCabinBags": {
+                            "weight": 7,
+                            "weightUnit": "KG"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+]

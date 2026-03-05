@@ -17,4 +17,4 @@ def rag_node(state: ChatState) -> ChatState:
     
     retrieved_context = "\n\n".join([doc.page_content for doc in docs])
     
-    return state.copy(update={"context": retrieved_context})
+    return state.copy(update={"context": retrieved_context, "action": None})
