@@ -7,6 +7,7 @@ class ChatRole(str, Enum):
 
 class ComponentType(str, Enum):
     NONE = "none"
+    ERROR = "error"
     DATE_PICKER = "date_picker"
     FLIGHT_LIST = "flight_list"
     CONFIRM_FORM = "confirm_form"
@@ -14,10 +15,14 @@ class ComponentType(str, Enum):
 class ChatIntent(str, Enum):
     GREETING = "greeting"
     SEARCH_FLIGHT = "search_flight"
-    BOOK_TICKET = "book_ticket"
     PROVIDE_INFO = "provide_info"
-    FILTER_RESULT = "filter_result"
     COMPARE_FLIGHTS = "compare_flights"
-    ASK_DETAIL = "ask_detail"
+    PRICE_ANALYSIS = "price_analysis"
     GENERAL_QUESTION = "general_question"
     OUT_OF_SCOPE = "out_of_scope"
+
+class TravelClass(str, Enum):
+    ECONOMY = "economy"
+    BUSINESS = "business"
+    FIRST = "first"
+    

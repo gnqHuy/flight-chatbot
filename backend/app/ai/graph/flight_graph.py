@@ -1,50 +1,68 @@
-from langgraph.graph import StateGraph, END
-from app.ai.graph.nodes.final_response_node import final_response_node
-from app.ai.graph.nodes.extract_intent_node import extract_intent_node
-from app.ai.graph.nodes.search_flight_node import search_flights_node
-from app.ai.graph.nodes.rag_node import rag_node
+from typing import List, Literal
+from langgraph.graph import StateGraph, START, END
+
 from app.ai.graph.state import ChatState
+from app.core.enums import ChatIntent
 from app.database.checkpointer import get_checkpointer
 
-def route_check_slots(state: ChatState) -> str:
-    if state.intent in ["greeting", "out_of_scope"]:
-        return "final_response"
-        
-    if state.intent == "general_question":
-        return "rag_node"
-        
-    if state.intent in ["search_flight", "provide_info"]:
-        required_slots = ["origin", "destination", "departureDate"]
-        
-        for slot in required_slots:
-            if not getattr(state, slot, None):
-                return "final_response"
+from app.ai.graph.nodes.splitter_node import splitter_node
+from app.ai.graph.nodes.extract_intent_node import extract_intent_node
+from app.ai.graph.nodes.search_flight_node import search_flights_node
+from app.ai.graph.nodes.compare_flights_node import compare_flights_node
+from app.ai.graph.nodes.rag_node import rag_node
+from app.ai.graph.nodes.final_response_node import final_response_node
+
+def route_tasks(state: ChatState) -> List[str]:
+    tasks = state.get("tasks", [])
+    next_nodes = set()
+    
+    if not tasks:
+        return ["final_response"]
+    
+    intents = [t.intent for t in tasks]
+    
+    if ChatIntent.COMPARE_FLIGHTS in intents or ChatIntent.PRICE_ANALYSIS in intents:
+        next_nodes.add("compare_flights")
+    elif ChatIntent.SEARCH_FLIGHT in intents:
+        next_nodes.add("search_flights")
                 
-        return "search_flights"
-        
-    return "final_response"
+    if ChatIntent.GENERAL_QUESTION in intents:
+        next_nodes.add("rag_node")
+            
+    if not next_nodes:
+        next_nodes.add("final_response")
+            
+    return list(next_nodes)
 
 def build_flight_graph():
     checkpointer = get_checkpointer()
     graph = StateGraph(ChatState)
 
-    graph.add_node("extract_intent", extract_intent_node)
-    graph.add_node("search_flights", search_flights_node)
-    graph.add_node("rag_node", rag_node)
-    graph.add_node("final_response", final_response_node)
+    graph.add_node("splitter", splitter_node)           
+    graph.add_node("extract_intent", extract_intent_node) 
+    graph.add_node("search_flights", search_flights_node) 
+    graph.add_node("compare_flights", compare_flights_node)
+    graph.add_node("rag_node", rag_node)                
+    graph.add_node("final_response", final_response_node) 
 
-    graph.set_entry_point("extract_intent")
+    graph.add_edge(START, "splitter")
+    graph.add_edge("splitter", "extract_intent")
+    
     graph.add_conditional_edges(
         "extract_intent",
-        route_check_slots,
+        route_tasks,
         {
-            "final_response": "final_response",
             "search_flights": "search_flights",
-            "rag_node": "rag_node"
+            "compare_flights": "compare_flights",
+            "rag_node": "rag_node",
+            "final_response": "final_response"
         }
     )
+
     graph.add_edge("search_flights", "final_response")
+    graph.add_edge("compare_flights", "final_response")
     graph.add_edge("rag_node", "final_response")
+    
     graph.add_edge("final_response", END)
 
     return graph.compile(checkpointer=checkpointer)

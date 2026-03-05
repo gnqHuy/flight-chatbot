@@ -3,7 +3,19 @@ from app.ai.graph.state import ChatState
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres.vectorstores import PGVector
 
-def rag_node(state: ChatState) -> ChatState:
+from app.core.enums import ChatIntent
+
+def rag_node(state: ChatState) -> dict:
+    query = ""
+    tasks = state.get("tasks", [])
+    for task in tasks:
+        if task.intent == ChatIntent.GENERAL_QUESTION and task.query_context:
+            query = task.query_context
+            break
+            
+    if not query:
+        query = state["messages"][-1].content
+
     connection = os.environ.get("DATABASE_URL")
     
     vector_store = PGVector(
@@ -13,8 +25,13 @@ def rag_node(state: ChatState) -> ChatState:
         use_jsonb=True,
     )
     
-    docs = vector_store.similarity_search(state.user_message, k=3)
+    docs = vector_store.similarity_search(query, k=3)
     
-    retrieved_context = "\n\n".join([doc.page_content for doc in docs])
+    if not docs:
+        return {"node_results": ["Không tìm thấy thông tin quy định nào liên quan."]}
     
-    return state.copy(update={"context": retrieved_context, "action": None})
+    retrieved_context = "THÔNG TIN QUY ĐỊNH/CHÍNH SÁCH TÌM ĐƯỢC:\n" + "\n\n".join([doc.page_content for doc in docs])
+    
+    return {
+        "node_results": [retrieved_context]
+    }
