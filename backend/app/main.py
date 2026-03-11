@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.ai.graph.flight_graph import flight_graph
-from app.ai.graph.state import ChatState
+from app.ai_orchestrator.graph.flight_graph import flight_graph
+from app.ai_orchestrator.graph.state import ChatState
 
 from app.api.api import api_router
 from app.database import models

@@ -1,5 +1,5 @@
 import os
-from app.ai.graph.state import ChatState
+from app.ai_orchestrator.graph.state import ChatState
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres.vectorstores import PGVector
 

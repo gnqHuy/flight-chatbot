@@ -1,8 +1,6 @@
-from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-
 from app.core.enums import ChatIntent, ChatRole, ComponentType
 
 class ClientAction(BaseModel):
@@ -11,12 +9,9 @@ class ClientAction(BaseModel):
 
 class ChatResponse(BaseModel):
     conversation_id: UUID
-    message_id: Optional[UUID] = Field(
-        default=None, 
-        description="ID của cuộc hội thoại (Session ID)"
-    )
+    message_id: Optional[UUID] = Field(default=None)
     role: ChatRole
     content: str
-    intent: ChatIntent
-    
+    intents: List[str] = Field(default_factory=list)
+    slots: Dict[str, Any] = Field(default_factory=dict)
     action: Optional[ClientAction] = None

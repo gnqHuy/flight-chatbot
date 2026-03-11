@@ -20,6 +20,33 @@ class FlightParameters(BaseModel):
         None, description="Tiêu chí so sánh: 'price' (giá), 'duration' (thời gian bay), 'time' (giờ khởi hành), 'class' (hạng ghế), 'all' (tổng hợp)."
     )
 
+    start_hour: Optional[int] = Field(
+        None, 
+        description=(
+            "Giờ bắt đầu mong muốn (0-23). "
+            "QUY TẮC QUY ĐỔI: "
+            "- 'Sáng' (Morning) -> start_hour=6. "
+            "- 'Trưa' (Noon) -> start_hour=11. "
+            "- 'Chiều' (Afternoon) -> start_hour=13. "
+            "- 'Tối/Đêm' (Evening/Night) -> start_hour=18. "
+            "- Nếu nói giờ cụ thể (VD: 'khoảng 15h') -> start_hour=14 (trừ đi 1 tiếng). "
+            "- Bỏ lọc giờ -> trả về 'CLEAR'."
+        )
+    )
+    end_hour: Optional[int] = Field(
+        None, 
+        description=(
+            "Giờ kết thúc mong muốn (0-23). "
+            "QUY TẮC QUY ĐỔI: "
+            "- 'Sáng' -> end_hour=11. "
+            "- 'Trưa' -> end_hour=13. "
+            "- 'Chiều' -> end_hour=18. "
+            "- 'Tối/Đêm' -> end_hour=23. "
+            "- Nếu nói giờ cụ thể (VD: 'khoảng 15h') -> end_hour=16 (cộng thêm 1 tiếng). "
+            "- Bỏ lọc giờ -> trả về 'CLEAR'."
+        )
+    )
+
 class Task(BaseModel):
     intent: ChatIntent = Field(..., description="Phân loại chính xác ý định. Nếu chỉ hỏi chính sách mà không tìm vé, KHÔNG ĐƯỢC tạo task search_flight.")
     parameters: Optional[FlightParameters] = Field(

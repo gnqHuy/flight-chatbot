@@ -1,13 +1,10 @@
 import uuid
-from langchain_core.messages import HumanMessage
 from fastapi.concurrency import run_in_threadpool
-from app.ai.graph.flight_graph import build_flight_graph
-from app.core.enums import ChatIntent, ChatRole
-from app.repositories.conversation_repo import ConversationRepository
+from app.ai_orchestrator.graph.flight_graph import flight_graph 
+from app.core.enums import ChatRole
 from app.repositories.message_repo import MessageRepository
+from app.repositories.conversation_repo import ConversationRepository
 from app.schemas.chat_response import ClientAction
-
-bot_app = build_flight_graph()
 
 class ChatService:
     def __init__(self, conversation_repo: ConversationRepository, message_repo: MessageRepository):
@@ -30,25 +27,46 @@ class ChatService:
         )
 
         config = {"configurable": {"thread_id": conversation_id}}
-        inputs = {"user_message": user_content}
+        inputs = {
+            "user_message": user_content,
+            "node_results": ["CLEAR"],  
+            "action": None,
+            "error_msg": None,
+            "tasks": []
+        }
         
-        final_state = await run_in_threadpool(bot_app.invoke, inputs, config=config)
-        print("--- FINAL STATE ---", final_state)
-
+        final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=config)
+        
         bot_message_content = final_state.get("response_text")
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
 
+        new_history = [
+            f"User: {user_content}",
+            f"Bot: {bot_message_content}"
+        ]
+
+        await run_in_threadpool(flight_graph.update_state, config, {"chat_history": new_history})
+
+        user_prefs = final_state.get("user_prefs", {})
+
         extracted_slots = {
-            "origin": final_state.get("origin"),
-            "destination": final_state.get("destination"),
-            "departureDate": final_state.get("departureDate"), 
+            "origin": user_prefs.get("origin"),
+            "destination": user_prefs.get("destination"),
+            "departureDate": user_prefs.get("departureDate"),
+            "current_search_id": user_prefs.get("current_search_id")
         }
+
+        tasks = final_state.get("tasks", [])
+        all_intents = [
+            task.intent.value if hasattr(task.intent, 'value') else str(task.intent) 
+            for task in tasks
+        ]
 
         action_dict = final_state.get("action")
         error_msg = final_state.get("error_msg")
 
-        if error_msg:
+        if error_msg and not action_dict:
             action_dict = {
                 "type": "error",
                 "payload": {"msg": error_msg}
@@ -70,10 +88,10 @@ class ChatService:
 
         return {
             "conversation_id": conversation_id,
-            "message_id": saved_bot_msg.id,
+            "message_id": str(saved_bot_msg.id),
             "role": saved_bot_msg.role,
             "content": bot_message_content,
-            "intent": final_state.get("intent", "unknown"),
+            "intents": all_intents,
             "slots": extracted_slots,
             "action": client_action
         }
