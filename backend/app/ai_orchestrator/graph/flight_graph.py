@@ -7,31 +7,29 @@ from app.database.checkpointer import get_checkpointer
 
 from app.ai_orchestrator.graph.nodes.extract_intent_node import extract_intent_node
 from app.ai_orchestrator.graph.nodes.search_flight_node import search_flights_node
-from app.ai_orchestrator.graph.nodes.compare_flights_node import compare_flights_node
+from app.ai_orchestrator.graph.nodes.analyze_flights_node import analyze_flights_node
 from app.ai_orchestrator.graph.nodes.rag_node import rag_node
 from app.ai_orchestrator.graph.nodes.final_response_node import final_response_node
 
-def route_tasks(state: ChatState) -> List[str]:
+def route_tasks(state: ChatState) -> str:
     tasks = state.get("tasks", [])
-    next_nodes = set()
     
     if not tasks:
-        return ["final_response"]
+        return "final_response"
     
-    intents = [t.intent for t in tasks]
-    
-    if ChatIntent.COMPARE_FLIGHTS in intents or ChatIntent.PRICE_ANALYSIS in intents:
-        next_nodes.add("compare_flights")
-    elif ChatIntent.SEARCH_FLIGHT in intents:
-        next_nodes.add("search_flights")
-                
-    if ChatIntent.GENERAL_QUESTION in intents:
-        next_nodes.add("rag_node")
+    current_task = tasks[0]
+    intent = current_task.intent
+
+    if intent == ChatIntent.SEARCH_FLIGHT:
+        return "search_flights"
+        
+    if intent in [ChatIntent.ANALYZE_FLIGHTS, ChatIntent.PRICE_ANALYSIS]:
+        return "analyze_flights"
+        
+    if intent == ChatIntent.GENERAL_QUESTION:
+        return "rag_node"
             
-    if not next_nodes:
-        next_nodes.add("final_response")
-            
-    return list(next_nodes)
+    return "final_response"
 
 def build_flight_graph():
     checkpointer = get_checkpointer()
@@ -39,7 +37,7 @@ def build_flight_graph():
 
     graph.add_node("extract_intent", extract_intent_node) 
     graph.add_node("search_flights", search_flights_node) 
-    graph.add_node("compare_flights", compare_flights_node)
+    graph.add_node("analyze_flights", analyze_flights_node)
     graph.add_node("rag_node", rag_node)                
     graph.add_node("final_response", final_response_node) 
 
@@ -50,15 +48,15 @@ def build_flight_graph():
         route_tasks,
         {
             "search_flights": "search_flights",
-            "compare_flights": "compare_flights",
+            "analyze_flights": "analyze_flights",
             "rag_node": "rag_node",
             "final_response": "final_response"
         }
     )
 
-    graph.add_edge("search_flights", "final_response")
-    graph.add_edge("compare_flights", "final_response")
-    graph.add_edge("rag_node", "final_response")
+    graph.add_edge("search_flights", "extract_intent")
+    graph.add_edge("analyze_flights", "extract_intent")
+    graph.add_edge("rag_node", "extract_intent")
     
     graph.add_edge("final_response", END)
 

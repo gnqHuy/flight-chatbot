@@ -1,6 +1,8 @@
 import uuid
 from fastapi.concurrency import run_in_threadpool
+from pydantic import config
 from app.ai_orchestrator.graph.flight_graph import flight_graph 
+from app.core import config
 from app.core.enums import ChatRole
 from app.repositories.message_repo import MessageRepository
 from app.repositories.conversation_repo import ConversationRepository
@@ -41,14 +43,18 @@ class ChatService:
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
 
-        new_history = [
-            f"User: {user_content}",
-            f"Bot: {bot_message_content}"
-        ]
+        user_prefs = final_state.get("user_prefs", {})
+        
+        current_search_id = user_prefs.get("current_search_id")
+        new_history = {
+            "messages": [
+                f"User: {user_content}",
+                f"Bot: {bot_message_content}"
+            ],
+            "search_ids": [current_search_id] if current_search_id else []
+        }
 
         await run_in_threadpool(flight_graph.update_state, config, {"chat_history": new_history})
-
-        user_prefs = final_state.get("user_prefs", {})
 
         extracted_slots = {
             "origin": user_prefs.get("origin"),

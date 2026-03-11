@@ -21,16 +21,30 @@ def merge_list_with_clear(left: list, right: list) -> list:
     right_list = right or []
     return left_list + right_list
 
-def merge_chat_history(left: list, right: list) -> list:
-    """
-    Giữ lại tối đa 6 tin nhắn gần nhất (3 lượt chat).
-    Nếu nhận cờ ["CLEAR"], xóa sạch lịch sử.
-    """
-    if right == ["CLEAR"]:
-        return []
+def merge_chat_history(left: dict, right: dict) -> dict:
+    """Hàm cộng dồn lịch sử chat: Gộp mảng vào mảng"""
+    if right and right.get("CLEAR"): 
+        return {"messages": [], "search_ids": []}
+        
+    left_dict = left or {"messages": [], "search_ids": []}
+    right_dict = right or {"messages": [], "search_ids": []}
     
+    merged_msgs = left_dict.get("messages", []) + right_dict.get("messages", [])
+    
+    merged_ids = left_dict.get("search_ids", []) + right_dict.get("search_ids", [])
+    unique_ids = list(dict.fromkeys(merged_ids)) 
+    
+    return {
+        "messages": merged_msgs,
+        "search_ids": unique_ids
+    }
+
+def merge_saved_flights(left: list, right: list) -> list:
+    """Hàm gộp: Tránh lưu trùng lặp một chuyến bay nhiều lần vào giỏ hàng"""
+    if right == ["CLEAR"]: return []
     combined = (left or []) + (right or [])
-    return combined[-6:]
+    unique_flights = {str(f.get("flightNumber")): f for f in combined if isinstance(f, dict)}
+    return list(unique_flights.values())
 
 class ChatState(TypedDict):
     user_message: str  
@@ -41,4 +55,6 @@ class ChatState(TypedDict):
     action: Optional[dict]     
     error_msg: Optional[str]
     response_text: str
-    chat_history: Annotated[list[str], merge_chat_history]
+    chat_history: Annotated[dict, merge_chat_history]
+    saved_flights: Annotated[list[dict], merge_saved_flights]
+    target_flights: list[str]

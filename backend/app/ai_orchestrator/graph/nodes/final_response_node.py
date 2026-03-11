@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
+    print("Current State in Final Response Node: \n", state)
     
     lang = state.get("language") or "vi"
     user_message = state.get("user_message", "")

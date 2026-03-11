@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Literal, Optional, List
 from app.core.enums import ChatIntent, TravelClass  
 
 class FlightParameters(BaseModel):
@@ -16,8 +16,9 @@ class FlightParameters(BaseModel):
     comparison_target: Optional[List[str]] = Field(
         None, description="Danh sách các đối tượng cần so sánh. Ví dụ: ['VN', 'VJ'] nếu khách so sánh 2 hãng."
     )
-    comparison_metric: Optional[str] = Field(
-        None, description="Tiêu chí so sánh: 'price' (giá), 'duration' (thời gian bay), 'time' (giờ khởi hành), 'class' (hạng ghế), 'all' (tổng hợp)."
+    sort_preference: Optional[Literal["price", "duration", "departure_time"]] = Field(
+        None, 
+        description="Tiêu chí khách muốn ưu tiên so sánh: 'price' (rẻ nhất), 'duration' (thời gian bay ngắn nhất/nhanh nhất), 'departure_time' (bay sớm nhất)."
     )
 
     start_hour: Optional[int] = Field(
@@ -47,6 +48,16 @@ class FlightParameters(BaseModel):
         )
     )
 
+    target_flights: Optional[List[str]] = Field(
+        None, 
+        description=(
+            "Danh sách MÃ CHUYẾN BAY CỤ THỂ khách muốn phân tích hoặc so sánh. "
+            "Ví dụ: Khách nói 'so sánh VN157 và VJ501' -> ['VN157', 'VJ501']. "
+            "Khách nói 'chuyến VJ503 có hành lý chưa' -> ['VJ503']. "
+            "Bỏ lọc -> trả về ['CLEAR']."
+        )
+    )
+
 class Task(BaseModel):
     intent: ChatIntent = Field(..., description="Phân loại chính xác ý định. Nếu chỉ hỏi chính sách mà không tìm vé, KHÔNG ĐƯỢC tạo task search_flight.")
     parameters: Optional[FlightParameters] = Field(
@@ -62,4 +73,8 @@ class ExtractionOutput(BaseModel):
     tasks: List[Task] = Field(
         ..., 
         description="Danh sách các tác vụ. Lưu ý: KHÔNG tự tạo thêm các task tìm kiếm nếu người dùng chỉ hỏi thông tin chung."
+    )
+
+    target_flights: Optional[List[str]] = Field(
+        None, description="Danh sách mã chuyến bay khách muốn lưu, phân tích hoặc so sánh. VD: ['VN123', 'VJ501']"
     )
