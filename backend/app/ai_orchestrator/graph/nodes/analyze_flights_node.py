@@ -1,6 +1,5 @@
 import json
 from app.ai_orchestrator.graph.state import ChatState
-from app.services.flight_service import flight_service
 from app.services.redis_service import redis_service
 from app.utils.validators import validate_flight_params         
 from app.utils.flight_analysis import analyze_flights_for_comparison, analyze_specific_flights
@@ -8,20 +7,19 @@ from app.utils.flight_analysis import analyze_flights_for_comparison, analyze_sp
 def analyze_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE PHÂN TÍCH CHUYẾN BAY ---")
 
+    tasks = state.get("tasks", [])
+    remaining_tasks = tasks[1:] if tasks else []
+
     user_prefs = state.get("user_prefs", {})
     
     is_valid, error_msgs, state_updates = validate_flight_params(user_prefs)
     
     if not is_valid:
-        result = {"node_results": error_msgs, "action": None}
+        result = {"node_results": error_msgs, "action": None, "tasks": remaining_tasks}
         if state_updates:
             result["user_prefs"] = state_updates
         return result
 
-    origin = user_prefs.get("origin")
-    dest = user_prefs.get("destination")
-    departureDate = user_prefs.get("departureDate")
-    
     target_flights = user_prefs.get("target_flights", []) 
     sort_preference = user_prefs.get("sort_preference", "price") 
     saved_flights = state.get("saved_flights", [])
@@ -29,7 +27,7 @@ def analyze_flights_node(state: ChatState) -> dict:
     current_search_id = user_prefs.get("current_search_id")
     history_dict = state.get("chat_history", {"messages": [], "search_ids": []})
 
-    result_dict = {}
+    result_dict = {"tasks": remaining_tasks}
 
     if target_flights:
         found_flights = []
@@ -81,40 +79,9 @@ def analyze_flights_node(state: ChatState) -> dict:
                 current_search_id = None
 
         if not flights_pool:
-            inc_airlines = user_prefs.get("includedAirlines", [])
-            if not isinstance(inc_airlines, list): inc_airlines = []
-                
-            comp_targets = user_prefs.get("comparison_target", [])
-            if not isinstance(comp_targets, list): comp_targets = []
-            
-            api_airlines = list(set(inc_airlines + comp_targets))
-            valid_api_airlines = [a.upper() for a in api_airlines if isinstance(a, str) and len(a) == 2]
-
-            try:
-                new_flights = flight_service.search_flights(
-                    origin=origin,
-                    destination=dest,
-                    departureDate=departureDate,
-                    returnDate=user_prefs.get("returnDate"),
-                    adults=user_prefs.get("adults", 1),
-                    includedAirlines=valid_api_airlines if valid_api_airlines else None,
-                    excludedAirlines=user_prefs.get("excludedAirlines"),
-                    nonStop=user_prefs.get("nonStop"),
-                    travelClass=user_prefs.get("travelClass"),
-                    maxPrice=user_prefs.get("maxPrice"),
-                    start_hour=user_prefs.get("start_hour"),
-                    end_hour=user_prefs.get("end_hour")
-                )
-                if new_flights:
-                    current_search_id = redis_service.save_flight_offers(new_flights)
-                    user_prefs["current_search_id"] = current_search_id
-                    flights_pool.extend(new_flights)
-            except Exception as e:
-                print(f"Lỗi gọi API khi phân tích: {e}")
-
-        if not flights_pool:
-            not_found_msg = f"[FLIGHTS_NOT_FOUND]: origin={origin}, destination={dest}, date={departureDate}."
-            return {"node_results": [not_found_msg]}
+            not_found_msg = "[ANALYZE_ERROR]: Không có dữ liệu chuyến bay trong bộ nhớ tạm để phân tích."
+            result_dict["node_results"] = [not_found_msg]
+            return result_dict
 
         unique_pool = {str(f.get("flightNumber")): f for f in flights_pool}
         final_pool = list(unique_pool.values())

@@ -7,7 +7,7 @@ class FlightParameters(BaseModel):
     destination: str = Field(description="Mã IATA sân bay đến")
     departureDate: str = Field(description="Ngày đi định dạng YYYY-MM-DD")
     returnDate: Optional[str] = Field(None, description="Ngày về định dạng YYYY-MM-DD")
-    adults: int = Field(1, description="Số lượng người lớn")
+    adults: int = Field(1, description="Số lượng khách hàng, không bao giờ bằng 0, nếu không đề cập tới mặc định là 1")
     includedAirlines: Optional[List[str]] = Field(None, description="Danh sách mã IATA hãng bay KHÁCH MUỐN ĐI (VD: ['VN', 'VJ'])")
     excludedAirlines: Optional[List[str]] = Field(None, description="Danh sách hãng KHÔNG MUỐN ĐI")
     nonStop: Optional[bool] = Field(False, description="True nếu khách chỉ muốn bay thẳng")

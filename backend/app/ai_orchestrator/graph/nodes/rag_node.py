@@ -6,32 +6,53 @@ from langchain_postgres.vectorstores import PGVector
 from app.core.enums import ChatIntent
 
 def rag_node(state: ChatState) -> dict:
-    query = ""
+    print("\n🔹🔹🔹 --- VÀO NODE RAG (TRA CỨU CHÍNH SÁCH) ---")
+    
     tasks = state.get("tasks", [])
-    for task in tasks:
-        if task.intent == ChatIntent.GENERAL_QUESTION and task.query_context:
-            query = task.query_context
-            break
+    remaining_tasks = tasks[1:] if tasks else []
+    
+    query = ""
+    
+    if tasks and hasattr(tasks[0], 'intent') and tasks[0].intent == ChatIntent.GENERAL_QUESTION:
+        query = getattr(tasks[0], 'query_context', "")
             
     if not query:
-        query = state["messages"][-1].content
+        query = state.get("user_message", "")
+
+    if not query:
+        return {
+            "node_results": ["Không xác định được câu hỏi để tra cứu."],
+            "tasks": remaining_tasks
+        }
 
     connection = os.environ.get("DATABASE_URL")
     
-    vector_store = PGVector(
-        embeddings=OpenAIEmbeddings(),
-        collection_name="flight_policies",
-        connection=connection,
-        use_jsonb=True,
-    )
-    
-    docs = vector_store.similarity_search(query, k=3)
-    
-    if not docs:
-        return {"node_results": ["Không tìm thấy thông tin quy định nào liên quan."]}
-    
-    retrieved_context = "THÔNG TIN QUY ĐỊNH/CHÍNH SÁCH TÌM ĐƯỢC:\n" + "\n\n".join([doc.page_content for doc in docs])
-    
-    return {
-        "node_results": [retrieved_context]
-    }
+    try:
+        vector_store = PGVector(
+            embeddings=OpenAIEmbeddings(),
+            collection_name="flight_policies",
+            connection=connection,
+            use_jsonb=True,
+        )
+        
+        docs = vector_store.similarity_search(query, k=3)
+        
+        if not docs:
+            return {
+                "node_results": ["Không tìm thấy thông tin quy định nào liên quan đến câu hỏi."],
+                "tasks": remaining_tasks 
+            }
+        
+        retrieved_context = "THÔNG TIN QUY ĐỊNH/CHÍNH SÁCH TÌM ĐƯỢC:\n" + "\n\n".join([doc.page_content for doc in docs])
+        
+        return {
+            "node_results": [retrieved_context],
+            "tasks": remaining_tasks 
+        }
+        
+    except Exception as e:
+        print(f"Lỗi kết nối hoặc truy vấn Vector DB: {e}")
+        return {
+            "node_results": ["[RAG_ERROR]: Lỗi hệ thống khi tra cứu tài liệu quy định."],
+            "tasks": remaining_tasks
+        }

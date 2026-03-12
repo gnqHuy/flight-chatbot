@@ -12,21 +12,26 @@ from app.ai_orchestrator.graph.nodes.rag_node import rag_node
 from app.ai_orchestrator.graph.nodes.final_response_node import final_response_node
 
 def route_tasks(state: ChatState) -> str:
+    """
+    Bộ định tuyến trung tâm (Central Router).
+    Hoạt động theo cơ chế Queue: Luôn đọc phần tử đầu tiên (tasks[0]) để điều phối.
+    """
     tasks = state.get("tasks", [])
     
     if not tasks:
         return "final_response"
     
     current_task = tasks[0]
-    intent = current_task.intent
+    
+    intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
 
-    if intent == ChatIntent.SEARCH_FLIGHT:
+    if intent_val in [ChatIntent.SEARCH_FLIGHT.value, ChatIntent.PROVIDE_INFO.value]:
         return "search_flights"
         
-    if intent in [ChatIntent.ANALYZE_FLIGHTS, ChatIntent.PRICE_ANALYSIS]:
+    if intent_val in [ChatIntent.ANALYZE_FLIGHTS.value, ChatIntent.PRICE_ANALYSIS.value]:
         return "analyze_flights"
         
-    if intent == ChatIntent.GENERAL_QUESTION:
+    if intent_val == ChatIntent.GENERAL_QUESTION.value:
         return "rag_node"
             
     return "final_response"
@@ -43,20 +48,19 @@ def build_flight_graph():
 
     graph.add_edge(START, "extract_intent")
     
-    graph.add_conditional_edges(
-        "extract_intent",
-        route_tasks,
-        {
-            "search_flights": "search_flights",
-            "analyze_flights": "analyze_flights",
-            "rag_node": "rag_node",
-            "final_response": "final_response"
-        }
-    )
+    routing_map = {
+        "search_flights": "search_flights",
+        "analyze_flights": "analyze_flights",
+        "rag_node": "rag_node",
+        "final_response": "final_response"
+    }
 
-    graph.add_edge("search_flights", "extract_intent")
-    graph.add_edge("analyze_flights", "extract_intent")
-    graph.add_edge("rag_node", "extract_intent")
+    
+    graph.add_conditional_edges("extract_intent", route_tasks, routing_map)
+
+    graph.add_conditional_edges("search_flights", route_tasks, routing_map)
+    graph.add_conditional_edges("analyze_flights", route_tasks, routing_map)
+    graph.add_conditional_edges("rag_node", route_tasks, routing_map)
     
     graph.add_edge("final_response", END)
 

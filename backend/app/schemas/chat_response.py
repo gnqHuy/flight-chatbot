@@ -12,6 +12,5 @@ class ChatResponse(BaseModel):
     message_id: Optional[UUID] = Field(default=None)
     role: ChatRole
     content: str
-    intents: List[str] = Field(default_factory=list)
     slots: Dict[str, Any] = Field(default_factory=dict)
     action: Optional[ClientAction] = None

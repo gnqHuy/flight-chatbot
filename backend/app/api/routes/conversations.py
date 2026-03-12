@@ -76,7 +76,6 @@ async def send_message(
             message_id=result["message_id"],
             role=result["role"],
             content=result["content"],
-            intents=result["intents"],
             slots=result["slots"],
             action=result["action"]
         )

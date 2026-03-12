@@ -38,23 +38,17 @@ class ChatService:
         }
         
         final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=config)
+
+        print("\n🔸🔸🔸 --- KẾT QUẢ TỪ FLIGHT GRAPH ---")
+        print( final_state)
+        print("\n🔸🔸🔸 ------")
+
         
         bot_message_content = final_state.get("response_text")
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
 
         user_prefs = final_state.get("user_prefs", {})
-        
-        current_search_id = user_prefs.get("current_search_id")
-        new_history = {
-            "messages": [
-                f"User: {user_content}",
-                f"Bot: {bot_message_content}"
-            ],
-            "search_ids": [current_search_id] if current_search_id else []
-        }
-
-        await run_in_threadpool(flight_graph.update_state, config, {"chat_history": new_history})
 
         extracted_slots = {
             "origin": user_prefs.get("origin"),
@@ -62,12 +56,6 @@ class ChatService:
             "departureDate": user_prefs.get("departureDate"),
             "current_search_id": user_prefs.get("current_search_id")
         }
-
-        tasks = final_state.get("tasks", [])
-        all_intents = [
-            task.intent.value if hasattr(task.intent, 'value') else str(task.intent) 
-            for task in tasks
-        ]
 
         action_dict = final_state.get("action")
         error_msg = final_state.get("error_msg")
@@ -97,7 +85,6 @@ class ChatService:
             "message_id": str(saved_bot_msg.id),
             "role": saved_bot_msg.role,
             "content": bot_message_content,
-            "intents": all_intents,
             "slots": extracted_slots,
             "action": client_action
         }
