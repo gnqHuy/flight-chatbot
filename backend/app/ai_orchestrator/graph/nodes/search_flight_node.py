@@ -5,6 +5,9 @@ from app.utils.validators import validate_flight_params
 
 def search_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE TÌM KIẾM CHUYẾN BAY ---")
+    print("[DEBUG - STATE]: \n", state)
+    print("\n🔹🔹🔹 ------------------------------------")
+
     user_prefs = state.get("user_prefs", {})
 
     print("👉 [DEBUG - PREFS]: ", user_prefs)
@@ -58,6 +61,7 @@ def search_flights_node(state: ChatState) -> dict:
                 "payload": {"search_id": search_id}
             },
             "user_prefs": user_prefs,
+            "chat_history": {"search_ids": [search_id]},
             "tasks": remaining_tasks
         }
 

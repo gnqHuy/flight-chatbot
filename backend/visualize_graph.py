@@ -1,4 +1,4 @@
-from app.ai.graph.flight_graph import build_flight_graph
+from app.ai_orchestrator.graph.flight_graph import build_flight_graph
 
 
 app = build_flight_graph()

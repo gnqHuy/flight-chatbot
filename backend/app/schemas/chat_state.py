@@ -3,78 +3,39 @@ from typing import Literal, Optional, List
 from app.core.enums import ChatIntent, TravelClass  
 
 class FlightParameters(BaseModel):
-    origin: str = Field(description="Mã IATA sân bay đi (VD: HAN, SGN)")
-    destination: str = Field(description="Mã IATA sân bay đến")
-    departureDate: str = Field(description="Ngày đi định dạng YYYY-MM-DD")
-    returnDate: Optional[str] = Field(None, description="Ngày về định dạng YYYY-MM-DD")
-    adults: int = Field(1, description="Số lượng khách hàng, không bao giờ bằng 0, nếu không đề cập tới mặc định là 1")
-    includedAirlines: Optional[List[str]] = Field(None, description="Danh sách mã IATA hãng bay KHÁCH MUỐN ĐI (VD: ['VN', 'VJ'])")
-    excludedAirlines: Optional[List[str]] = Field(None, description="Danh sách hãng KHÔNG MUỐN ĐI")
-    nonStop: Optional[bool] = Field(False, description="True nếu khách chỉ muốn bay thẳng")
-    travelClass: Optional[TravelClass] = Field(None)
-    maxPrice: Optional[int] = Field(None, description="Ngân sách tối đa của khách")
-    comparison_target: Optional[List[str]] = Field(
-        None, description="Danh sách các đối tượng cần so sánh. Ví dụ: ['VN', 'VJ'] nếu khách so sánh 2 hãng."
-    )
-    sort_preference: Optional[Literal["price", "duration", "departure_time"]] = Field(
-        None, 
-        description="Tiêu chí khách muốn ưu tiên so sánh: 'price' (rẻ nhất), 'duration' (thời gian bay ngắn nhất/nhanh nhất), 'departure_time' (bay sớm nhất)."
-    )
-
-    start_hour: Optional[int] = Field(
-        None, 
-        description=(
-            "Giờ bắt đầu mong muốn (0-23). "
-            "QUY TẮC QUY ĐỔI: "
-            "- 'Sáng' (Morning) -> start_hour=6. "
-            "- 'Trưa' (Noon) -> start_hour=11. "
-            "- 'Chiều' (Afternoon) -> start_hour=13. "
-            "- 'Tối/Đêm' (Evening/Night) -> start_hour=18. "
-            "- Nếu nói giờ cụ thể (VD: 'khoảng 15h') -> start_hour=14 (trừ đi 1 tiếng). "
-            "- Bỏ lọc giờ -> trả về 'CLEAR'."
-        )
-    )
-    end_hour: Optional[int] = Field(
-        None, 
-        description=(
-            "Giờ kết thúc mong muốn (0-23). "
-            "QUY TẮC QUY ĐỔI: "
-            "- 'Sáng' -> end_hour=11. "
-            "- 'Trưa' -> end_hour=13. "
-            "- 'Chiều' -> end_hour=18. "
-            "- 'Tối/Đêm' -> end_hour=23. "
-            "- Nếu nói giờ cụ thể (VD: 'khoảng 15h') -> end_hour=16 (cộng thêm 1 tiếng). "
-            "- Bỏ lọc giờ -> trả về 'CLEAR'."
-        )
+    origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI. Dấu hiệu: Thường đứng sau chữ 'từ', 'khởi hành tại'. NẾU KHÁCH NÓI 'đi Sài Gòn', 'đến Hà Nội' thì đó KHÔNG PHẢI origin. Bỏ qua nếu không rõ.")
+    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN. Dấu hiệu: Thường đứng sau chữ 'đi', 'đến', 'vào', 'bay ra'. VD: 'đi công tác Sài Gòn' -> destination='SGN'.")
+    departureDate: Optional[str] = Field(None, description="Ngày đi (YYYY-MM-DD).")
+    returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
+    adults: Optional[int] = Field(None, description="Số lượng hành khách (người lớn).")
+    includedAirlines: Optional[List[str]] = Field(None, description="Mã IATA hãng bay muốn đi (VD: ['VN', 'VJ']).")
+    excludedAirlines: Optional[List[str]] = Field(None, description="Mã IATA hãng bay không muốn đi.")
+    nonStop: Optional[bool] = Field(None, description="True nếu chỉ muốn bay thẳng, không quá cảnh.")
+    travelClass: Optional[TravelClass] = Field(None, description="Hạng ghế.")
+    maxPrice: Optional[int] = Field(None, description="Ngân sách tối đa.")
+    sort_preference: Optional[Literal["price", "duration", "departure_time"]] = Field(None, description="Tiêu chí ưu tiên: price, duration, departure_time.")
+    start_hour: Optional[int] = Field(None, description="Giờ đi: Sáng=6, Trưa=11, Chiều=13, Tối=18.")
+    end_hour: Optional[int] = Field(None, description="Giờ đến: Sáng=11, Trưa=13, Chiều=18, Tối=23.")
+    
+    cleared_filters: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Danh sách các TÊN BIẾN mà khách yêu cầu gỡ bỏ. VD: khách nói 'hủy chiều về' -> ['returnDate']. 'Bỏ lọc hãng' -> ['includedAirlines']."
     )
 
     target_flights: Optional[List[str]] = Field(
-        None, 
+        default=None, 
         description=(
-            "Danh sách MÃ CHUYẾN BAY CỤ THỂ khách muốn phân tích hoặc so sánh. "
-            "Ví dụ: Khách nói 'so sánh VN157 và VJ501' -> ['VN157', 'VJ501']. "
-            "Khách nói 'chuyến VJ503 có hành lý chưa' -> ['VJ503']. "
-            "Bỏ lọc -> trả về ['CLEAR']."
+            "Danh sách các MÃ CHUYẾN BAY (Flight Number) CỤ THỂ mà khách muốn xem chi tiết hoặc so sánh. "
+            "Dấu hiệu: Các mã có cả chữ và số (VD: VN123, VJ501). "
+            "Ví dụ: Khách nói 'So sánh chuyến VN157 và VJ501' -> ['VN157', 'VJ501']. "
+            "KHÔNG dùng biến này để chứa mã Hãng bay (như VN, VJ)."
         )
     )
 
 class Task(BaseModel):
-    intent: ChatIntent = Field(..., description="Phân loại chính xác ý định. Nếu chỉ hỏi chính sách mà không tìm vé, KHÔNG ĐƯỢC tạo task search_flight.")
-    parameters: Optional[FlightParameters] = Field(
-        default=None, 
-        description="Chỉ điền khi intent liên quan đến tìm vé"
-    )
-    query_context: Optional[str] = Field(
-        default=None, 
-        description="Nội dung câu hỏi gốc của người dùng dùng cho RAG (VD: 'Bầu 30 tuần bay được không?')."
-    )
+    intent: ChatIntent = Field(..., description="Phân loại ý định.")
+    parameters: Optional[FlightParameters] = Field(None, description="Tham số chuyến bay (nếu có).")
+    query_context: Optional[str] = Field(None, description="Câu hỏi RAG.")
 
 class ExtractionOutput(BaseModel):
-    tasks: List[Task] = Field(
-        ..., 
-        description="Danh sách các tác vụ. Lưu ý: KHÔNG tự tạo thêm các task tìm kiếm nếu người dùng chỉ hỏi thông tin chung."
-    )
-
-    target_flights: Optional[List[str]] = Field(
-        None, description="Danh sách mã chuyến bay khách muốn lưu, phân tích hoặc so sánh. VD: ['VN123', 'VJ501']"
-    )
+    tasks: List[Task] = Field(..., description="Danh sách tác vụ.")

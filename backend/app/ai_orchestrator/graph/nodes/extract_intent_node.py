@@ -5,27 +5,24 @@ from app.ai_orchestrator.llm.llm import llm
 from app.schemas.chat_state import ExtractionOutput, Task
 from app.core.enums import ChatIntent
 
-SYSTEM_PROMPT = """You are an AI intent classifier for a flight booking system. 
-Current time: {current_time}.
+SYSTEM_PROMPT = """Bạn là AI trích xuất thông tin đặt vé máy bay.
+Thời gian hiện tại: {current_time}
 
-RECENT CHAT HISTORY (For context reference only):
+LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY, HÃY SỬ DỤNG ĐỂ THAM KHẢO VÀ QUYẾT ĐỊNH INTENTS:
 {chat_history}
 
-TASK: Classify the user's message into one of the following Intents:
-1. 'search_flight': Searching for flights, checking prices.
-2. 'analyze_flights': Comparing prices, duration, or airlines between different flight options.
-3. 'provide_info': Providing departure/destination, dates, or answering bot's follow-up questions.
-4. 'greeting': Basic greetings, thanks (e.g., Hello, thank you, bye).
-5. 'general_question': Questions about flight policies, luggage, documents, pregnant passengers, or airline regulations. (Use this for RAG).
-6. 'out_of_scope': STRICTLY FOR NON-AVIATION TOPICS.
+NHIỆM VỤ: Phân loại tin nhắn của người dùng vào một trong các Ý định (Intents) sau:
+1. 'search_flight': Tìm kiếm chuyến bay, kiểm tra giá vé.
+2. 'analyze_flights': So sánh giá cả, thời gian bay, hoặc các hãng hàng không giữa các lựa chọn vé khác nhau.
+3. 'provide_info': Khi câu hỏi trước đó hỏi thêm về thông tin cho khách hàng.
+4. 'greeting': Chào hỏi cơ bản, cảm ơn, tạm biệt (VD: Xin chào, cảm ơn em, bye).
+5. 'general_question': Các câu hỏi chung về chính sách chuyến bay, hành lý, giấy tờ, phụ nữ mang thai, hoặc quy định của hãng (Dùng intent này cho tác vụ tra cứu RAG).
+6. 'out_of_scope': CHỈ DÙNG CHO các chủ đề ngoài lề, không liên quan đến hàng không.
 
-CRITICAL RULES & CLUSTERING:
-- [ANTI-HALLUCINATION - VERY IMPORTANT]: DO NOT guess, assume, or auto-fill ANY parameters (especially departureDate, returnDate). ONLY extract information EXPLICITLY stated by the user. If the user does not mention a date or a location, you MUST leave it as null/None.
-- If the user's message contains multiple distinct requests (e.g., searching for a flight AND asking a general question), output MULTIPLE tasks in the tasks list, one for each request.
-- GROUP FLIGHT INFO: All flight-related parameters (origin, destination, date, airline preferences, filters) MUST be grouped into a SINGLE 'search_flight' or 'analyze_flights' task.
-- SEPARATE RAG/GREETINGS: General policy questions MUST be separated into distinct tasks.
-- Use the 'current_time' provided ONLY to resolve explicitly mentioned relative dates like 'tomorrow', 'next Monday', etc. Format dates as YYYY-MM-DD.
-- [IMPORTANT]: If the user explicitly asks to CANCEL, REMOVE, or CLEAR a specific filter, you MUST output the exact string "CLEAR" for that specific parameter.
+NGUYÊN TẮC TRÍCH XUẤT (CỰC KỲ QUAN TRỌNG):
+1. TRUNG THỰC TUYỆT ĐỐI: CHỈ trích xuất những thông tin CÓ XUẤT HIỆN trong câu nói của khách. KHÔNG ĐƯỢC tự động điền hay mặc định bất kỳ biến nào. Nếu khách không nhắc tới, để trống.
+2. MÃ IATA: Mọi địa danh phải được quy đổi ra mã IATA 3 chữ cái (VD: Hà Nội -> HAN, TPHCM/Sài Gòn -> SGN, Đà Nẵng -> DAD). Không lưu tên tiếng Việt.
+3. HỦY BỘ LỌC: Nếu khách yêu cầu hủy/bỏ qua một bộ lọc (VD: "không đi khứ hồi nữa", "không lọc giờ nữa"), KHÔNG điền vào biến đó, mà hãy thêm tên biến đó vào mảng `cleared_filters`.
 """
 
 prompt_template = ChatPromptTemplate.from_messages([
@@ -37,6 +34,8 @@ extraction_chain = prompt_template | llm.with_structured_output(ExtractionOutput
 
 def extract_intent_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE EXTRACT INTENT ---")
+    print("[DEBUG - STATE]: \n", state)
+    print("\n🔹🔹🔹 ------------------------------------")
     
     if state.get("tasks"):
         return {} 
@@ -57,18 +56,37 @@ def extract_intent_node(state: ChatState):
             "chat_history": history_str
         })
 
+        print(f"👉 [DEBUG - EXTRACTED TASKS]: ", result)
+
         if result and result.tasks:
             all_tasks = result.tasks
+            all_tasks.sort(
+                key=lambda t: (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) in ["greeting", "out_of_scope"]
+            )
             flight_intents = ["search_flight", "analyze_flights", "provide_info", "price_analysis"]
             
             clean_params = {}
             for task in all_tasks:
                 intent_str = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
                 if intent_str in flight_intents and task.parameters:
-                    for k, v in task.parameters.model_dump(exclude_none=True).items():
+                    raw_dump = task.parameters.model_dump(exclude_none=True)
+                    
+                    filters_to_clear = raw_dump.get("cleared_filters", [])
+                    if filters_to_clear:
+                        for field in filters_to_clear:
+                            clean_params[field] = "CLEAR"
+                        clean_params["cleared_filters"] = "CLEAR"
+                            
+                    for k, v in raw_dump.items():
+                        if k == "cleared_filters": 
+                            continue
+                            
+                        if isinstance(v, str) and v.strip().lower() in ["", "null", "none", "clear"]:
+                            continue
+                            
                         if v == "CLEAR" or v == ["CLEAR"]:
                             clean_params[k] = v
-                        elif v is not None and v != "" and v != []:
+                        elif v is not None and v != []:
                             clean_params[k] = v
 
             core_search_params = [
@@ -85,7 +103,7 @@ def extract_intent_node(state: ChatState):
 
             if changed_details:
                 change_info = ", ".join(changed_details)
-                node_result.append(f"[Cập nhật thông tin]: Hệ thống đã ghi nhận thay đổi tham số ({change_info}) và tìm kiếm lại kết quả mới nhất cho khách hàng.")
+                node_result.append(f"[Cập nhật thông tin]: Hệ thống đã ghi nhận tham số ({change_info}) và tìm kiếm chuyến bay cho các tham số này.")
 
             if "target_flights" in clean_params:
                 raw_targets = clean_params["target_flights"]
@@ -106,14 +124,8 @@ def extract_intent_node(state: ChatState):
     except Exception as e:
         print(f"Lỗi extract intent: {e}")
         
-    saved_intents = [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in all_tasks]
-
-    print(f"\n Extracted Tasks: {saved_intents}")
-    print(f" Current User Preferences: {current_prefs}")
-    
     return {
         "tasks": all_tasks,
         "user_prefs": current_prefs,
-        "executed_intents": saved_intents,
         "node_results": node_result
     }

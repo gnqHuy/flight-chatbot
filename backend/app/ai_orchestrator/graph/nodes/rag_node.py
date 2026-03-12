@@ -7,6 +7,8 @@ from app.core.enums import ChatIntent
 
 def rag_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE RAG (TRA CỨU CHÍNH SÁCH) ---")
+    print("[DEBUG - STATE]: \n", state)
+    print("\n🔹🔹🔹 ------------------------------------")
     
     tasks = state.get("tasks", [])
     remaining_tasks = tasks[1:] if tasks else []

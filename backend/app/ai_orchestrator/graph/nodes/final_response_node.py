@@ -5,6 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
+    print("[DEBUG - STATE]: \n", state)
+    print("\n🔹🔹🔹 ------------------------------------")
     
     lang = state.get("language") or "vi"
     user_message = state.get("user_message", "")
@@ -54,6 +56,8 @@ def final_response_node(state: ChatState):
          "Bạn là nhân viên tư vấn vé máy bay xuất sắc và tận tâm. Nhiệm vụ của bạn là tổng hợp dữ liệu từ [Hệ thống] và phản hồi khách hàng bằng ngôn ngữ {lang}.\n\n"
          "--- NGỮ CẢNH BẠN ĐANG CÓ (USER PREFERENCES) ---\n"
          "{known_info}\n\n"
+         "--- LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY ---\n"
+         "{history}\n\n"
          "--- QUY TẮC GIAO TIẾP SỐNG CÒN ---\n"
          "1. XÁC NHẬN THÔNG TIN: Dựa vào [NGỮ CẢNH], hãy lồng ghép khéo léo các thông tin đã biết (điểm đi, điểm đến, ngày...) vào câu trả lời để khách yên tâm.\n"
          "2. XỬ LÝ SỰ THAY ĐỔI: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [CẬP NHẬT TỪ KHÁCH HÀNG], bạn PHẢI chủ động thông báo bạn đã tìm kiếm lại/lọc lại dữ liệu theo tham số mới đó (VD: 'Dạ em đã cập nhật danh sách vé sang các chuyến bay buổi sáng theo ý chị rồi ạ...').\n"
@@ -85,4 +89,8 @@ def final_response_node(state: ChatState):
     
     response = llm.invoke(formatted_messages)
 
-    return {"response_text": response.content}
+    bot_reply = response.content 
+    
+    current_exchange = f"User: {state.get('user_message')}\nBot: {bot_reply}"
+
+    return {"response_text": response.content, "chat_history": {"messages": [current_exchange]}}

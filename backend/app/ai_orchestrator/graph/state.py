@@ -2,10 +2,12 @@ from typing import TypedDict, Annotated, List, Dict, Any, Optional
 from app.schemas.chat_state import Task
 
 def merge_dicts(left: dict, right: dict) -> dict:
-    if not left: return right or {}
-    if not right: return left or {}
-    merged = left.copy()
-    for k, v in right.items():
+    left_dict = left or {}
+    right_dict = right or {}
+    
+    merged = left_dict.copy()
+    
+    for k, v in right_dict.items():
         if v == "CLEAR" or v == ["CLEAR"]:
             merged.pop(k, None)
         elif v is not None:
@@ -57,4 +59,3 @@ class ChatState(TypedDict):
     response_text: str
     chat_history: Annotated[dict, merge_chat_history]
     saved_flights: Annotated[list[dict], merge_saved_flights]
-    target_flights: list[str]
