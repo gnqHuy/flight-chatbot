@@ -18,13 +18,15 @@ class FlightService:
         departureDate: str, 
         returnDate: Optional[str] = None,
         adults: int = 1,
+        children: int = 0,
+        infants: int = 0,
         includedAirlines: Optional[List[str]] = None,
-        excludedAirlines: Optional[List[str]] = None,
         nonStop: Optional[bool] = None,
         travelClass: Any = None,
         maxPrice: Optional[int] = None,
         start_hour: Optional[int] = None,
         end_hour: Optional[int] = None,
+        max_offers: int = 50,
         lang: str = "vi"
     ):
         try:
@@ -53,16 +55,24 @@ class FlightService:
                 })
 
             flight_filters = {}
-            
+
             if travelClass:
+                od_ids = ["1"]
+                if returnDate:
+                    od_ids.append("2")
+
                 tc_value = travelClass.value if hasattr(travelClass, 'value') else str(travelClass).upper()
-                flight_filters["cabinRestrictions"] = [{"cabin": tc_value, "coverage": "MOST_SEGMENTS"}]
+                
+                flight_filters["cabinRestrictions"] = [{
+                    "cabin": tc_value,
+                    "coverage": "MOST_SEGMENTS",
+                    "originDestinationIds": od_ids
+                }]
 
             carrier_restrictions = {}
             if includedAirlines:
                 carrier_restrictions["includedCarrierCodes"] = includedAirlines
-            if excludedAirlines:
-                carrier_restrictions["excludedCarrierCodes"] = excludedAirlines
+
             if carrier_restrictions:
                 flight_filters["carrierRestrictions"] = carrier_restrictions
 
@@ -73,15 +83,36 @@ class FlightService:
                 flight_filters["priceRestriction"] = {"maxPrice": maxPrice}
 
             search_criteria = {
-                "maxFlightOffers": 20  
+                "maxFlightOffers": max_offers  
             }
             if flight_filters:
                 search_criteria["flightFilters"] = flight_filters
 
+            travelers = []            
+            current_id = 1
+            adult_ids = []
+            for _ in range(adults):
+                travelers.append({"id": str(current_id), "travelerType": "ADULT"})
+                adult_ids.append(str(current_id))
+                current_id += 1
+            
+            for _ in range(children):
+                travelers.append({"id": str(current_id), "travelerType": "CHILD"})
+                current_id += 1
+            
+            for i in range(infants):
+                assoc_id = adult_ids[i] if i < len(adult_ids) else adult_ids[0]
+                travelers.append({
+                    "id": str(current_id), 
+                    "travelerType": "HELD_INFANT", 
+                    "associatedAdultId": assoc_id
+                })
+                current_id += 1
+
             body = {
                 "currencyCode": "VND",
                 "originDestinations": origin_destinations,
-                "travelers": [{"id": str(i+1), "travelerType": "ADULT"} for i in range(adults)],
+                "travelers": travelers,
                 "sources": ["GDS"],
                 "searchCriteria": search_criteria
             }
@@ -111,4 +142,21 @@ class FlightService:
                     
             raise Exception(f"Lỗi API: {error_detail}")
 
+
+    def get_price_metrics(self, origin: str, destination: str, departureDate: str) -> list:
+        """Gọi API Amadeus Itinerary Price Metrics để lấy dữ liệu phân tích giá"""
+        try:
+            response = self.amadeus.analytics.itinerary_price_metrics.get(
+                originIataCode=origin,
+                destinationIataCode=destination,
+                departureDate=departureDate,
+                currencyCode="VND"
+            )
+            if response.data and len(response.data) > 0:
+                return response.data[0].get("priceMetrics", [])
+            return []
+        except Exception as e:
+            print(f"[LỖI AMADEUS PRICE METRICS]: {e}")
+            return []
+        
 flight_service = FlightService()

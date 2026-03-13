@@ -28,7 +28,7 @@ def parse_duration_to_minutes(duration_str: str) -> int:
 def get_departure_time(f) -> str:
     dep_time = f.get('departure', {}).get('at', '')
     if 'T' in dep_time: return dep_time.split('T')[1]
-    return '23:59:59' # Nếu không có, đẩy xuống cuối
+    return '23:59:59'
 
 def analyze_flights_for_comparison(flights: list, sort_pref: str = "price") -> str:
     """So sánh tổng quát mảng chuyến bay dựa trên tiêu chí khách chọn"""

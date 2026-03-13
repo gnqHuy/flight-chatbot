@@ -8,7 +8,7 @@ from app.core.enums import ChatIntent
 SYSTEM_PROMPT = """Bạn là AI trích xuất thông tin đặt vé máy bay.
 Thời gian hiện tại: {current_time}
 
-LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY, HÃY SỬ DỤNG ĐỂ THAM KHẢO VÀ QUYẾT ĐỊNH INTENTS:
+LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY, HÃY SỬ DỤNG ĐỂ THAM KHẢO VÀ QUYẾT ĐỊNH INTENTS, NHƯNG KHÔNG ĐƯỢC LẤY THAM SỐ TỪ LỊCH SỬ NẾU KHÁCH KHÔNG NHẮC TỚI TRONG TIN NHẮN MỚI.:
 {chat_history}
 
 NHIỆM VỤ: Phân loại tin nhắn của người dùng vào một trong các Ý định (Intents) sau:
@@ -34,7 +34,8 @@ extraction_chain = prompt_template | llm.with_structured_output(ExtractionOutput
 
 def extract_intent_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE EXTRACT INTENT ---")
-    print("[DEBUG - STATE]: \n", state)
+    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
+    print("\n👉 [DEBUG - NODE]: ", state.get("node_results", {}))
     print("\n🔹🔹🔹 ------------------------------------")
     
     if state.get("tasks"):
@@ -56,14 +57,14 @@ def extract_intent_node(state: ChatState):
             "chat_history": history_str
         })
 
-        print(f"👉 [DEBUG - EXTRACTED TASKS]: ", result)
+        print(f"\n👉 [DEBUG - EXTRACTED TASKS]: ", result)
 
         if result and result.tasks:
             all_tasks = result.tasks
             all_tasks.sort(
                 key=lambda t: (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) in ["greeting", "out_of_scope"]
             )
-            flight_intents = ["search_flight", "analyze_flights", "provide_info", "price_analysis"]
+            flight_intents = ["search_flight", "analyze_flights", "provide_info"]
             
             clean_params = {}
             for task in all_tasks:
@@ -105,10 +106,10 @@ def extract_intent_node(state: ChatState):
                 change_info = ", ".join(changed_details)
                 node_result.append(f"[Cập nhật thông tin]: Hệ thống đã ghi nhận tham số ({change_info}) và tìm kiếm chuyến bay cho các tham số này.")
 
-            if "target_flights" in clean_params:
-                raw_targets = clean_params["target_flights"]
+            if "analysis_targets" in clean_params:
+                raw_targets = clean_params["analysis_targets"]
                 if isinstance(raw_targets, list):
-                    clean_params["target_flights"] = [str(t).upper().replace(" ", "") for t in raw_targets if t]
+                    clean_params["analysis_targets"] = [str(t).upper().replace(" ", "") for t in raw_targets if t]
 
             current_prefs.update(clean_params)
 

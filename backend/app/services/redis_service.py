@@ -14,12 +14,12 @@ class RedisService:
         )
         self.ttl_seconds = 1800 
 
-    def save_flight_offers(self, flights: List[Dict[str, Any]]) -> str:
+    def save_flight_offers(self, flight_data: list | dict) -> str:
         search_id = f"search_{uuid.uuid4().hex[:8]}"
         self.client.setex(
             name=search_id,
             time=self.ttl_seconds,
-            value=json.dumps(flights)
+            value=json.dumps(flight_data)
         )
         return search_id
 

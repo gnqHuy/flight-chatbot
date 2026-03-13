@@ -5,7 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
-    print("[DEBUG - STATE]: \n", state)
+    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
+    print("\n👉 [DEBUG - NODE]: ", state.get("node_results", {}))
     print("\n🔹🔹🔹 ------------------------------------")
     
     lang = state.get("language") or "vi"
@@ -86,6 +87,8 @@ def final_response_node(state: ChatState):
         lang=lang,
         current_time=current_time_str
     )
+
+    print("\n👉 [DEBUG - PROMPT MESSAGES]: ", formatted_messages)
     
     response = llm.invoke(formatted_messages)
 

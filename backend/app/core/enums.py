@@ -17,13 +17,27 @@ class ChatIntent(str, Enum):
     SEARCH_FLIGHT = "search_flight"
     PROVIDE_INFO = "provide_info"
     ANALYZE_FLIGHTS = "analyze_flights"
-    PRICE_ANALYSIS = "price_analysis"
     MANAGE_CART = "manage_cart"
     GENERAL_QUESTION = "general_question"
     OUT_OF_SCOPE = "out_of_scope"
 
 class TravelClass(str, Enum):
-    ECONOMY = "economy"
-    BUSINESS = "business"
-    FIRST = "first"
-    
+    ECONOMY = "ECONOMY"
+    BUSINESS = "BUSINESS"
+    FIRST = "FIRST"
+    PREMIUM_ECONOMY = "PREMIUM_ECONOMY"
+from enum import Enum
+
+class SortPreference(str, Enum):
+    PRICE = "price"
+    DURATION = "duration"
+    DEPARTURE_TIME = "departure_time"
+
+class AnalysisCriteria(str, Enum):
+    PRICE = "PRICE"              
+    DURATION = "DURATION"        
+    SERVICE = "SERVICE"          
+    AIRCRAFT = "AIRCRAFT"        
+    TIME = "TIME"                
+    FLEXIBILITY = "FLEXIBILITY"  
+    AIRLINE_REPUTATION = "AIRLINE" 

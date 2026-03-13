@@ -28,7 +28,7 @@ def route_tasks(state: ChatState) -> str:
     if intent_val in [ChatIntent.SEARCH_FLIGHT.value, ChatIntent.PROVIDE_INFO.value]:
         return "search_flights"
         
-    if intent_val in [ChatIntent.ANALYZE_FLIGHTS.value, ChatIntent.PRICE_ANALYSIS.value]:
+    if intent_val == ChatIntent.ANALYZE_FLIGHTS.value:
         return "analyze_flights"
         
     if intent_val == ChatIntent.GENERAL_QUESTION.value:
@@ -57,7 +57,6 @@ def build_flight_graph():
 
     
     graph.add_conditional_edges("extract_intent", route_tasks, routing_map)
-
     graph.add_conditional_edges("search_flights", route_tasks, routing_map)
     graph.add_conditional_edges("analyze_flights", route_tasks, routing_map)
     graph.add_conditional_edges("rag_node", route_tasks, routing_map)

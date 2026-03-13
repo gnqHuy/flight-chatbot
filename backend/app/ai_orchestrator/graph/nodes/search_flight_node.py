@@ -2,16 +2,15 @@ from app.ai_orchestrator.graph.state import ChatState
 from app.services.flight_service import flight_service
 from app.services.redis_service import redis_service
 from app.utils.validators import validate_flight_params
+from app.core.constants import SUPPORTED_AIRLINES
 
 def search_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE TÌM KIẾM CHUYẾN BAY ---")
-    print("[DEBUG - STATE]: \n", state)
+    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
+    print("\n 👉 [DEBUG - NODE]: ", state.get("node_results", {}))
     print("\n🔹🔹🔹 ------------------------------------")
 
     user_prefs = state.get("user_prefs", {})
-
-    print("👉 [DEBUG - PREFS]: ", user_prefs)
-
     tasks = state.get("tasks", [])
     remaining_tasks = tasks[1:] if tasks else []
     
@@ -27,6 +26,17 @@ def search_flights_node(state: ChatState) -> dict:
     origin = user_prefs.get("origin")
     destination = user_prefs.get("destination")
     departureDate = user_prefs.get("departureDate")
+    valid_airlines = user_prefs.get("includedAirlines", []) 
+
+    num_airlines = len(valid_airlines)
+    if num_airlines == 1:
+        max_results = 25
+    elif num_airlines == 2:
+        max_results = 50
+    else:
+        max_results = 100
+
+    print(f"\n👉 [DEBUG - STRATEGY]: Đang tìm vé cho {num_airlines if num_airlines else 3} hãng. Ép API trả về tối đa {max_results} kết quả.")
     
     try:
         flights = flight_service.search_flights(
@@ -35,23 +45,34 @@ def search_flights_node(state: ChatState) -> dict:
             departureDate=departureDate,
             returnDate=user_prefs.get("returnDate"),
             adults=user_prefs.get("adults", 1),
-            includedAirlines=user_prefs.get("includedAirlines"),
-            excludedAirlines=user_prefs.get("excludedAirlines"),
+            children=user_prefs.get("children", 0),
+            infants=user_prefs.get("infants", 0),
+            includedAirlines=valid_airlines if valid_airlines else None,
             nonStop=user_prefs.get("nonStop"),
             travelClass=user_prefs.get("travelClass"),
             maxPrice=user_prefs.get("maxPrice"),
             start_hour=user_prefs.get("start_hour"),
-            end_hour=user_prefs.get("end_hour")
+            end_hour=user_prefs.get("end_hour"),
+            max_offers=max_results
         )
 
-        print(f"👉 [DEBUG - API]: API search_flights trả về {len(flights)} kết quả.")
+        print(f"\n👉 [DEBUG - API]: API search_flights trả về {len(flights)} kết quả.")
         
         if not flights:
             not_found_msg = f"[FLIGHTS_NOT_FOUND]: origin={origin}, destination={destination}, date={departureDate}."
             return {"node_results": [not_found_msg], "action": None, "tasks": remaining_tasks}
         
-        search_id = redis_service.save_flight_offers(flights)
-        found_msg = f"FLIGHTS_FOUND: {len(flights)} flights. FROM: {origin}. TO: {destination}. DATE: {departureDate}."
+        active_tabs = valid_airlines if valid_airlines else SUPPORTED_AIRLINES
+        full_grouped_flights = {tab: [] for tab in active_tabs}
+        
+        for f in flights:
+            fn = str(f.get("flightNumber", "")).upper()
+            airline_code = fn[:2] 
+            if airline_code in full_grouped_flights:
+                full_grouped_flights[airline_code].append(f)
+                
+        search_id = redis_service.save_flight_offers(full_grouped_flights)
+        found_msg = f"FLIGHTS_FOUND: Đã tìm thấy các chuyến bay từ {origin} đi {destination} ngày {departureDate}."
         user_prefs["current_search_id"] = search_id
         
         return {

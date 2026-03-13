@@ -7,7 +7,8 @@ from app.core.enums import ChatIntent
 
 def rag_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE RAG (TRA CỨU CHÍNH SÁCH) ---")
-    print("[DEBUG - STATE]: \n", state)
+    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
+    print("\n 👉 [DEBUG - NODE]: ", state.get("node_results", {}))
     print("\n🔹🔹🔹 ------------------------------------")
     
     tasks = state.get("tasks", [])
