@@ -25,15 +25,37 @@ class FlightParameters(BaseModel):
     )
 
     includedAirlines: Optional[List[str]] = Field(
-        default=["VN", "VJ", "QH"], 
+        default=None, 
         description=(
-            "DANH SÁCH CÁC HÃNG BÀY ĐƯỢC PHÉP TÌM KIẾM (Mặc định: ['VN', 'VJ', 'QH']). "
-            "Đây là biến DUY NHẤT để quản lý hãng bay. Mọi yêu cầu của khách đều phải quy đổi ra danh sách được phép bay:\n"
-            "- Nếu khách KHẲNG ĐỊNH 'chỉ đi VN' -> Trả về ['VN'].\n"
-            "- Nếu khách PHỦ ĐỊNH 'tránh VJ' -> Trả về ['VN', 'QH'].\n"
-            "- Nếu khách PHỦ ĐỊNH 'không bay VN và QH' -> Trả về ['VJ'].\n"
-            "- Nếu khách XÓA LỌC 'thôi đi hãng nào cũng được', 'bỏ lọc hãng đi' -> Trả về lại ['VN', 'VJ', 'QH'].\n"
-            "TUYỆT ĐỐI BỎ QUA biến này nếu Intent là ANALYZE_FLIGHTS."
+            "CHỈ DÙNG KHI TÌM KIẾM HOẶC LỌC VÉ. "
+            "Dùng khi khách KHẲNG ĐỊNH, YÊU CẦU hoặc CHỈ ĐỊNH rõ hãng muốn đi. "
+            "Hỗ trợ: VN (Vietnam Airlines), VJ (VietJet Air), QH (Bamboo Airways). "
+            "VD: 'Chỉ tìm vé VN', 'Sếp thích bay Vietnam Airlines' -> Trả về ['VN']. "
+            "TUYỆT ĐỐI KHÔNG DÙNG biến này nếu khách nói câu phủ định (như 'tránh', 'không đi'). "
+            "KHÔNG điền vào đây nếu Intent là ANALYZE_FLIGHTS (hãy điền vào analysis_targets)."
+        )
+    )
+    
+    excludedAirlines: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "CHỈ DÙNG KHI TÌM KIẾM HOẶC LỌC VÉ. "
+            "Dùng khi khách có ý PHỦ ĐỊNH, KHÔNG MUỐN hoặc TRÁNH một hãng nào đó. "
+            "VD: 'Tránh VJ ra nhé', 'Sếp không bay Vietjet đâu' -> Trả về chính xác mã hãng bị ghét ['VJ']. "
+            "TUYỆT ĐỐI KHÔNG tự suy luận hay làm toán trừ danh sách (không được tự đổi thành include VN, QH). "
+            "Cứ thấy khách chê/ghét hãng nào là ném thẳng mã hãng đó vào biến này. "
+            "KHÔNG điền vào đây nếu Intent là ANALYZE_FLIGHTS."
+        )
+    )
+
+    cleared_filters: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "QUAN TRỌNG: Danh sách các 'TÊN BIẾN' cần XÓA BỎ khỏi State khi khách đổi ý (Undo/Quay xe). "
+            "VD 1: Khách từng chê 'tránh VJ', nay đổi ý 'thôi cứ tìm cả Vietjet đi xem sao' (tức là xóa lệnh cấm) -> Trả về ['excludedAirlines']. "
+            "VD 2: Khách từng chốt 'chỉ bay VN', nay nói 'đi hãng nào cũng được' (xóa mọi bộ lọc) -> Trả về ['includedAirlines', 'excludedAirlines']. "
+            "VD 3: Khách nói 'Bỏ lọc giá đi' -> Trả về ['maxPrice']. "
+            "TUYỆT ĐỐI KHÔNG ghi giá trị vào includedAirlines/excludedAirlines nếu đã điền tên chúng vào biến cleared_filters này."
         )
     )
 
@@ -52,15 +74,6 @@ class FlightParameters(BaseModel):
     start_hour: Optional[int] = Field(None, description="Giờ đi: Sáng=6, Trưa=11, Chiều=13, Tối=18.")
     end_hour: Optional[int] = Field(None, description="Giờ đến: Sáng=11, Trưa=13, Chiều=18, Tối=23.")
     
-    cleared_filters: Optional[List[str]] = Field(
-        default=None,
-        description=(
-            "Danh sách các tên biến cần XÓA BỎ."
-            "CHỈ DÙNG khi khách chủ động nói: 'Bỏ lọc đi', 'Đi hãng nào cũng được', 'Giờ nào cũng được'. "
-            "TUYỆT ĐỐI KHÔNG ĐƯỢC điền tên biến vào đây nếu bạn đang cung cấp giá trị mới cho biến đó. "
-            "Ví dụ: Khách nói 'Tránh Vietjet ra' -> KHÔNG ĐƯỢC điền 'includedAirlines' vào đây."
-        )
-    )
     analysis_targets: Optional[List[str]] = Field(
         default=None, 
         description=(

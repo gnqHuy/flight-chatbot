@@ -17,7 +17,7 @@ class ChatIntent(str, Enum):
     SEARCH_FLIGHT = "search_flight"
     PROVIDE_INFO = "provide_info"
     ANALYZE_FLIGHTS = "analyze_flights"
-    MANAGE_CART = "manage_cart"
+    FILTER_SORT_FLIGHTS = "filter_sort_flights"
     GENERAL_QUESTION = "general_question"
     OUT_OF_SCOPE = "out_of_scope"
 

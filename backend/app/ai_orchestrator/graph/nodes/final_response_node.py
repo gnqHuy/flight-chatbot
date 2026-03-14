@@ -50,7 +50,7 @@ def final_response_node(state: ChatState):
 
     combined_context = "\n\n".join(system_instructions)
 
-    known_info = {k: v for k, v in user_prefs.items() if v and v != "CLEAR" and k != "current_search_id"}
+    known_info = {k: v for k, v in user_prefs.items() if v and k != "current_search_id"}
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", 

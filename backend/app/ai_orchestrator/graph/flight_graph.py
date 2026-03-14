@@ -8,29 +8,35 @@ from app.database.checkpointer import get_checkpointer
 from app.ai_orchestrator.graph.nodes.extract_intent_node import extract_intent_node
 from app.ai_orchestrator.graph.nodes.search_flight_node import search_flights_node
 from app.ai_orchestrator.graph.nodes.analyze_flights_node import analyze_flights_node
+from app.ai_orchestrator.graph.nodes.filter_sort_flights_node import filter_sort_flights_node
 from app.ai_orchestrator.graph.nodes.rag_node import rag_node
 from app.ai_orchestrator.graph.nodes.final_response_node import final_response_node
 
 def route_tasks(state: ChatState) -> str:
-    """
-    Bộ định tuyến trung tâm (Central Router).
-    Hoạt động theo cơ chế Queue: Luôn đọc phần tử đầu tiên (tasks[0]) để điều phối.
-    """
     tasks = state.get("tasks", [])
+    current_id = state.get("current_search_id")
     
     if not tasks:
         return "final_response"
     
     current_task = tasks[0]
-    
     intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
 
-    if intent_val in [ChatIntent.SEARCH_FLIGHT.value, ChatIntent.PROVIDE_INFO.value]:
-        return "search_flights"
+    flight_related_intents = [
+        ChatIntent.SEARCH_FLIGHT.value, 
+        ChatIntent.PROVIDE_INFO.value,
+        ChatIntent.ANALYZE_FLIGHTS.value
+    ]
+
+    if intent_val in flight_related_intents:
+        if not current_id:
+            return "search_flights"
         
-    if intent_val == ChatIntent.ANALYZE_FLIGHTS.value:
-        return "analyze_flights"
-        
+        if intent_val == ChatIntent.ANALYZE_FLIGHTS.value:
+            return "analyze_flights"
+            
+        return "filter_sort_flights"
+
     if intent_val == ChatIntent.GENERAL_QUESTION.value:
         return "rag_node"
             
@@ -42,6 +48,7 @@ def build_flight_graph():
 
     graph.add_node("extract_intent", extract_intent_node) 
     graph.add_node("search_flights", search_flights_node) 
+    graph.add_node("filter_sort_flights", filter_sort_flights_node)
     graph.add_node("analyze_flights", analyze_flights_node)
     graph.add_node("rag_node", rag_node)                
     graph.add_node("final_response", final_response_node) 
@@ -50,14 +57,15 @@ def build_flight_graph():
     
     routing_map = {
         "search_flights": "search_flights",
+        "filter_sort_flights": "filter_sort_flights",
         "analyze_flights": "analyze_flights",
         "rag_node": "rag_node",
         "final_response": "final_response"
     }
-
     
     graph.add_conditional_edges("extract_intent", route_tasks, routing_map)
     graph.add_conditional_edges("search_flights", route_tasks, routing_map)
+    graph.add_conditional_edges("filter_sort_flights", route_tasks, routing_map) 
     graph.add_conditional_edges("analyze_flights", route_tasks, routing_map)
     graph.add_conditional_edges("rag_node", route_tasks, routing_map)
     

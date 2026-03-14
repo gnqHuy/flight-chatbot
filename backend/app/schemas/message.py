@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 from sqlmodel import SQLModel
 from uuid import UUID
@@ -18,5 +19,9 @@ class MessageRead(SQLModel):
     created_at: datetime
     action: dict | None = None
 
+class UIContext(BaseModel):
+    active_search_id: Optional[str] = None
+
 class MessageCreateBody(BaseModel):
     message: str
+    ui_context: Optional[UIContext] = None

@@ -23,14 +23,14 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
     state_updates = {}
 
     if included and isinstance(included, list):
-        unsupported = [air for air in included if air not in SUPPORTED_AIRLINES_SET and air != "CLEAR"]
+        unsupported = [air for air in included if air not in SUPPORTED_AIRLINES_SET]
         if unsupported:
-            err_msg = f"[LỖI NGHIỆP VỤ]: Khách yêu cầu hãng ngoài luồng ({', '.join(unsupported)}). Hệ thống chỉ bán vé của Vietnam Airlines (VN), VietJet (VJ) và Bamboo Airways (QH)."
+            err_msg = f"[LỖI NGHIỆP VỤ]: Khách yêu cầu hãng ngoài luồng ({', '.join(unsupported)}). Hệ thống chỉ bán vé của VN, VJ, QH."
             error_msgs.append(err_msg)
             state_updates["includedAirlines"] = ["CLEAR"]
 
     missing_fields = []
-    if not origin: missing_fields.append("ngày đi (origin)")
+    if not origin: missing_fields.append("điểm đi (origin)")
     if not destination: missing_fields.append("điểm đến (destination)")
     if not departureDate: missing_fields.append("ngày đi (departureDate)")
 
@@ -51,13 +51,10 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
         error_msgs.append("[PAX_INVALID]: Số lượng trẻ sơ sinh (infants) không được vượt quá số lượng người lớn (adults).")
         state_updates["infants"] = 0 
 
-    if is_roundtrip:
-        if not returnDate or returnDate == "CLEAR":
-            error_msgs.append(
-                "[MISSING_RETURN_DATE]: Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về."
-            )
+    if is_roundtrip and not returnDate:
+        error_msgs.append("[MISSING_RETURN_DATE]: Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về.")
 
-    if departureDate and returnDate and departureDate != "CLEAR" and returnDate != "CLEAR":
+    if departureDate: 
         try:
             dep_dt = datetime.strptime(departureDate, "%Y-%m-%d")
             today = datetime.now()
@@ -66,7 +63,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
                 error_msgs.append("[INVALID_DATE]: Ngày đi (departureDate) nằm trong quá khứ.")
                 state_updates["departureDate"] = "CLEAR"
                 
-            if returnDate and returnDate != "CLEAR":
+            if returnDate:
                 ret_dt = datetime.strptime(returnDate, "%Y-%m-%d")
                 if ret_dt.date() < dep_dt.date():
                     error_msgs.append("[INVALID_DATE]: Ngày về (returnDate) diễn ra trước ngày đi.")
@@ -75,8 +72,9 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
         except ValueError:
             error_msgs.append("[INVALID_FORMAT]: Định dạng ngày tháng không hợp lệ (phải là YYYY-MM-DD).")
             state_updates["departureDate"] = "CLEAR"
-            if returnDate and returnDate != "CLEAR":
+            if returnDate:
                 state_updates["returnDate"] = "CLEAR"
 
+    print(f"👉 [VALIDATION]: errors={error_msgs}, state_updates={state_updates}")
     is_valid = len(error_msgs) == 0
     return is_valid, error_msgs, state_updates

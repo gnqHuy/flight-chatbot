@@ -1,3 +1,4 @@
+import operator
 from typing import TypedDict, Annotated, List, Dict, Any, Optional
 from app.schemas.chat_state import Task
 
@@ -14,14 +15,6 @@ def merge_dicts(left: dict, right: dict) -> dict:
             merged[k] = v
             
     return merged
-
-def merge_list_with_clear(left: list, right: list) -> list:
-    if right == ["CLEAR"]:
-        return []
-    
-    left_list = left or []
-    right_list = right or []
-    return left_list + right_list
 
 def merge_chat_history(left: dict, right: dict) -> dict:
     """Hàm cộng dồn lịch sử chat: Gộp mảng vào mảng"""
@@ -48,14 +41,20 @@ def merge_saved_flights(left: list, right: list) -> list:
     unique_flights = {str(f.get("flightNumber")): f for f in combined if isinstance(f, dict)}
     return list(unique_flights.values())
 
+def merge_search_id(left: Optional[str], right: Optional[str]) -> Optional[str]:
+    if right == "CLEAR":
+        return None
+    return right if right is not None else left
+
 class ChatState(TypedDict):
     user_message: str  
     tasks: List[Task] 
-    node_results: Annotated[list[str], merge_list_with_clear]
+    node_results: Annotated[list[str], operator.add]
     user_prefs: Annotated[Dict[str, Any], merge_dicts]
     language: str
     action: Optional[dict]     
     error_msg: Optional[str]
     response_text: str
+    current_search_id: Annotated[Optional[str], merge_search_id]
     chat_history: Annotated[dict, merge_chat_history]
     saved_flights: Annotated[list[dict], merge_saved_flights]

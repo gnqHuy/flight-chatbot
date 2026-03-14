@@ -13,11 +13,12 @@ LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY, HÃY SỬ DỤNG ĐỂ THAM KHẢO VÀ QU
 
 NHIỆM VỤ: Phân loại tin nhắn của người dùng vào một trong các Ý định (Intents) sau:
 1. 'search_flight': Tìm kiếm chuyến bay, kiểm tra giá vé.
-2. 'analyze_flights': So sánh giá cả, thời gian bay, hoặc các hãng hàng không giữa các lựa chọn vé khác nhau.
-3. 'provide_info': Khi câu hỏi trước đó hỏi thêm về thông tin cho khách hàng.
-4. 'greeting': Chào hỏi cơ bản, cảm ơn, tạm biệt (VD: Xin chào, cảm ơn em, bye).
-5. 'general_question': Các câu hỏi chung về chính sách chuyến bay, hành lý, giấy tờ, phụ nữ mang thai, hoặc quy định của hãng (Dùng intent này cho tác vụ tra cứu RAG).
-6. 'out_of_scope': CHỈ DÙNG CHO các chủ đề ngoài lề, không liên quan đến hàng không.
+2. 'filter_sort_flights': Lọc/sắp xếp danh sách chuyến bay đã tìm kiếm dựa trên các tiêu chí như giá, giờ bay, hãng hàng không, v.v. (Chỉ dùng khi khách đã có một danh sách chuyến bay hiện tại và muốn thao tác trên đó).
+3. 'analyze_flights': So sánh giá cả, thời gian bay, hoặc các hãng hàng không giữa các lựa chọn vé khác nhau.
+4. 'provide_info': Khi câu hỏi trước đó hỏi thêm về thông tin cho khách hàng.
+5. 'greeting': Chào hỏi cơ bản, cảm ơn, tạm biệt (VD: Xin chào, cảm ơn em, bye).
+6. 'general_question': Các câu hỏi chung về chính sách chuyến bay, hành lý, giấy tờ, phụ nữ mang thai, hoặc quy định của hãng (Dùng intent này cho tác vụ tra cứu RAG).
+7. 'out_of_scope': CHỈ DÙNG CHO các chủ đề ngoài lề, không liên quan đến hàng không.
 
 NGUYÊN TẮC TRÍCH XUẤT (CỰC KỲ QUAN TRỌNG):
 1. TRUNG THỰC TUYỆT ĐỐI: CHỈ trích xuất những thông tin CÓ XUẤT HIỆN trong câu nói của khách. KHÔNG ĐƯỢC tự động điền hay mặc định bất kỳ biến nào. Nếu khách không nhắc tới, để trống.
@@ -34,9 +35,6 @@ extraction_chain = prompt_template | llm.with_structured_output(ExtractionOutput
 
 def extract_intent_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE EXTRACT INTENT ---")
-    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
-    print("\n👉 [DEBUG - NODE]: ", state.get("node_results", {}))
-    print("\n🔹🔹🔹 ------------------------------------")
     
     if state.get("tasks"):
         return {} 
@@ -44,6 +42,7 @@ def extract_intent_node(state: ChatState):
     all_tasks = []
     node_result = [] 
     current_prefs = {}
+    changed_details = []
     old_prefs = state.get("user_prefs", {}) 
     
     history_dict = state.get("chat_history", {"messages": [], "search_ids": []})
@@ -57,19 +56,24 @@ def extract_intent_node(state: ChatState):
             "chat_history": history_str
         })
 
-        print(f"\n👉 [DEBUG - EXTRACTED TASKS]: ", result)
-
         if result and result.tasks:
             all_tasks = result.tasks
             all_tasks.sort(
                 key=lambda t: (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) in ["greeting", "out_of_scope"]
             )
-            flight_intents = ["search_flight", "analyze_flights", "provide_info"]
+
+            flight_data_intents = [
+                ChatIntent.SEARCH_FLIGHT.value, 
+                ChatIntent.FILTER_SORT_FLIGHTS.value,
+                ChatIntent.ANALYZE_FLIGHTS.value, 
+                ChatIntent.PROVIDE_INFO.value
+            ]
             
             clean_params = {}
             for task in all_tasks:
                 intent_str = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
-                if intent_str in flight_intents and task.parameters:
+                
+                if intent_str in flight_data_intents and task.parameters:
                     raw_dump = task.parameters.model_dump(exclude_none=True)
                     
                     filters_to_clear = raw_dump.get("cleared_filters", [])
@@ -79,11 +83,8 @@ def extract_intent_node(state: ChatState):
                         clean_params["cleared_filters"] = "CLEAR"
                             
                     for k, v in raw_dump.items():
-                        if k == "cleared_filters": 
-                            continue
-                            
-                        if isinstance(v, str) and v.strip().lower() in ["", "null", "none", "clear"]:
-                            continue
+                        if k == "cleared_filters": continue
+                        if isinstance(v, str) and v.strip().lower() in ["", "null", "none", "clear"]: continue
                             
                         if v == "CLEAR" or v == ["CLEAR"]:
                             clean_params[k] = v
@@ -96,15 +97,13 @@ def extract_intent_node(state: ChatState):
                 "travelClass", "maxPrice", "start_hour", "end_hour"
             ]
             
-            changed_details = []
             for param in core_search_params:
                 if param in clean_params and clean_params[param] != old_prefs.get(param):
                     changed_details.append(f"{param}: {clean_params[param]}")
-                    clean_params["current_search_id"] = "CLEAR"
 
             if changed_details:
                 change_info = ", ".join(changed_details)
-                node_result.append(f"[Cập nhật thông tin]: Hệ thống đã ghi nhận tham số ({change_info}) và tìm kiếm chuyến bay cho các tham số này.")
+                node_result.append(f"[Cập nhật]: {change_info}")
 
             if "analysis_targets" in clean_params:
                 raw_targets = clean_params["analysis_targets"]
@@ -113,20 +112,20 @@ def extract_intent_node(state: ChatState):
 
             current_prefs.update(clean_params)
 
-            if changed_details:
-                has_search = any(
-                    (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) == ChatIntent.SEARCH_FLIGHT.value
-                    for t in all_tasks
-                )
-                if not has_search:
-                    ref_params = next((t.parameters for t in all_tasks if (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) in flight_intents), None)
-                    all_tasks.insert(0, Task(intent=ChatIntent.SEARCH_FLIGHT, parameters=ref_params, query_context="Auto-refresh search"))
-
     except Exception as e:
         print(f"Lỗi extract intent: {e}")
         
-    return {
+    result_dict = {
         "tasks": all_tasks,
         "user_prefs": current_prefs,
         "node_results": node_result
     }
+
+    if changed_details:
+        result_dict["current_search_id"] = "CLEAR"
+
+    print("👉 [DEBUG - NEW PREFS]: ", current_prefs)
+    print("👉 [DEBUG - TASK COUNT]: ", len(all_tasks))
+    print("🔹🔹🔹 ------------------------------------")
+
+    return result_dict

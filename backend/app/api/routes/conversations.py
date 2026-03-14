@@ -69,7 +69,11 @@ async def send_message(
     service = ChatService(conv_repo, msg_repo)
     
     try:
-        result = await service.process_message(str(conversation_id), body.message)
+        result = await service.process_message(
+            conversation_id=str(conversation_id), 
+            user_message=body.message,
+            ui_context=body.ui_context.model_dump() if body.ui_context else None
+        )
         
         return ChatResponse(
             conversation_id=result["conversation_id"],

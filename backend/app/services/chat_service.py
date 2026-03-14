@@ -13,7 +13,7 @@ class ChatService:
         self.conversation_repo = conversation_repo
         self.message_repo = message_repo
 
-    async def process_message(self, conversation_id: str | None, user_content: str):
+    async def process_message(self, conversation_id: str | None, user_message: str, ui_context: dict | None = None):
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
             self.conversation_repo.create(id=conversation_id, title="New Chat")
@@ -25,25 +25,29 @@ class ChatService:
         self.message_repo.create(
             conversation_id=conversation_id,
             role=ChatRole.USER,
-            content=user_content
+            content=user_message
         )
 
-        config = {"configurable": {"thread_id": conversation_id}}
+        graph_config = {"configurable": {"thread_id": conversation_id}}
         inputs = {
-            "user_message": user_content,
-            "node_results": ["CLEAR"],  
+            "user_message": user_message,
+            "node_results": [],  
             "action": None,
             "error_msg": None,
-            "tasks": []
+            "tasks": [],
+            "user_prefs": {},
+            "current_search_id": None
         }
         
-        final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=config)
+        if ui_context and ui_context.get("active_search_id"):
+            inputs["current_search_id"] = ui_context["active_search_id"]
+        
+        final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=graph_config)
 
         print("\n🔸🔸🔸 --- KẾT QUẢ TỪ FLIGHT GRAPH ---")
-        print( final_state)
+        print(final_state)
         print("\n🔸🔸🔸 ------")
 
-        
         bot_message_content = final_state.get("response_text")
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
@@ -54,7 +58,7 @@ class ChatService:
             "origin": user_prefs.get("origin"),
             "destination": user_prefs.get("destination"),
             "departureDate": user_prefs.get("departureDate"),
-            "current_search_id": user_prefs.get("current_search_id")
+            "current_search_id": final_state.get("current_search_id")
         }
 
         action_dict = final_state.get("action")

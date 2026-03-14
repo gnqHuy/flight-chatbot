@@ -1,4 +1,5 @@
 from app.core.i18n_service import i18n
+from app.core.constants import SUPPORTED_AIRLINES
 
 def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | None:
     try:
@@ -45,3 +46,19 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
     except Exception as e:
         print(f"Lỗi parse vé: {e}")
         return None
+    
+def get_final_airlines(user_prefs: dict) -> list:
+    """
+    Tính toán danh sách hãng bay cuối cùng từ State đã được merge hoàn chỉnh.
+    """
+    included = user_prefs.get("includedAirlines", [])
+    excluded = user_prefs.get("excludedAirlines", [])
+    
+    active_airlines = set(SUPPORTED_AIRLINES) # Mặc định là {VN, VJ, QH}
+    
+    if included:
+        active_airlines = set(included)
+    if excluded:
+        active_airlines = active_airlines - set(excluded)
+        
+    return list(active_airlines)
