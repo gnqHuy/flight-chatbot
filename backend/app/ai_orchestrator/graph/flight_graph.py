@@ -25,8 +25,10 @@ def route_tasks(state: ChatState) -> str:
     flight_related_intents = [
         ChatIntent.SEARCH_FLIGHT.value, 
         ChatIntent.PROVIDE_INFO.value,
-        ChatIntent.ANALYZE_FLIGHTS.value
+        ChatIntent.ANALYZE_FLIGHTS.value,
+        ChatIntent.FILTER_SORT_FLIGHTS.value
     ]
+    print(f"👉 [DEBUG - current_id]: {current_id}", intent_val)
 
     if intent_val in flight_related_intents:
         if not current_id:

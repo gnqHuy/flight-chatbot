@@ -24,3 +24,8 @@ langchain-postgres
 psycopg 
 pgvector
 pypdf
+requests
+beautifulsoup4
+google-genai 
+playwright
+chromium

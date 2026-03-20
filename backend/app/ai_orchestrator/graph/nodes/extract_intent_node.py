@@ -125,7 +125,7 @@ def extract_intent_node(state: ChatState):
         result_dict["current_search_id"] = "CLEAR"
 
     print("👉 [DEBUG - NEW PREFS]: ", current_prefs)
-    print("👉 [DEBUG - TASK COUNT]: ", len(all_tasks))
+    print("👉 [DEBUG - TASK]: ", all_tasks)
     print("🔹🔹🔹 ------------------------------------")
 
     return result_dict

@@ -4,6 +4,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_postgres.vectorstores import PGVector
 
 from app.core.enums import ChatIntent
+from app.utils.helpers import consume_task
 
 def rag_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO NODE RAG (TRA CỨU CHÍNH SÁCH) ---")
@@ -12,7 +13,7 @@ def rag_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 ------------------------------------")
     
     tasks = state.get("tasks", [])
-    remaining_tasks = tasks[1:] if tasks else []
+    remaining_tasks = consume_task(tasks, "rag_node")
     
     query = ""
     
