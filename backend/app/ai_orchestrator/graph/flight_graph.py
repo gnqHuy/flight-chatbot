@@ -9,7 +9,7 @@ from app.ai_orchestrator.graph.nodes.extract_intent_node import extract_intent_n
 from app.ai_orchestrator.graph.nodes.search_flight_node import search_flights_node
 from app.ai_orchestrator.graph.nodes.analyze_flights_node import analyze_flights_node
 from app.ai_orchestrator.graph.nodes.filter_sort_flights_node import filter_sort_flights_node
-from app.ai_orchestrator.graph.nodes.rag_node import rag_node
+from app.ai_orchestrator.graph.nodes.policy_retrieval_node import policy_retrieval_node
 from app.ai_orchestrator.graph.nodes.final_response_node import final_response_node
 
 def route_tasks(state: ChatState) -> str:
@@ -40,7 +40,7 @@ def route_tasks(state: ChatState) -> str:
         return "filter_sort_flights"
 
     if intent_val == ChatIntent.GENERAL_QUESTION.value:
-        return "rag_node"
+        return "policy_retrieval_node"
             
     return "final_response"
 
@@ -52,7 +52,7 @@ def build_flight_graph():
     graph.add_node("search_flights", search_flights_node) 
     graph.add_node("filter_sort_flights", filter_sort_flights_node)
     graph.add_node("analyze_flights", analyze_flights_node)
-    graph.add_node("rag_node", rag_node)                
+    graph.add_node("policy_retrieval_node", policy_retrieval_node)                
     graph.add_node("final_response", final_response_node) 
 
     graph.add_edge(START, "extract_intent")
@@ -61,7 +61,7 @@ def build_flight_graph():
         "search_flights": "search_flights",
         "filter_sort_flights": "filter_sort_flights",
         "analyze_flights": "analyze_flights",
-        "rag_node": "rag_node",
+        "policy_retrieval_node": "policy_retrieval_node",
         "final_response": "final_response"
     }
     
@@ -69,7 +69,7 @@ def build_flight_graph():
     graph.add_conditional_edges("search_flights", route_tasks, routing_map)
     graph.add_conditional_edges("filter_sort_flights", route_tasks, routing_map) 
     graph.add_conditional_edges("analyze_flights", route_tasks, routing_map)
-    graph.add_conditional_edges("rag_node", route_tasks, routing_map)
+    graph.add_conditional_edges("policy_retrieval_node", route_tasks, routing_map)
     
     graph.add_edge("final_response", END)
 

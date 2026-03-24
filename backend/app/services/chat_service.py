@@ -31,7 +31,7 @@ class ChatService:
         graph_config = {"configurable": {"thread_id": conversation_id}}
         inputs = {
             "user_message": user_message,
-            "node_results": [],  
+            "node_results": ["CLEAR"],  
             "action": None,
             "error_msg": None,
             "tasks": [],

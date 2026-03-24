@@ -3,7 +3,6 @@ POLICY_URLS = {
     # 1. VIETNAM AIRLINES (VN)
     # ==========================================
     "VN": {
-        # --- HÀNH LÝ ---
         "baggage_hand": "https://www.vietnamairlines.com/vn/vi/travel-information/baggage/baggage-allowance-hand-baggage",
         "baggage_checked": "https://www.vietnamairlines.com/vn/vi/travel-information/baggage/baggage-allowance-checked-baggage",
         "baggage_excess": "https://www.vietnamairlines.com/vn/vi/travel-information/baggage/excess-baggage",
@@ -35,12 +34,10 @@ POLICY_URLS = {
         "checkin_online_vna_app": "https://www.vietnamairlines.com/vn/vi/travel-information/check-in/online-check-in/check-in-online-on-VNA-app",
         "checkin_airport": "https://www.vietnamairlines.com/vn/vi/travel-information/check-in/airport-check-in",
 
-        # --- THÔNG TIN SÂN BAY ---
         "airport_lotus_lounge": "https://www.vietnamairlines.com/vn/vi/travel-information/airports-transit/lotus-lounge",
         "airport_sky_priority": "https://www.vietnamairlines.com/vn/vi/travel-information/airports-transit/sky-priority",
         "airport_guides": "https://www.vietnamairlines.com/vn/vi/travel-information/airports-transit/airport-guides",
 
-        # --- DỊCH VỤ ĐẶC BIỆT ---
         "special_pax_pets": "https://www.vietnamairlines.com/vn/vi/travel-information/special-services/traveling-with-pet",
         "special_pax_pets_charge": "https://www.vietnamairlines.com/vn/vi/travel-information/special-services/traveling-with-pet/avih-charge",
         "special_pax_meals": "https://www.vietnamairlines.com/vn/vi/travel-information/special-services/special-meals",
@@ -53,11 +50,9 @@ POLICY_URLS = {
         "special_pax_charges": "https://www.vietnamairlines.com/vn/vi/travel-information/special-services/special-service-charges",
         "special_pax_infant_seat": "https://www.vietnamairlines.com/vn/vi/travel-information/special-services/infant-with-seat",
 
-        # --- CHUẨN BỊ CHO CHUYẾN BAY ---
         "travel_advice_tips": "https://www.vietnamairlines.com/vn/vi/travel-information/travel-advice/tips-for-a-seamless-trip",
         "travel_advice_domestic": "https://www.vietnamairlines.com/vn/vi/travel-information/travel-advice/for-Vietnam-domestic-flights",
 
-        # --- DỊCH VỤ BỔ TRỢ ---
         "additional_rail_fly": "https://www.vietnamairlines.com/vn/vi/additional-services/rail-and-fly",
         "additional_excess_baggage": "https://www.vietnamairlines.com/vn/vi/additional-services/excess-baggage",
         "additional_paid_meal": "https://www.vietnamairlines.com/vn/vi/additional-services/paid-meal",
@@ -73,7 +68,6 @@ POLICY_URLS = {
         "additional_transfer": "https://www.vietnamairlines.com/vn/vi/additional-services/transfer-service",
         "additional_lounge": "https://www.vietnamairlines.com/vn/vi/additional-services/lotusmiles-lounge",
 
-        # --- TRẢI NGHIỆM BAY ---
         "experience_business": "https://www.vietnamairlines.com/vn/vi/experience/business-class",
         "experience_premium_economy": "https://www.vietnamairlines.com/vn/vi/experience/premium-economy-class",
         "experience_economy": "https://www.vietnamairlines.com/vn/vi/experience/economy-class"
@@ -89,11 +83,9 @@ POLICY_URLS = {
         "compensation_info": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/thong-tin-boi-thuong-1578483460118",
         "travel_documents": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/giay-to-tuy-than-1578483122906",
         "checkin_guide": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/huong-dan-lam-thu-tuc-chuyen-bay-1685509950583",
-        # "airport_terminals": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/san-bay-va-nha-ga-quoc-te-1578483188498",
         "transit_info": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/thong-tin-noi-chuyen-1578483387074",
         "baggage_rules": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/quy-dinh-hanh-ly-1578483259803",
         "baggage_prebook": "https://www.vietjetair.com/vi/pages/mua-hanh-ly-suat-an-chon-cho-ngoi-va-hon-the-nua-1754713926921/mua-truoc-hanh-ly-1606894306295",
-        # "baggage_lost": "https://www.vietjetair.com/vi/pages/de-co-chuyen-bay-tot-dep-1578323501979/tim-kiem-hanh-ly-1578483293321",
         "special_services": "https://www.vietjetair.com/vi/pages/dich-vu-dac-biet-1601999003316",
         "class_business": "https://www.vietjetair.com/vi/pages/dich-vu-cao-cap-1689909996583/hang-ve-thuong-gia---business-1689909772703",
         "class_skyboss": "https://www.vietjetair.com/vi/pages/dich-vu-cao-cap-1689909996583/hang-ve-skyboss-1689909971054",
@@ -108,7 +100,6 @@ POLICY_URLS = {
     # 3. BAMBOO AIRWAYS (QH)
     # ==========================================
     "QH": {
-        # --- Hành lý ---
         "baggage_carry_on": "https://www.bambooairways.com/vn/vi/travel-info/baggage-info/carry-on-baggage",
         "baggage_allowance": "https://www.bambooairways.com/vn/vi/travel-info/baggage-info/baggage-allowance",
         "baggage_excess": "https://www.bambooairways.com/vn/vi/travel-info/baggage-info/excess-baggage",
@@ -120,13 +111,11 @@ POLICY_URLS = {
         "baggage_delayed_lost": "https://www.bambooairways.com/vn/vi/travel-info/baggage-info/delayed-damaged-or-lost-baggage",
         "baggage_lost_found": "https://www.bambooairways.com/vn/vi/travel-info/baggage-info/contact-lost-and-found-offices",
         
-        # --- Thủ tục ---
         "checkin_online": "https://www.bambooairways.com/vn/vi/travel-info/check-in/online-check-in",
         "checkin_airport": "https://www.bambooairways.com/vn/vi/travel-info/check-in/airport-check-in",
         "checkin_kiosk": "https://www.bambooairways.com/vn/vi/travel-info/check-in/kiosk-check-in",
         "checkin_cancel": "https://www.bambooairways.com/vn/vi/travel-info/check-in/cancel-check-in",
         
-        # --- Dịch vụ đặc biệt ---
         "special_pax_kids": "https://www.bambooairways.com/vn/vi/travel-info/special-services/travelling-with-kids",
         "special_pax_unaccompanied": "https://www.bambooairways.com/vn/vi/travel-info/special-services/unaccompanied-minors",
         "special_pax_pregnant": "https://www.bambooairways.com/vn/vi/travel-info/special-services/pregnant-passengers",
@@ -134,12 +123,10 @@ POLICY_URLS = {
         "special_pax_food_allergies": "https://www.bambooairways.com/vn/vi/travel-info/special-services/food-allergies",
         "special_pax_meals": "https://www.bambooairways.com/vn/vi/travel-info/special-services/special-meals",
         
-        # --- Giấy tờ ---
         "travel_docs_health": "https://www.bambooairways.com/vn/vi/travel-info/necessary-documents/health-status-confirmation-requirements",
         "travel_docs_id_visa": "https://www.bambooairways.com/vn/vi/travel-info/necessary-documents/identification-documents-visa",
         "travel_docs_entry_exit": "https://www.bambooairways.com/vn/vi/travel-info/necessary-documents/entry-exit-regulations",
 
-        # --- Điều kiện vé & Thông tin đặt chỗ (QUAN TRỌNG) ---
         "fare_rules_domestic": "https://www.bambooairways.com/vn/vi/book/booking-information/fare-rules/domestic-routes",
         "refund_cancellation": "https://www.bambooairways.com/vn/vi/book/booking-information/refund-cancellation-rebook-reroute",
         "special_fares": "https://www.bambooairways.com/vn/vi/book/booking-information/special-fares",
@@ -148,7 +135,6 @@ POLICY_URLS = {
         "payment_options": "https://www.bambooairways.com/vn/vi/book/booking-information/payment-options",
         "instructional_info": "https://www.bambooairways.com/vn/vi/booking/booking-information/instructional-information",
 
-        # --- Dịch vụ bổ trợ (Mua thêm) ---
         "ancillary_info": "https://www.bambooairways.com/vn/vi/book/additional-services",
         "ancillary_seat_selection": "https://www.bambooairways.com/vn/vi/book/additional-services/seat-selection",
         "ancillary_extra_baggage": "https://www.bambooairways.com/vn/vi/book/additional-services/extra-baggage",

@@ -1,8 +1,8 @@
 from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.state import ChatState
-from app.ai_orchestrator.llm.llm import llm
-from app.schemas.chat_state import ExtractionOutput, Task
+from app.core.llm_setup import llm
+from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
 
 SYSTEM_PROMPT = """Bạn là AI trích xuất thông tin đặt vé máy bay.
