@@ -2,11 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, String, Enum as SaEnum
 from typing import Optional
 from datetime import datetime
-import enum
-
-class UrlType(str, enum.Enum):
-    POLICY_PAGE = "policy_page"
-    PROMO_LIST_PAGE = "promo_list_page"
+from app.core.enums import UrlType
 
 class CrawlerUrl(SQLModel, table=True):
     __tablename__ = "crawler_urls"

@@ -5,9 +5,9 @@ from playwright.sync_api import sync_playwright
 
 MAX_RETRIES = 3
 
-def crawl_vj_policy(url):
+def crawl_vj_policy(url: str) -> str | None:
     """
-    Crawler Vietjet Air dùng Playwright.
+    Crawler Vietjet Air dùng Playwright. Nhận vào url policy, trả về raw text.
     Thuật toán khoan sâu: root (Tầng 0) -> jss149 (Tầng 2) -> xs-12 -> MuiGrid-item.
     """
     for attempt in range(MAX_RETRIES):
@@ -17,7 +17,6 @@ def crawl_vj_policy(url):
                 page = browser.new_page()
                 
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                
                 page.wait_for_selector('#root', timeout=15000)
                 page.wait_for_timeout(3000) 
                 
@@ -93,9 +92,12 @@ def crawl_vj_policy(url):
             
     return None
 
-def get_vj_promo_urls():
-    url = "https://www.vietjetair.com/vi/news/khuyen-mai-1697696806643/"
-    
+
+def get_vj_promo_urls(url: str) -> list[str]:
+    """
+    Nhận vào 1 url (trang danh sách khuyến mãi), trả về danh sách các link (chuỗi).
+    Sử dụng Playwright interception để bắt API trả về danh sách bài viết.
+    """
     unique_urls = set()
     
     with sync_playwright() as p:
@@ -116,21 +118,21 @@ def get_vj_promo_urls():
 
         page.on("response", handle_response)
         
-        page.goto(url, wait_until="networkidle", timeout=60000)
-        time.sleep(3)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=60000)
+            time.sleep(3)
+        except Exception as e:
+            print(f"Lỗi cào URL VJ: {e}")
+        finally:
+            browser.close()
         
-        browser.close()
-        
-    promotions = [{"airline": "VJ", "url": u} for u in unique_urls]
-    
-    return promotions
+    return list(unique_urls)
 
-import re
-import time
-from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 
-def extract_vj_promo_text(url):
+def extract_vj_promo_text(url: str) -> str:
+    """
+    Nhận vào 1 url khuyến mãi cụ thể, dùng Playwright để cào và trả về raw text.
+    """
     print(f"   ⏳ [VJ] Đang cào: {url}")
     text_content = ""
     with sync_playwright() as p:
@@ -141,9 +143,7 @@ def extract_vj_promo_text(url):
         
         try:
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            
             page.wait_for_selector("#root", timeout=20000)
-            
             time.sleep(3) 
             
             soup = BeautifulSoup(page.content(), 'html.parser')

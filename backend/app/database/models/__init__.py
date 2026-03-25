@@ -4,3 +4,4 @@ from .user import User
 from .flight_promotion import FlightPromotion
 from .airline import Airline
 from .crawler_url import CrawlerUrl
+from .crawler_staging import CrawlerStaging

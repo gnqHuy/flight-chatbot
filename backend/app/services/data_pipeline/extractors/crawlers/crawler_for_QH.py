@@ -7,10 +7,9 @@ from requests.compat import urljoin
 
 MAX_RETRIES = 3
 
-def crawl_qh_policy(url):
+def crawl_qh_policy(url: str) -> str | None:
     """
-    Crawler chuyên biệt cho Bamboo Airways (Liferay CMS).
-    Thuật toán: Quét id="main-content" -> gom toàn bộ class="portlet-content".
+    Nhận vào 1 url policy, trả về raw text.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -23,7 +22,6 @@ def crawl_qh_policy(url):
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
-
             main_content = soup.find(id='main-content')
             
             if not main_content:
@@ -70,17 +68,20 @@ def crawl_qh_policy(url):
             
     return None
 
-def get_qh_promo_urls():
+
+def get_qh_promo_urls(url: str) -> list[str]:
+    """
+    Nhận vào 1 url (trang danh sách khuyến mãi), trả về danh sách các link (chuỗi).
+    """
     base_url = "https://www.bambooairways.com"
-    target_url = "https://www.bambooairways.com/vn/vi/explore/offers"
-    promotions = []
+    promotions = set()
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
     }
     
     try:
-        response = requests.get(target_url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -93,20 +94,19 @@ def get_qh_promo_urls():
                 href = a.get('href')
                 if href:
                     full_url = urljoin(base_url, href)
-                    promotions.append({
-                        "airline": "QH",
-                        "url": full_url,
-                        "title": "Khuyến mãi Bamboo Airways"
-                    })
+                    promotions.add(full_url)
                         
-        unique_promos = {p["url"]: p for p in promotions}.values()
-        return list(unique_promos)
+        return list(promotions)
 
     except Exception as e:
         print(f"Lỗi cào URL QH: {e}")
         return []
     
-def extract_qh_promo_text(url):
+
+def extract_qh_promo_text(url: str) -> str:
+    """
+    Nhận vào 1 url khuyến mãi cụ thể, dùng Playwright để cào và trả về raw text.
+    """
     print(f"   ⏳ [QH] Đang cào: {url}")
     text_content = ""
     with sync_playwright() as p:
