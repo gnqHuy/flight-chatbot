@@ -3,9 +3,12 @@ from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from app.core.enums import ChatRole
+
+if TYPE_CHECKING:
+    from app.database.models.conversation import Conversation
 
 class Message(SQLModel, table=True):
     __tablename__ = "messages"

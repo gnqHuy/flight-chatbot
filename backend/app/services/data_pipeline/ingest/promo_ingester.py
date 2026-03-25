@@ -57,13 +57,22 @@ class PromoDBIngester:
                     if promo.get("booking_end_date"):
                         end_date = datetime.strptime(promo["booking_end_date"], "%Y-%m-%d").date()
 
+                    t_start_date = None
+                    if promo.get("travel_start_date"):
+                        t_start_date = datetime.strptime(promo["travel_start_date"], "%Y-%m-%d").date()
+                        
+                    t_end_date = None
+                    if promo.get("travel_end_date"):
+                        t_end_date = datetime.strptime(promo["travel_end_date"], "%Y-%m-%d").date()
+
                     db_promo = FlightPromotion(
                         airline=promo["airline"],
                         promo_code=promo.get("promo_code"),
                         promo_name=promo["promo_name"],
                         booking_start_date=start_date,
                         booking_end_date=end_date,
-                        travel_period=promo.get("travel_period"),
+                        travel_start_date=t_start_date,
+                        travel_end_date=t_end_date,
                         description=promo["description"],
                         conditions=promo["conditions"],
                         url=promo["url"],

@@ -12,14 +12,21 @@ class PolicyLLMFormatter:
         self.input_dir = os.path.join("data", "policies")
         self.output_dir = os.path.join("data", "cleaned_policies")
         
-        self.system_instruction = """Bạn là một chuyên gia Data Engineer. Nhiệm vụ của bạn là nhận văn bản thô cào từ website hàng không và định dạng lại thành Markdown (.md) chuẩn xác để nạp vào hệ thống RAG.
-QUY TẮC TỐI THƯỢNG:
-1. KHÔNG thêm, bớt, tóm tắt hay bịa đặt bất kỳ thông tin nào (đặc biệt là giá tiền, con số, số kg, kích thước).
-2. Dùng Heading (##, ###) cho các tiêu đề chính/phụ.
-3. Dùng Bullet points (- ) cho các danh sách, các mức giá, hoặc các khu vực (A, B, C...).
-4. In đậm (**) các từ khóa quan trọng, số tiền, và trọng lượng.
-5. Xóa bỏ hoàn toàn các thông tin rác lọt lưới ở cuối trang (như bản quyền, địa chỉ công ty, menu footer) nếu có.
-Chỉ trả về nội dung Markdown, không giải thích gì thêm."""
+        self.system_instruction = (
+            "Bạn là một chuyên gia Data Engineer. Nhiệm vụ của bạn là nhận văn bản thô cào từ website "
+            "hàng không và định dạng lại thành Markdown (.md) siêu sạch để nạp vào hệ thống RAG.\n\n"
+            "QUY TẮC TỐI THƯỢNG:\n"
+            "1. KHÔNG thêm, bớt hay bịa đặt bất kỳ thông tin nào (đặc biệt là giá tiền, con số, số kg, kích thước).\n"
+            "2. Dùng Heading (##, ###) cho các tiêu đề chính/phụ để phân tách rõ ràng các hạng mục.\n"
+            "3. XỬ LÝ BẢNG BIỂU (QUAN TRỌNG): TUYỆT ĐỐI KHÔNG dùng định dạng bảng (Table |...|...|). "
+            "Hãy chuyển đổi mọi bảng biểu thành các gạch đầu dòng (Bullet points) mang đầy đủ ngữ cảnh.\n"
+            "   - Ví dụ SAI (Bảng): | Chặng bay | 20kg | 30kg |\n"
+            "   - Ví dụ ĐÚNG (Danh sách):\n"
+            "     - Chặng bay nội địa: Hành lý 20kg giá 150.000 VNĐ, Hành lý 30kg giá 250.000 VNĐ.\n"
+            "4. In đậm (**) các từ khóa quan trọng, số tiền, và trọng lượng.\n"
+            "5. Xóa bỏ hoàn toàn các thông tin rác (như bản quyền, menu footer, các câu 'click vào đây').\n"
+            "Chỉ trả về nội dung Markdown, không giải thích gì thêm."
+        )
 
         self.prompt_template = ChatPromptTemplate.from_messages([
             ("system", self.system_instruction),

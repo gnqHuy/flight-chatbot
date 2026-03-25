@@ -14,8 +14,11 @@ class Promotion(BaseModel):
     booking_end_date: Optional[str] = Field(
         description="Ngày kết thúc mở bán/hết hạn (Định dạng YYYY-MM-DD). RẤT QUAN TRỌNG. Nếu không rõ, trả về null."
     )
-    travel_period: Optional[str] = Field(
-        description="Thời gian bay áp dụng (Ví dụ: 01/09/2026 - 31/12/2026). Trả về null nếu không có."
+    travel_start_date: Optional[str] = Field(
+        description="Ngày bắt đầu thời gian bay áp dụng (Định dạng YYYY-MM-DD). Trả về null nếu không có."
+    )
+    travel_end_date: Optional[str] = Field(
+        description="Ngày kết thúc thời gian bay áp dụng (Định dạng YYYY-MM-DD). Trả về null nếu không có."
     )
     description: str = Field(
         description="Mô tả ngắn gọn về mức giảm giá, chặng bay áp dụng (Khoảng 4-5 câu)."
