@@ -1,5 +1,4 @@
-import enum
-from sqlmodel import SQLModel, Field
+from sqlmodel import Relationship, SQLModel, Field
 from sqlalchemy import Column, Text, JSON, Enum as SaEnum
 from typing import Optional
 from datetime import datetime, timezone
@@ -23,3 +22,4 @@ class CrawlerStaging(SQLModel, table=True):
     
     error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    url_obj: Optional["CrawlerUrl"] = Relationship(back_populates="stagings")

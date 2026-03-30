@@ -18,4 +18,6 @@ class CrawlerUrl(SQLModel, table=True):
     is_active: bool = Field(default=True)
     last_crawled_at: Optional[datetime] = Field(default=None)
     
-    airline: Optional["Airline"] = Relationship(back_populates="crawler_urls")
+    airline: Optional["Airline"] = Relationship(back_populates="crawler_urls"
+                                                )
+    stagings: list["CrawlerStaging"] = Relationship(back_populates="url_obj")

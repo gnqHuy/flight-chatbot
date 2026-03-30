@@ -2,67 +2,92 @@
 
 import { useEffect, useState } from 'react';
 import FlightOfferCard from './FlightOfferCard';
-import { FlightOffer } from '@/types/ChatMessage';
+import { FlightOffer } from '@/types/FlightOffer'; // Adjust type import if needed
 import { chatAPI } from '@/services/chatAPI';
 
 type Props = {
   searchId: string;
+  activeTab: 'ALL' | 'VN' | 'VJ' | 'QH';
+  onAskAI: (prompt: string) => void;
 };
 
-const FlightListContainer = ({ searchId }: Props) => {
-  const [flights, setFlights] = useState<FlightOffer[]>([]);
+const FlightListContainer = ({ searchId, activeTab, onAskAI }: Props) => {
+  const [allFlights, setAllFlights] = useState<FlightOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     const fetchFlights = async () => {
       if (!searchId) return;
-
       try {
         setLoading(true);
+        setIsExpired(false);
         const data = await chatAPI.getCachedFlights(searchId);
-        setFlights(data.flights || []);
+        setAllFlights(data.flights || []);
       } catch (error: any) {
-        if (error.response && error.response.status === 410) {
+        if (error.response?.status === 410) {
           setIsExpired(true);
         } else {
-          console.error('Lỗi lấy vé từ cache:', error);
+          console.error('Lỗi lấy vé:', error);
         }
       } finally {
         setLoading(false);
       }
     };
-
     fetchFlights();
   }, [searchId]);
 
+  // Logic lọc theo tab hãng bay
+  const displayedFlights = allFlights.filter((flight) => {
+    if (activeTab === 'ALL') return true;
+    
+    // Giả định flight có trường flightNumber (vd: VN208) hoặc validatingAirlineCodes
+    const carrierCode = flight.flightNumber?.substring(0, 2)?.toUpperCase();
+    return carrierCode === activeTab;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center space-y-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+        <p className="text-sm font-medium text-slate-500 animate-pulse">Đang tìm chuyến bay tốt nhất...</p>
+      </div>
+    );
+  }
+
+  if (isExpired) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <p className="text-lg font-bold text-amber-800">⏳ Phiên tìm kiếm đã hết hạn</p>
+          <p className="mt-2 text-sm text-amber-700">Giá vé có thể đã thay đổi. Vui lòng yêu cầu AI tìm kiếm lại.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (displayedFlights.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-center">
+        <div className="rounded-2xl bg-white p-8 shadow-sm border border-slate-100">
+          <span className="text-4xl">📭</span>
+          <p className="mt-4 font-semibold text-slate-700">Không tìm thấy chuyến bay</p>
+          <p className="text-sm text-slate-500 mt-1">Không có chuyến bay nào phù hợp với hãng {activeTab !== 'ALL' ? activeTab : 'này'}.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      {loading ? (
-        <div className="mt-2 pr-4 pl-12 text-sm text-gray-500 italic">
-          Đang tải thông tin chuyến bay...
-        </div>
-      ) : isExpired ? (
-        <div className="mt-2 ml-12 w-full max-w-[70%] rounded-lg border border-gray-300 bg-gray-50 p-4 text-center">
-          <p className="font-medium text-gray-600">Phiên tìm kiếm vé này đã hết hạn.</p>
-          <p className="text-sm text-gray-500">
-            Giá vé có thể đã thay đổi. Vui lòng nhắn tin để bot tìm lại nhé!
-          </p>
-        </div>
-      ) : (
-        <div className="mt-2 ml-12 flex flex-col gap-3">
-          {flights.map((flight) => (
-            <FlightOfferCard
-              key={flight.id}
-              flight={flight}
-              onSelectFlight={(selected) => {
-                console.log('User vừa chọn vé: ', selected);
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </>
+    <div className="flex flex-col gap-4 pb-8">
+      {displayedFlights.map((flight, idx) => (
+        <FlightOfferCard
+          key={flight.id || idx}
+          flight={flight}
+          onAskAI={onAskAI}
+        />
+      ))}
+    </div>
   );
 };
 

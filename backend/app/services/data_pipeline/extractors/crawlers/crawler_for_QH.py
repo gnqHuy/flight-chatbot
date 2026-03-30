@@ -5,6 +5,8 @@ import requests
 from bs4 import BeautifulSoup
 from requests.compat import urljoin
 
+from app.core.constants import AIRLINE_BASE_URLS
+
 MAX_RETRIES = 3
 
 def crawl_qh_policy(url: str) -> str | None:
@@ -73,7 +75,7 @@ def get_qh_promo_urls(url: str) -> list[str]:
     """
     Nhận vào 1 url (trang danh sách khuyến mãi), trả về danh sách các link (chuỗi).
     """
-    base_url = "https://www.bambooairways.com"
+    base_url = AIRLINE_BASE_URLS["QH"]
     promotions = set()
     
     headers = {

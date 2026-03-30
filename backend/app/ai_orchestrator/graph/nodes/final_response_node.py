@@ -2,6 +2,7 @@ from datetime import datetime
 from app.ai_orchestrator.graph.state import ChatState
 from app.core.llm_setup import llm
 from langchain_core.prompts import ChatPromptTemplate
+from app.utils.promo_injector import check_and_inject_promos
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
@@ -15,6 +16,7 @@ def final_response_node(state: ChatState):
     node_results = state.get("node_results", [])
     action = state.get("action")
     error_msg = state.get("error_msg")
+    current_search_id = state.get("current_search_id")
     
     history_dict = state.get("chat_history", {})
     history_list = history_dict.get("messages", []) if isinstance(history_dict, dict) else []
@@ -33,22 +35,40 @@ def final_response_node(state: ChatState):
         for result in node_results:
             if not result: continue
             
-            if "[Cập nhật thông tin]" in result:
-                system_instructions.append(f"[CẬP NHẬT TỪ KHÁCH HÀNG]: {result}")
-            elif "[SLOT_FILLING_REQUIRED]" in result or "[INVALID" in result:
-                system_instructions.append(f"[YÊU CẦU THÔNG TIN]: {result}")
-            elif "NOT_FOUND" in result or "ERROR" in result:
-                system_instructions.append(f"[TRỤC TRẶC TÌM KIẾM/PHÂN TÍCH]: {result}")
-            elif "[BÁO CÁO PHÂN TÍCH" in result or "SO SÁNH" in result:
-                system_instructions.append(f"[DỮ LIỆU SO SÁNH]: \n{result}")
-            elif "THÔNG TIN QUY ĐỊNH" in result:
-                system_instructions.append(f"[KIẾN THỨC NGHIỆP VỤ (RAG)]: \n{result}")
-            elif "FOUND" in result: 
-                system_instructions.append(f"[THÔNG TIN CHUYẾN BAY]: {result}")
+            result_upper = result.upper()
+            
+            if "[CẬP NHẬT THÔNG TIN]" in result_upper:
+                system_instructions.append(f"[CẬP NHẬT TỪ KHÁCH HÀNG]:\n{result}")
+                
+            elif "[YÊU CẦU THÔNG TIN]" in result_upper or "[INVALID]" in result_upper:
+                system_instructions.append(f"[YÊU CẦU THÔNG TIN]:\n{result}")
+                
+            elif "[KHÔNG_TÌM_THẤY]" in result_upper or "[LỖI]" in result_upper:
+                system_instructions.append(f"[TRỤC TRẶC HỆ THỐNG]:\n{result}")
+                
+            elif "[BÁO CÁO PHÂN TÍCH]" in result_upper or "SO SÁNH" in result_upper:
+                system_instructions.append(f"[DỮ LIỆU SO SÁNH CHUYẾN BAY]: \n{result}")
+                
+            elif "[TRA CỨU CHÍNH SÁCH]" in result_upper:
+                system_instructions.append(f"[KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)]: \n{result}")
+                
+            elif "[TRA CỨU KHUYẾN MÃI]" in result_upper: 
+                system_instructions.append(f"[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]: \n{result}")
+                
+            elif "[THÔNG TIN CHUYẾN BAY]" in result_upper or "[TÌM_THẤY]" in result_upper: 
+                system_instructions.append(f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]:\n{result}")
+                
             else:
-                system_instructions.append(f"[THÔNG TIN BỔ SUNG]: {result}")
+                system_instructions.append(f"[THÔNG TIN BỔ SUNG]:\n{result}")
 
     combined_context = "\n\n".join(system_instructions)
+
+    if "THÔNG TIN CHUYẾN BAY" in combined_context or "BÁO CÁO PHÂN TÍCH" in combined_context:
+        print("👉 [DEBUG]: Đang rà soát Khuyến mãi ẩn để bán chéo...")
+        promo_context = check_and_inject_promos(current_search_id)
+        if promo_context:
+            combined_context += f"\n\n{promo_context}"
+            print("👉 [DEBUG]: Đã tiêm thành công khuyến mãi vào Context cho LLM!")
 
     known_info = {k: v for k, v in user_prefs.items() if v and k != "current_search_id"}
 
@@ -73,7 +93,11 @@ def final_response_node(state: ChatState):
          "   - Ngân sách / Mức giá tối đa mong muốn.\n"
          "   - Tiêu chí ưu tiên khi so sánh (muốn tìm chuyến rẻ nhất, bay nhanh nhất, hay cất cánh sớm nhất).\n"
          "5. ĐÓNG VAI HOÀN HẢO: Dịch các trường dữ liệu thô sang lời nói tự nhiên. Tuyệt đối KHÔNG lộ các thẻ mã lệnh hệ thống (VD: [HÀNH ĐỘNG CỦA UI], [CẬP NHẬT...]) ra ngoài.\n"
-         "6. MỜI XEM MÀN HÌNH: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [THÔNG TIN CHUYẾN BAY], bạn BẮT BUỘC phải thêm 1 câu mời khách xem danh sách vé/kết quả đang hiển thị trên giao diện.\n\n"
+         "6. MỜI XEM MÀN HÌNH: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC], bạn BẮT BUỘC phải thêm 1 câu mời khách xem danh sách vé/kết quả đang hiển thị trên giao diện.\n"
+         "7. KHÉO LÉO BÁN CHÉO (CROSS-SELL): Nếu trong [CHỈ THỊ NỘI BỘ] có cung cấp thông tin mã giảm giá/khuyến mãi cho các chuyến bay khách đang xem, BẮT BUỘC phải lồng ghép vào câu trả lời như một 'mẹo nhỏ' hoặc 'đặc quyền' để thôi thúc khách chốt vé.\n"
+         "8. TRÍCH DẪN NGUỒN (RẤT QUAN TRỌNG): Khi trả lời dựa trên thông tin từ [KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)], bạn PHẢI sao chép Y NGUYÊN và đính kèm [Link tham khảo] ở cuối câu trả lời. TUYỆT ĐỐI không được bỏ qua link này.\n"
+         "9. XỬ LÝ LOGIC GIỚI HẠN: Khi khách hàng hỏi về một mốc số liệu (ví dụ: đúng 32 tuần tuổi thai), hãy chú ý phân biệt rõ giữa 'ĐẾN 32 tuần' (được phép bay nhưng cần giấy tờ) và 'TRÊN 32 tuần' (từ chối vận chuyển) dựa trên tài liệu được cung cấp. Cung cấp cả 2 trường hợp để khách tự đối chiếu.\n\n"
+         "--- CHỈ THỊ NỘI BỘ TỪ CÁC NODE ---\n"
          "--- CHỈ THỊ NỘI BỘ TỪ CÁC NODE ---\n"
          "{context}"
         ),

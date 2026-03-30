@@ -36,10 +36,10 @@ class CrawlerStagingRepository:
         """
         statement = (
             select(CrawlerStaging)
-            .join(CrawlerUrl)
+            .join(CrawlerUrl, CrawlerStaging.url_id == CrawlerUrl.id) 
             .where(CrawlerStaging.status == StagingStatus.CRAWLED)
             .where(CrawlerUrl.url_type == url_type)
-            .options(joinedload(CrawlerStaging.url)) 
+            .options(joinedload(CrawlerStaging.url_obj)) 
             .limit(limit)
         )
         return list(self.session.exec(statement).all())

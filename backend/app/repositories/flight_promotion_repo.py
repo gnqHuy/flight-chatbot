@@ -17,10 +17,14 @@ class FlightPromotionRepository:
         self.session.add_all(promotions)
         self.session.commit()
 
-    def get_active_promotions(self) -> List[FlightPromotion]:
+    def get_active_promotions(self, target_airline_id: Optional[int] = None) -> List[FlightPromotion]:
         today = date.today()
         statement = select(FlightPromotion).where(
             (FlightPromotion.booking_end_date == None) | 
             (FlightPromotion.booking_end_date >= today)
         )
+        
+        if target_airline_id:
+            statement = statement.where(FlightPromotion.airline_id == target_airline_id)
+            
         return list(self.session.exec(statement).all())

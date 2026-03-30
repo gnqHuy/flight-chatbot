@@ -91,16 +91,20 @@ class FlightService:
             travelers = []            
             current_id = 1
             adult_ids = []
-            for _ in range(adults):
+            
+            safe_adults = max(1, int(adults) if adults is not None else 1)
+            for _ in range(safe_adults):
                 travelers.append({"id": str(current_id), "travelerType": "ADULT"})
                 adult_ids.append(str(current_id))
                 current_id += 1
             
-            for _ in range(children):
+            safe_children = int(children) if children is not None else 0
+            for _ in range(safe_children):
                 travelers.append({"id": str(current_id), "travelerType": "CHILD"})
                 current_id += 1
             
-            for i in range(infants):
+            safe_infants = int(infants) if infants is not None else 0
+            for i in range(safe_infants):
                 assoc_id = adult_ids[i] if i < len(adult_ids) else adult_ids[0]
                 travelers.append({
                     "id": str(current_id), 
@@ -135,13 +139,12 @@ class FlightService:
         except ResponseError as error:
             print(f"Amadeus Service Error: {error}")
             error_detail = str(error)
-            if hasattr(error, 'response') and error.response and error.response.result:
+            if hasattr(error, 'response') and error.response and getattr(error.response, 'result', None):
                 errors = error.response.result.get('errors', [])
                 if errors:
                     error_detail = errors[0].get('detail', str(error))
                     
             raise Exception(f"Lỗi API: {error_detail}")
-
 
     def get_price_metrics(self, origin: str, destination: str, departureDate: str) -> list:
         """Gọi API Amadeus Itinerary Price Metrics để lấy dữ liệu phân tích giá"""

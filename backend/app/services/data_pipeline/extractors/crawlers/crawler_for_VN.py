@@ -6,6 +6,8 @@ import json
 from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright
 
+from app.core.constants import AIRLINE_BASE_URLS
+
 MAX_RETRIES = 3
 
 def crawl_vn_policy(url: str) -> str | None:
@@ -67,7 +69,8 @@ def get_vn_promo_urls(url: str) -> list[str]:
     Nhận vào trang khuyến mãi tháng của VN, dùng Playwright bắt cả DOM và Data attribute, 
     trả về danh sách các link (chuỗi).
     """
-    base_url = "https://www.vietnamairlines.com"
+    
+    base_url = AIRLINE_BASE_URLS["VN"]
     unique_urls = set()
     
     with sync_playwright() as p:

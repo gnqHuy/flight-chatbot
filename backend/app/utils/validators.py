@@ -36,7 +36,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
 
     if missing_fields:
         missing_str = ", ".join(missing_fields)
-        error_msgs.append(f"[SLOT_FILLING_REQUIRED]: Khách chưa cung cấp đủ {missing_str}.")
+        error_msgs.append(f"[YÊU CẦU THÔNG TIN]: Khách chưa cung cấp đủ {missing_str}.")
 
     total_passengers = adults + children
     has_kids = (children > 0 or infants > 0)

@@ -1,7 +1,7 @@
 'use client';
 
 import { use } from 'react';
-import ChatWindow from '@/components/ChatWindow';
+import ChatLayout from '@/components/ChatLayout';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -10,5 +10,5 @@ interface PageProps {
 export default function ChatPage({ params }: PageProps) {
   const { id } = use(params);
 
-  return <ChatWindow conversationId={id} />;
+  return <ChatLayout conversationId={id} />;
 }

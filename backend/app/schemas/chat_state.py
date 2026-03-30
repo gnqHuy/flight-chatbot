@@ -3,95 +3,82 @@ from typing import Literal, Optional, List
 from app.core.enums import AnalysisCriteria, ChatIntent, SortPreference, TravelClass  
 
 class FlightParameters(BaseModel):
-    origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI. Dấu hiệu: Thường đứng sau chữ 'từ', 'khởi hành tại'. NẾU KHÁCH NÓI 'đi Sài Gòn', 'đến Hà Nội' thì đó KHÔNG PHẢI origin. Bỏ qua nếu không rõ.")
-    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN. Dấu hiệu: Thường đứng sau chữ 'đi', 'đến', 'vào', 'bay ra'. VD: 'đi công tác Sài Gòn' -> destination='SGN'.")
+    origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI. NẾU KHÁCH NÓI 'đi Sài Gòn' thì đó là destination, KHÔNG PHẢI origin.")
+    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN. VD: 'bay vào Đà Nẵng' -> DAD.")
     
     departureDate: Optional[str] = Field(None, description="Ngày đi (YYYY-MM-DD).")
     returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
-    is_roundtrip: bool = Field(
-        False, 
-        description="Đặt là True nếu khách nhắc đến 'khứ hồi', 'bay về', 'đi và về'. Mặc định là False."
-    )
+    is_roundtrip: bool = Field(False, description="True nếu là vé khứ hồi.")
 
-    adults: int = Field(1, description="Số lượng người lớn (trên 12 tuổi).")
-    children: int = Field(0, description="Số lượng trẻ em (2-12 tuổi).")
-    infants: int = Field(0, description="Số lượng trẻ sơ sinh (dưới 2 tuổi).")
-    pax_confirmed: bool = Field(
-        True, 
-        description=(
-            "Đặt là False nếu khách nhắc đến 'trẻ em', 'con nhỏ' nhưng KHÔNG nói rõ tuổi hoặc năm sinh. "
-            "Đặt là True nếu khách đã nói rõ tuổi (VD: 'bé 3 tuổi', 'con chị 5 tuổi') hoặc chỉ có người lớn."
-        )
-    )
+    adults: int = Field(1, description="Số lượng người lớn.")
+    children: int = Field(0, description="Số lượng trẻ em.")
+    infants: int = Field(0, description="Số lượng trẻ sơ sinh.")
+    pax_confirmed: bool = Field(True, description="False nếu chưa rõ số tuổi trẻ em.")
 
     includedAirlines: Optional[List[str]] = Field(
         default=None, 
         description=(
-            "CHỈ DÙNG KHI TÌM KIẾM HOẶC LỌC VÉ. "
-            "Dùng khi khách KHẲNG ĐỊNH, YÊU CẦU hoặc CHỈ ĐỊNH rõ hãng muốn đi. "
-            "Hỗ trợ: VN (Vietnam Airlines), VJ (VietJet Air), QH (Bamboo Airways). "
-            "VD: 'Chỉ tìm vé VN', 'Sếp thích bay Vietnam Airlines' -> Trả về ['VN']. "
-            "TUYỆT ĐỐI KHÔNG DÙNG biến này nếu khách nói câu phủ định (như 'tránh', 'không đi'). "
-            "KHÔNG điền vào đây nếu Intent là ANALYZE_FLIGHTS (hãy điền vào analysis_targets)."
+            "CHỈ DÙNG khi khách muốn TÌM/MUA vé (intent: search_flight). "
+            "VD: 'Tìm vé Vietjet' -> ['VJ']. "
+            "KHÔNG dùng cho hỏi quy định/khuyến mãi."
         )
     )
     
     excludedAirlines: Optional[List[str]] = Field(
         default=None,
-        description=(
-            "CHỈ DÙNG KHI TÌM KIẾM HOẶC LỌC VÉ. "
-            "Dùng khi khách có ý PHỦ ĐỊNH, KHÔNG MUỐN hoặc TRÁNH một hãng nào đó. "
-            "VD: 'Tránh VJ ra nhé', 'Sếp không bay Vietjet đâu' -> Trả về chính xác mã hãng bị ghét ['VJ']. "
-            "TUYỆT ĐỐI KHÔNG tự suy luận hay làm toán trừ danh sách (không được tự đổi thành include VN, QH). "
-            "Cứ thấy khách chê/ghét hãng nào là ném thẳng mã hãng đó vào biến này. "
-            "KHÔNG điền vào đây nếu Intent là ANALYZE_FLIGHTS."
-        )
+        description="Mã hãng khách muốn tránh (intent: search_flight/filter_sort)."
     )
 
     cleared_filters: Optional[List[str]] = Field(
         default=None,
-        description=(
-            "QUAN TRỌNG: Danh sách các 'TÊN BIẾN' cần XÓA BỎ khỏi State khi khách đổi ý (Undo/Quay xe). "
-            "VD 1: Khách từng chê 'tránh VJ', nay đổi ý 'thôi cứ tìm cả Vietjet đi xem sao' (tức là xóa lệnh cấm) -> Trả về ['excludedAirlines']. "
-            "VD 2: Khách từng chốt 'chỉ bay VN', nay nói 'đi hãng nào cũng được' (xóa mọi bộ lọc) -> Trả về ['includedAirlines', 'excludedAirlines']. "
-            "VD 3: Khách nói 'Bỏ lọc giá đi' -> Trả về ['maxPrice']. "
-            "TUYỆT ĐỐI KHÔNG ghi giá trị vào includedAirlines/excludedAirlines nếu đã điền tên chúng vào biến cleared_filters này."
-        )
+        description="Các biến cần xóa khỏi State."
     )
 
-    nonStop: Optional[bool] = Field(None, description="True nếu chỉ muốn bay thẳng, không quá cảnh.")
+    nonStop: Optional[bool] = Field(None, description="True nếu chỉ bay thẳng.")
     travelClass: Optional[TravelClass] = Field(None, description="Hạng ghế.")
     maxPrice: Optional[int] = Field(None, description="Ngân sách tối đa.")
     sort_preference: Optional[SortPreference] = Field(
         SortPreference.PRICE, 
-        description=(
-            "Tiêu chí ưu tiên sắp xếp danh sách: "
-            "'price' (khi khách muốn rẻ), "
-            "'duration' (khi khách muốn bay nhanh), "
-            "'departure_time' (khi khách muốn bay sớm)."
-        )
+        description="Tiêu chí sắp xếp."
     )
-    start_hour: Optional[int] = Field(None, description="Giờ đi: Sáng=6, Trưa=11, Chiều=13, Tối=18.")
-    end_hour: Optional[int] = Field(None, description="Giờ đến: Sáng=11, Trưa=13, Chiều=18, Tối=23.")
-    
-    analysis_targets: Optional[List[str]] = Field(
+    start_hour: Optional[int] = Field(None, description="Giờ đi.")
+    end_hour: Optional[int] = Field(None, description="Giờ đến.")
+        
+    target_flight: Optional[List[str]] = Field(
         default=None, 
-        description=(
-            "Mã chuyến bay (VD: VN123) hoặc Mã hãng bay (VD: VN, VJ, QH) mà khách muốn SO SÁNH hoặc PHÂN TÍCH. "
-            "LƯU Ý SỐNG CÒN: Nếu khách nói 'So sánh VN và QH', BẮT BUỘC điền ['VN', 'QH'] vào ĐÂY. "
-            "KHÔNG ĐƯỢC điền vào biến includedAirlines."
-        )
+        description="Mã chuyến bay cụ thể (VN208) để phân tích. KHÔNG điền mã hãng vào đây."
     )
 
+    target_airline: Optional[List[str]] = Field(
+        default=None, 
+        description=(
+            "BẮT BUỘC ĐIỀN khi khách nhắc tên hãng trong các tác vụ: Tra cứu quy định (general_question), "
+            "Khuyến mãi (promo_search), So sánh (analyze_flights). "
+            "Đây là 'Airline Filter' cho RAG. "
+            "VD: 'Bà bầu đi Vietjet có sao không?' -> intent='general_question', target_airline=['VJ']."
+        )
+    )
+    
     criteria: List[AnalysisCriteria] = Field(
         default=[AnalysisCriteria.PRICE, AnalysisCriteria.TIME],
-        description="Các khía cạnh khách muốn tập trung so sánh. Nếu khách không nói rõ, mặc định so sánh giá và giờ giấc."
+        description="Tiêu chí so sánh."
     )
 
 class Task(BaseModel):
     intent: ChatIntent = Field(..., description="Phân loại ý định.")
-    parameters: Optional[FlightParameters] = Field(None, description="Tham số chuyến bay (nếu có).")
-    query_context: Optional[str] = Field(None, description="Câu hỏi RAG.")
+    
+    parameters: Optional[FlightParameters] = Field(
+        None, 
+        description=(
+            "Tham số chi tiết. NẾU khách nhắc tên hãng (Vietjet, VN Airlines...) trong câu hỏi quy định/khuyến mãi, "
+            "BẮT BUỘC trích xuất mã hãng vào parameters.target_airline thay vì bỏ qua."
+        )
+    )
+    
+    query_context: Optional[str] = Field(
+        None, 
+        description="Nội dung cốt lõi để tra cứu (VD: 'phụ nữ mang thai 32 tuần', 'hành lý xách tay')."
+    )
 
 class ExtractionOutput(BaseModel):
     tasks: List[Task] = Field(..., description="Danh sách tác vụ.")
