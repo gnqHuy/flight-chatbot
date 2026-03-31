@@ -19,16 +19,13 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [isSending, setIsSending] = useState(false); // Trạng thái đang đợi AI rep
+  const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Cuộn xuống cuối khi có tin nhắn mới
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
-  // Load lịch sử chat
-  // Load lịch sử chat
   useEffect(() => {
     const fetchHistory = async () => {
       if (!conversationId) {

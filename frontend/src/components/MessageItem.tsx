@@ -3,6 +3,8 @@
 import React from 'react';
 import Image from 'next/image';
 import { Role } from '@/types/enums/Role';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export interface MessageItemProps {
   role: Role;
@@ -16,7 +18,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
 
   return (
     <div className={`mb-5 flex w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`relative h-9 w-9 flex-shrink-0 ${isUser ? 'ml-3' : 'mr-3'}`}>
+      <div className={`relative h-9 w-9 shrink-0 ${isUser ? 'ml-3' : 'mr-3'}`}>
         <Image
           src={isUser ? '/assets/user.svg' : '/assets/chatbot.svg'}
           alt={isUser ? 'User' : 'Bot'}
@@ -25,7 +27,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
         />
       </div>
 
-      <div className={`flex max-w-[75%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex max-w-[70%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div
           className={`rounded-2xl px-5 py-3 shadow-sm ${
             isUser
@@ -40,7 +42,40 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400"></span>
             </div>
           ) : (
-            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{text}</p>
+            <div
+              className={`text-[15px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                  strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                  a: ({ node, ...props }) => (
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`break-all underline underline-offset-2 ${isUser ? 'text-blue-200 hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}
+                      {...props}
+                    />
+                  ),
+                  ul: ({ node, ...props }) => (
+                    <ul className="mb-3 list-outside list-disc pl-5" {...props} />
+                  ),
+                  ol: ({ node, ...props }) => (
+                    <ol className="mb-3 list-outside list-decimal pl-5" {...props} />
+                  ),
+                  li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                  blockquote: ({ node, ...props }) => (
+                    <blockquote
+                      className={`my-2 border-l-4 pl-3 italic ${isUser ? 'border-blue-300' : 'border-slate-300 text-slate-600'}`}
+                      {...props}
+                    />
+                  ),
+                }}
+              >
+                {text}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
         {timestamp && (

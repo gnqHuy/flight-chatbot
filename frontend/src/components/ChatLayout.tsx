@@ -31,12 +31,9 @@ export default function ChatLayout({ conversationId }: Props) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-gray-800">
-      {/* ---------------- CỘT TRÁI: KHUNG CHAT AI ---------------- */}
       <div
         className={`h-full transition-all duration-500 ease-in-out ${
-          isWorkspaceOpen
-            ? 'z-10 w-[50%] border-r border-gray-200 shadow-lg'
-            : 'mx-auto w-full max-w-4xl'
+          isWorkspaceOpen ? 'z-10 w-[50%] border-r border-gray-200 shadow-lg' : 'mx-auto w-full'
         }`}
       >
         <ChatWindow
@@ -46,7 +43,6 @@ export default function ChatLayout({ conversationId }: Props) {
         />
       </div>
 
-      {/* ---------------- CỘT PHẢI: KẾT QUẢ TÌM KIẾM ---------------- */}
       <div
         className={`flex h-full flex-col bg-[#F8FAFC] transition-all duration-500 ease-in-out ${
           isWorkspaceOpen
