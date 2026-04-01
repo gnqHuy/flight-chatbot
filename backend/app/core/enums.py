@@ -8,14 +8,10 @@ class ChatRole(str, Enum):
 class ComponentType(str, Enum):
     NONE = "none"
     ERROR = "error"
-    DATE_PICKER = "date_picker"
     FLIGHT_LIST = "flight_list"
-    CONFIRM_FORM = "confirm_form"
 
 class ChatIntent(str, Enum):
-    GREETING = "greeting"
     SEARCH_FLIGHT = "search_flight"
-    PROVIDE_INFO = "provide_info"
     ANALYZE_FLIGHTS = "analyze_flights"
     FILTER_SORT_FLIGHTS = "filter_sort_flights"
     GENERAL_QUESTION = "general_question"
@@ -27,7 +23,6 @@ class TravelClass(str, Enum):
     BUSINESS = "BUSINESS"
     FIRST = "FIRST"
     PREMIUM_ECONOMY = "PREMIUM_ECONOMY"
-from enum import Enum
 
 class SortPreference(str, Enum):
     PRICE = "price"

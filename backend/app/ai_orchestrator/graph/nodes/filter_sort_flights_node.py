@@ -10,7 +10,7 @@ def filter_sort_flights_node(state: ChatState) -> dict:
     user_prefs = state.get("user_prefs", {})
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])    
-    remaining_tasks = consume_task(tasks, "filter_sort_flights")
+    remaining_tasks = consume_task(tasks, ["filter_sort_flights"])
     
     sort_pref = user_prefs.get("sort_preference", "price_asc")
     sort_val = sort_pref.value if hasattr(sort_pref, 'value') else str(sort_pref)

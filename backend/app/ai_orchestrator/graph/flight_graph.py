@@ -32,12 +32,6 @@ def route_tasks(state: ChatState) -> str:
         
     if intent_val == ChatIntent.ANALYZE_FLIGHTS.value:
         return "analyze_flights"
-        
-    if intent_val == ChatIntent.PROVIDE_INFO.value:
-        if not current_id or current_id == "CLEAR":
-            return "search_flights"
-        else:
-            return "filter_sort_flights"
 
     if intent_val == ChatIntent.GENERAL_QUESTION.value:
         return "policy_retrieval_node"

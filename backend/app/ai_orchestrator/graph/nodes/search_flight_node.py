@@ -4,6 +4,7 @@ from app.services.flight_service import flight_service
 from app.services.redis_service import redis_service
 from app.utils.flight_parser import get_final_airlines
 from app.utils.validators import validate_flight_params
+from app.utils.helpers import consume_task
 
 def search_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM CHUYẾN BAY ---")
@@ -12,16 +13,9 @@ def search_flights_node(state: ChatState) -> dict:
 
     user_prefs = state.get("user_prefs", {})
     
-    # Xóa task search_flight an toàn
     current_tasks = state.get("tasks", [])
-    remaining_tasks = []
+    remaining_tasks = consume_task(current_tasks, ["search_flight"])
     
-    for t in current_tasks:
-        task_name = t.intent.value if hasattr(t.intent, 'value') else str(t.intent)
-        task_name_lower = task_name.lower()
-        if "search_flight" not in task_name_lower:
-            remaining_tasks.append(t)
-            
     is_valid, error_msgs, state_updates = validate_flight_params(user_prefs)
     
     if not is_valid:
