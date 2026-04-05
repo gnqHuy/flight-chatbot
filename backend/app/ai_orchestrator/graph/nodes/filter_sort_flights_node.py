@@ -3,14 +3,12 @@ from datetime import datetime
 import uuid
 from app.ai_orchestrator.graph.state import ChatState
 from app.services.redis_service import redis_service
-from app.utils.flight_parser import get_final_airlines
 from app.utils.helpers import consume_task
 from app.schemas.chat_state import Task
 from app.core.enums import ChatIntent 
 from app.core.constants import ContextTag
 
 def filter_sort_flights_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM LỌC & SẮP XẾP LOCAL ---")
     user_prefs = state.get("user_prefs", {})
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])    
@@ -42,7 +40,6 @@ def filter_sort_flights_node(state: ChatState) -> dict:
         
     all_flights = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
 
-    final_airlines = get_final_airlines(user_prefs)
     max_price = user_prefs.get("maxPrice")
     start_hour = user_prefs.get("start_hour")
     end_hour = user_prefs.get("end_hour")
@@ -53,15 +50,6 @@ def filter_sort_flights_node(state: ChatState) -> dict:
     for f in all_flights:
         is_match = True
         
-        if final_airlines:
-            flight_airlines = f.get("airlines", [])
-            if not flight_airlines:
-                fn = str(f.get("flightNumber", "")).upper()
-                if fn: flight_airlines = [fn[:2]]
-            
-            if not any(a in final_airlines for a in flight_airlines):
-                is_match = False
-
         if is_match and max_price not in [None, 0, "CLEAR"]:
             try:
                 if float(f.get('price', 0)) > float(max_price):
@@ -91,7 +79,7 @@ def filter_sort_flights_node(state: ChatState) -> dict:
 
     if not filtered_flights:
         return {
-            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Không có chuyến bay nào thỏa mãn bộ lọc hiện tại (hãng, giờ, mức giá). Khách có thể nới lỏng hoặc hủy bộ lọc để xem lại danh sách cũ."],
+            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Không có chuyến bay nào thỏa mãn bộ lọc hiện tại (giờ, mức giá). Khách có thể nới lỏng hoặc hủy bộ lọc để xem lại danh sách cũ."],
             "action": None, 
             "tasks": consume_task(tasks, ["filter_sort_flights"])
         }

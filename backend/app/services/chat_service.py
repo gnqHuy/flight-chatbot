@@ -1,8 +1,6 @@
 import uuid
 from fastapi.concurrency import run_in_threadpool
-from pydantic import config
-from app.ai_orchestrator.graph.flight_graph import flight_graph 
-from app.core import config
+from app.ai_orchestrator.graph.flight_graph import flight_graph
 from app.core.enums import ChatRole
 from app.repositories.message_repo import MessageRepository
 from app.repositories.conversation_repo import ConversationRepository

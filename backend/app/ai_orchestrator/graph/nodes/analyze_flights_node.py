@@ -1,14 +1,13 @@
 import json
 from app.ai_orchestrator.graph.state import ChatState
 from app.services.redis_service import redis_service
+from app.services.airline_service import airline_service
 from app.utils.flight_analysis import format_flights_to_text
 from app.utils.helpers import consume_task
 from app.core.constants import ContextTag
 
 def analyze_flights_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH CHUYẾN BAY ---")
-    print("\n👉 [DEBUG - NODE]: ", state.get("node_results", {}))
-    print("\n🔹🔹🔹 ------------------------------------")
+    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH CHUYẾN BAY & HÃNG BAY ---")
     
     user_prefs = state.get("user_prefs", {})
     current_search_id = state.get("current_search_id")
@@ -41,10 +40,9 @@ def analyze_flights_node(state: ChatState) -> dict:
     criteria_clean = [c.value if hasattr(c, 'value') else str(c) for c in raw_criteria if str(c).upper() != "CLEAR"]
     
     if not criteria_clean:
-        criteria_clean = ["giá vé", "thời gian bay"]
+        criteria_clean = ["giá vé", "thời gian bay", "chính sách hãng"]
 
     target_flights_to_analyze = []
-    
     if not t_flights_clean and not t_airlines_clean:
         target_flights_to_analyze = all_flights[:3] if isinstance(all_flights, list) else []
     elif isinstance(all_flights, list):
@@ -58,14 +56,20 @@ def analyze_flights_node(state: ChatState) -> dict:
             for target_a in t_airlines_clean:
                 count = 0
                 for f in all_flights:
-                    flight_num = str(f.get('flightNumber', '')).upper()
-                    airlines = [str(a).upper() for a in f.get('airlines', [])]
-                    if target_a in airlines or flight_num.startswith(target_a):
+                    airlines_in_flight = [str(a).upper() for a in f.get('airlines', [])]
+                    if target_a in airlines_in_flight:
                         target_flights_to_analyze.append(f)
                         count += 1
                         if count >= 2: break
 
     unique_targets = list({f.get('id'): f for f in target_flights_to_analyze if f.get('id')}.values())
+
+    codes_for_db = set(t_airlines_clean)
+    for f in unique_targets:
+        for a in f.get('airlines', []):
+            codes_for_db.add(str(a).upper())
+    
+    airline_info_context = airline_service.get_airlines_analysis_context(list(codes_for_db))
 
     if unique_targets:
         flights_text = format_flights_to_text(unique_targets)
@@ -73,14 +77,15 @@ def analyze_flights_node(state: ChatState) -> dict:
         
         report = (
             f"{ContextTag.FLIGHT_ANALYSIS}:\n"
-            f"Dưới đây là dữ liệu thực tế về các chuyến bay khách đang quan tâm.\n"
-            f"**TIÊU CHÍ ƯU TIÊN**: {criteria_str}\n\n"
+            f"### DỮ LIỆU CHUYẾN BAY THỰC TẾ (REAL-TIME):\n"
             f"{flights_text}\n\n"
-            "CHỈ THỊ: Sử dụng số liệu này để so sánh ưu/nhược điểm. Tuyệt đối không bịa thêm thông tin ngoài danh sách."
+            f"### KIẾN THỨC NỀN TẢNG VỀ HÃNG (DATABASE):\n"
+            f"{airline_info_context}\n\n"
+            f"**YÊU CẦU PHÂN TÍCH**: Hãy dựa vào dữ liệu trên để so sánh theo các tiêu chí: {criteria_str}.\n"
+            "Chỉ ra chuyến nào rẻ nhất, chuyến nào giờ bay đẹp nhất và ưu thế của từng hãng để khách hàng dễ dàng lựa chọn."
         )
     else:
-        req_summary = f"Mã chuyến: {t_flights_clean} | Hãng: {t_airlines_clean}"
-        report = f"{ContextTag.SYS_NOT_FOUND}: Không tìm thấy chuyến bay khớp với yêu cầu ({req_summary}) trong bộ nhớ tạm."
+        report = f"{ContextTag.SYS_NOT_FOUND}: Không tìm thấy chuyến bay khớp với yêu cầu để so sánh."
 
     return {
         "node_results": [report],

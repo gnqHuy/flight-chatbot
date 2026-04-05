@@ -94,22 +94,6 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
     except Exception as e:
         print(f"Lỗi parse vé: {e}")
         return None
-    
-def get_final_airlines(user_prefs: dict) -> list:
-    """
-    Tính toán danh sách hãng bay cuối cùng từ State đã được merge hoàn chỉnh.
-    """
-    target_airline = user_prefs.get("target_airline", [])
-    excluded = user_prefs.get("excludedAirlines", [])
-    
-    active_airlines = set(SUPPORTED_AIRLINES)
-    
-    if target_airline:
-        active_airlines = set(target_airline)
-    if excluded:
-        active_airlines = active_airlines - set(excluded)
-        
-    return list(active_airlines)
 
 def group_flights_by_airline(flights: list, final_airlines: list) -> dict:
     """
