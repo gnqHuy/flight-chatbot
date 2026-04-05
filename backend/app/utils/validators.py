@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Tuple, List, Dict
-from app.core.constants import SUPPORTED_AIRLINES_SET
+from app.core.constants import SUPPORTED_AIRLINES_SET, ContextTag
 
 def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
     """
@@ -19,15 +19,14 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
     pax_confirmed = user_prefs.get("pax_confirmed", False)
     is_roundtrip = user_prefs.get("is_roundtrip", False)
 
-    error_msgs = []
+    raw_errors = []
     state_updates = {}
 
     if included and isinstance(included, list):
         unsupported = [air for air in included if air not in SUPPORTED_AIRLINES_SET]
         if unsupported:
-            err_msg = f"[LỖI NGHIỆP VỤ]: Khách yêu cầu hãng ngoài luồng ({', '.join(unsupported)}). Hệ thống chỉ bán vé của VN, VJ, QH."
-            error_msgs.append(err_msg)
-            state_updates["includedAirlines"] = ["CLEAR"]
+            raw_errors.append(f"Khách yêu cầu hãng ngoài luồng ({', '.join(unsupported)}). Hệ thống chỉ hỗ trợ VN, VJ, QH.")
+            state_updates["includedAirlines"] = "CLEAR"
 
     missing_fields = []
     if not origin: missing_fields.append("điểm đi (origin)")
@@ -36,23 +35,27 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
 
     if missing_fields:
         missing_str = ", ".join(missing_fields)
-        error_msgs.append(f"[YÊU CẦU THÔNG TIN]: Khách chưa cung cấp đủ {missing_str}.")
+        raw_errors.append(f"Khách chưa cung cấp đủ {missing_str}.")
 
     total_passengers = adults + children
     has_kids = (children > 0 or infants > 0)
 
+    if adults < 1:
+        raw_errors.append("Mỗi lượt tìm kiếm bắt buộc phải có ít nhất 1 người lớn.")
+        state_updates["adults"] = 1 
+
     if has_kids and not pax_confirmed:
-        error_msgs.append("[NEED_AGE_CONFIRMATION]: Cần xác nhận lại độ tuổi chính xác của bé để áp dụng giá vé ưu đãi nhất.")
+        raw_errors.append("Cần xác nhận lại độ tuổi chính xác của trẻ em để áp dụng giá vé ưu đãi nhất.")
     
     if total_passengers > 9:
-        error_msgs.append("[PAX_LIMIT]: Hệ thống chỉ hỗ trợ đặt tối đa 9 khách có ghế. Vui lòng liên hệ bộ phận đoàn.")
+        raw_errors.append("Vượt quá số khách. Hệ thống chỉ hỗ trợ đặt tối đa 9 khách có ghế. Vui lòng liên hệ bộ phận đoàn.")
     
     if infants > adults:
-        error_msgs.append("[PAX_INVALID]: Số lượng trẻ sơ sinh (infants) không được vượt quá số lượng người lớn (adults).")
+        raw_errors.append("Số lượng trẻ sơ sinh (infants) không được vượt quá số lượng người lớn (adults).")
         state_updates["infants"] = 0 
 
     if is_roundtrip and not returnDate:
-        error_msgs.append("[MISSING_RETURN_DATE]: Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về.")
+        raw_errors.append("Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về.")
 
     if departureDate: 
         try:
@@ -60,21 +63,27 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
             today = datetime.now()
             
             if dep_dt.date() < today.date():
-                error_msgs.append("[INVALID_DATE]: Ngày đi (departureDate) nằm trong quá khứ.")
+                raw_errors.append("Ngày đi (departureDate) nằm trong quá khứ.")
                 state_updates["departureDate"] = "CLEAR"
                 
             if returnDate:
                 ret_dt = datetime.strptime(returnDate, "%Y-%m-%d")
                 if ret_dt.date() < dep_dt.date():
-                    error_msgs.append("[INVALID_DATE]: Ngày về (returnDate) diễn ra trước ngày đi.")
+                    raw_errors.append("Ngày về diễn ra trước ngày đi.")
                     state_updates["returnDate"] = "CLEAR"
-                    
+                
         except ValueError:
-            error_msgs.append("[INVALID_FORMAT]: Định dạng ngày tháng không hợp lệ (phải là YYYY-MM-DD).")
+            raw_errors.append("Định dạng ngày tháng không hợp lệ (phải là YYYY-MM-DD).")
             state_updates["departureDate"] = "CLEAR"
             if returnDate:
                 state_updates["returnDate"] = "CLEAR"
 
-    print(f"👉 [VALIDATION]: errors={error_msgs}, state_updates={state_updates}")
-    is_valid = len(error_msgs) == 0
+    error_msgs = []
+    
+    if raw_errors:
+        print(f"VALIDATION FAILED: {len(raw_errors)} errors found.")
+        combined_error = f"{ContextTag.VALIDATION}:\n" + "\n".join([f"- {err}" for err in raw_errors])
+        error_msgs.append(combined_error)
+
+    is_valid = len(raw_errors) == 0
     return is_valid, error_msgs, state_updates

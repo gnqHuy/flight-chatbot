@@ -1,25 +1,35 @@
 from typing import Optional
 
-def consume_task(tasks: list, expected_intents: str | list) -> list:
+from typing import Union, List
+# Giả sử bạn đã import TaskItem từ schemas của bạn
+# from app.schemas.chat_state import TaskItem 
+
+def consume_task(tasks: list, expected_intents: Union[str, list], next_task=None) -> list:
     """
     Kiểm tra task đầu tiên trong danh sách.
     Nếu đúng là nhiệm vụ của Node hiện tại (nằm trong expected_intents), thì "nuốt" nó (xóa đi).
-    Nếu không phải, giữ nguyên danh sách để Router xử lý tiếp.
+    Nếu không phải, giữ nguyên danh sách.
+    ĐẶC BIỆT: Nếu có next_task (Dùng cho Fallback), chèn nó vào vị trí ưu tiên cao nhất.
     """
-    if not tasks:
-        return []
+    remaining_tasks = []
     
-    if isinstance(expected_intents, str):
-        expected_intents = [expected_intents]
+    if tasks:
+        if isinstance(expected_intents, str):
+            expected_intents = [expected_intents]
+            
+        current_task = tasks[0]
         
-    current_task = tasks[0]
-    
-    intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
-    
-    if intent_val in expected_intents:
-        return tasks[1:]
+        intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
         
-    return tasks.copy()
+        if intent_val in expected_intents:
+            remaining_tasks = tasks[1:]
+        else:
+            remaining_tasks = tasks.copy()
+
+    if next_task:
+        remaining_tasks.insert(0, next_task)
+        
+    return remaining_tasks
 
 def merge_dicts(left: dict, right: dict) -> dict:
     left_dict = left or {}

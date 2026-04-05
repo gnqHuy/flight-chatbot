@@ -1,6 +1,7 @@
 from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.state import ChatState
+from app.core.constants import ContextTag
 from app.core.llm_setup import llm
 from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
@@ -14,18 +15,19 @@ LỊCH SỬ TRÒ CHUYỆN (LƯU Ý: Dùng lịch sử để hiểu ngữ cảnh 
 --- 1. PHÂN LOẠI Ý ĐỊNH (INTENT) ---
 Dựa vào CÂU NÓI MỚI NHẤT và LỊCH SỬ, hãy chọn 1 ý định chính xác nhất:
 
-* NHÓM TÌM VÉ & CẬP NHẬT THÔNG TIN:
-  - 'search_flight': Dùng cho MỌI hành động liên quan đến việc thiết lập hoặc thay đổi thông số chuyến bay. Bao gồm:
-    + Bắt đầu tìm chuyến bay mới tinh (VD: "Tìm vé đi HN", "Tôi muốn đặt vé máy bay").
-    + Bổ sung thông tin khi Bot đang hỏi (VD: "Đi Đà Nẵng", "Ngày mai").
-    + Thay đổi, sửa đổi thông số vé đang tìm (VD: "Đổi sang 2 người lớn", "Không đi Huế nữa", "Chốt chuyến này").
-    + XỬ LÝ CHÀO HỎI: Nếu khách CHỈ chào hỏi cơ bản (VD: "Alo", "Xin chào"), hãy phân loại vào 'search_flight' để hệ thống tự động chào lại và mồi khách tìm vé. Nếu khách chào kèm yêu cầu, bỏ qua lời chào và phân loại theo yêu cầu chính.
+* NHÓM TÌM VÉ (SEARCH_FLIGHT):
+  - CHỈ CHỌN intent này khi khách hàng cung cấp HOẶC thay đổi các thông số CỐT LÕI tạo nên chuyến đi: Điểm đi (origin), Điểm đến (destination), Ngày đi/về (date), Số lượng người (adults/children/infants).
+  - VD: "Tìm vé đi HN", "Đổi sang ngày mai", "Đi 2 người lớn".
+  - LƯU Ý: Kể cả khi khách đang ở bước lọc, nhưng nếu họ ĐỔI NGÀY hoặc ĐỔI ĐIỂM ĐẾN, bắt buộc phải trả về 'search_flight'.
+  - XỬ LÝ CHÀO HỎI: Nếu khách CHỈ chào hỏi cơ bản (VD: "Alo", "Xin chào"), hãy phân loại vào 'search_flight' để hệ thống tự động chào lại.
 
-* NHÓM THAO TÁC (Khi đã có danh sách vé):
-  - 'filter_sort_flights': Lọc/Sắp xếp danh sách (VD: "Chỉ đi Vietjet", "Vé rẻ nhất", "Giờ sáng").
-  - 'analyze_flights': So sánh, phân tích ưu/nhược điểm (VD: "Chuyến Vietjet hay delay không?", "So sánh giá 3 hãng").
+* NHÓM THAO TÁC (FILTER_SORT_FLIGHTS):
+  - CHỈ CHỌN intent này khi hành trình (Điểm đi/đến/ngày) KHÔNG ĐỔI, và khách CHỈ MUỐN THU HẸP danh sách vé bằng các tiêu chí: Hãng bay, Khung giờ, Mức giá, Sắp xếp.
+  - VD: "Chỉ bay Vietjet", "Có chuyến nào buổi sáng không?", "Lọc vé rẻ nhất".
+  - LƯU Ý SINH TỬ: Nếu kết quả tìm kiếm trước đó là RỖNG (0 vé), nhưng câu nói của khách VẪN MANG Ý NGHĨA LỌC (VD: "Tìm thử chuyến đêm xem", "Xem Vietjet có ko"), bạn VẪN PHẢI TRẢ VỀ 'filter_sort_flights'. Tuyệt đối không tự ý đổi sang search_flight.
 
 * NHÓM HỎI ĐÁP & KHÁC:
+  - 'analyze_flights': So sánh, phân tích ưu/nhược điểm (VD: "Chuyến Vietjet hay delay không?", "So sánh giá 3 hãng").
   - 'promo_search': Hỏi về khuyến mãi, mã giảm giá.
   - 'general_question': Hỏi quy định, giấy tờ, hành lý (VD: "Hành lý bao nhiêu kg?", "Bà bầu bay được không?").
   - 'out_of_scope': Ngoài lề, không liên quan đến hàng không.
@@ -37,7 +39,7 @@ Dựa vào CÂU NÓI MỚI NHẤT và LỊCH SỬ, hãy chọn 1 ý định chí
 2. MÃ IATA: Chuẩn hóa địa danh thành mã 3 chữ cái (VD: Hà Nội -> HAN, Sài Gòn/TPHCM -> SGN, Đà Nẵng -> DAD).
 3. LỌC PHỦ ĐỊNH: Bỏ qua các địa danh mà khách từ chối (VD: "Không đi Huế nữa" -> Huế KHÔNG phải là origin/destination).
 4. HỦY LỌC: Nếu khách muốn bỏ điều kiện (VD: "Không lọc hãng nữa"), đưa tên biến đó vào mảng `cleared_filters`.
-5. GẮN MÃ HÃNG: Luôn trích xuất mã hãng bay (VN, VJ, QH) vào `target_airline` nếu khách có nhắc đến khi hỏi chính sách (general_question, promo_search, analyze_flights).
+5. GẮN MÃ HÃNG: Luôn trích xuất mã hãng bay (VN, VJ, QH) vào `target_airline` nếu khách có nhắc đến.
 """
 
 prompt_template = ChatPromptTemplate.from_messages([
@@ -55,9 +57,9 @@ def extract_intent_node(state: ChatState):
 
     all_tasks = []
     node_result = [] 
-    current_prefs = {}
-    changed_details = []
-    old_prefs = state.get("user_prefs", {}) 
+    
+    old_prefs = state.get("user_prefs", {}) or {}
+    current_prefs = old_prefs.copy()
     
     history_dict = state.get("chat_history", {"messages": [], "search_ids": []})
     history_list = history_dict.get("messages", [])
@@ -107,17 +109,6 @@ def extract_intent_node(state: ChatState):
                         elif v is not None and v != []:
                             clean_params[k] = v
 
-            core_search_params = [
-                "origin", "destination", "departureDate", "returnDate", 
-                "includedAirlines", "excludedAirlines", "nonStop", 
-                "travelClass", "maxPrice", "start_hour", "end_hour",
-                "adults", "children", "infants"
-            ]
-            
-            for param in core_search_params:
-                if param in clean_params and clean_params[param] != old_prefs.get(param):
-                    changed_details.append(f"{param}: {clean_params[param]}")
-
             if "target_flight" in clean_params:
                 raw_flights = clean_params["target_flight"]
                 if isinstance(raw_flights, list):
@@ -128,15 +119,30 @@ def extract_intent_node(state: ChatState):
                 if isinstance(raw_airlines, list):
                     clean_params["target_airline"] = [str(t).upper().replace(" ", "") for t in raw_airlines if t]
 
-            if changed_details:
-                change_info = ", ".join(changed_details)
-                node_result.append(f"[HỆ THỐNG] Phát hiện thay đổi tham số ({change_info}). Reset Search ID.")
-                
-                existing_intents = [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in all_tasks]
-                if ChatIntent.SEARCH_FLIGHT.value not in existing_intents:
-                    from app.schemas.chat_state import TaskItem # Đảm bảo đã import
-                    all_tasks.insert(0, TaskItem(intent=ChatIntent.SEARCH_FLIGHT, parameters=task.parameters))
-                    print("👉 [AUTO-INSERT]: Đã chèn thêm task SEARCH_FLIGHT do thông số thay đổi.")
+            CORE_PARAMS = ["origin", "destination", "departureDate", "returnDate", "adults", "children", "infants", "travelClass"]
+            SOFT_PARAMS = ["target_airline", "includedAirlines", "excludedAirlines", "nonStop", "maxPrice", "start_hour", "end_hour", "criteria", "sort_preference"]
+            
+            core_changed = []
+            soft_changed = []
+            
+            for param in CORE_PARAMS:
+                if param in clean_params and clean_params[param] != old_prefs.get(param):
+                    core_changed.append(f"{param}: {clean_params[param]}")
+
+            for param in SOFT_PARAMS:
+                if param in clean_params and clean_params[param] != old_prefs.get(param):
+                    soft_changed.append(f"{param}: {clean_params[param]}")
+
+            if core_changed:
+                change_info = ", ".join(core_changed)
+                node_result.append(f"{ContextTag.USER_UPDATE}: Thay đổi CORE Param ({change_info}). Yêu cầu tìm kiếm mới.")
+                # for param in SOFT_PARAMS:
+                #     if param in current_prefs and current_prefs[param] not in ["CLEAR", "", None]:
+                #         if param not in clean_params:
+                #             clean_params[param] = "CLEAR"
+            elif soft_changed:
+                change_info = ", ".join(soft_changed)
+                node_result.append(f"{ContextTag.USER_UPDATE}: Thay đổi SOFT Param ({change_info}). Áp dụng lọc cục bộ.")
 
             current_prefs.update(clean_params)
 
@@ -149,11 +155,11 @@ def extract_intent_node(state: ChatState):
         "node_results": node_result
     }
 
-    if changed_details:
+    if core_changed:
         result_dict["current_search_id"] = "CLEAR"
 
     print("👉 [DEBUG - NEW PREFS]: ", current_prefs)
-    print("👉 [DEBUG - TASK]: ", all_tasks)
+    print("👉 [DEBUG - TASK]: ", [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in all_tasks])
     print("🔹🔹🔹 ------------------------------------")
 
     return result_dict

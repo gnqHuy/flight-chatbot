@@ -10,10 +10,13 @@ class FlightParameters(BaseModel):
     returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
     is_roundtrip: bool = Field(False, description="True nếu là vé khứ hồi.")
 
-    adults: int = Field(1, description="Số lượng người lớn.")
-    children: int = Field(0, description="Số lượng trẻ em.")
-    infants: int = Field(0, description="Số lượng trẻ sơ sinh.")
-    pax_confirmed: bool = Field(True, description="False nếu chưa rõ số tuổi trẻ em.")
+    adults: int = Field(1, description="Số lượng người lớn (từ 12 tuổi trở lên).")
+    
+    children: int = Field(0, description="Số lượng trẻ em (từ 2 đến 11 tuổi). LƯU Ý QUAN TRỌNG: Nếu khách chỉ nói chung chung là 'trẻ em', 'trẻ nhỏ', 'con nít' mà KHÔNG NÓI RÕ tuổi, tuyệt đối KHÔNG ĐIỀN trường này (giữ nguyên 0).")
+    
+    infants: int = Field(0, description="Số lượng em bé/trẻ sơ sinh (dưới 2 tuổi). Tương tự, nếu không rõ tuổi, tuyệt đối giữ nguyên 0.")
+    
+    pax_confirmed: bool = Field(True, description="Đánh dấu là False NẾU khách có nhắc đến việc mang theo trẻ em/em bé nhưng CHƯA RÕ ĐỘ TUỔI cụ thể. Nếu khách đã cung cấp rõ tuổi (ví dụ: 'bé 3 tuổi') hoặc đoàn chỉ toàn người lớn, giữ nguyên là True.")
 
     includedAirlines: Optional[List[str]] = Field(
         default=None, 

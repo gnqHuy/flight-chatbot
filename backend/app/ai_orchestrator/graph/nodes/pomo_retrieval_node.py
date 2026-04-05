@@ -1,11 +1,11 @@
+from datetime import datetime
+from sqlmodel import Session, select
 from app.ai_orchestrator.graph.state import ChatState
-from sqlmodel import Session
 from app.database.database import engine
 from app.repositories.flight_promotion_repo import FlightPromotionRepository
 from app.database.models.airline import Airline
 from app.utils.helpers import consume_task
-from datetime import datetime
-from sqlmodel import select
+from app.core.constants import ContextTag
 
 def promo_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (SQL REPO) ---")
@@ -33,17 +33,12 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 airline_obj = session.exec(select(Airline).where(Airline.code == target_airline_code)).first()
                 if airline_obj:
                     target_airline_id = airline_obj.id
-                    print(f"👉 [GỠ LỖI]: Đang tìm khuyến mãi của hãng {target_airline_code} (ID: {target_airline_id})")
-                else:
-                    print(f"👉 [GỠ LỖI]: Không tìm thấy ID của hãng {target_airline_code} trong Database.")
-            else:
-                print("👉 [GỠ LỖI]: Không chỉ định hãng, đang quét TẤT CẢ khuyến mãi còn hiệu lực...")
-
+            
             docs = repo.get_active_promotions(target_airline_id=target_airline_id)
             
         if not docs:
             return {
-                "node_results": ["[KHÔNG_TÌM_THẤY] Hiện tại không có chương trình khuyến mãi nào đang diễn ra phù hợp với yêu cầu của khách hàng."],
+                "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không có chương trình khuyến mãi nào đang diễn ra phù hợp với yêu cầu."],
                 "tasks": remaining_tasks 
             }
         
@@ -51,9 +46,9 @@ def promo_retrieval_node(state: ChatState) -> dict:
         
         current_date_str = datetime.now().strftime("%d/%m/%Y")
         result_string = (
-            f"[TRA CỨU KHUYẾN MÃI]\n"
-            f"- NGÀY HÔM NAY: {current_date_str}\n"
-            f"- DANH SÁCH KHUYẾN MÃI CÒN HIỆU LỰC TỪ HỆ THỐNG:\n"
+            f"{ContextTag.PROMO_INFO}\n"
+            f"- NGÀY HỆ THỐNG: {current_date_str}\n"
+            f"- DANH SÁCH ƯU ĐÃI HIỆU LỰC:\n"
         )
         
         for idx, promo in enumerate(docs, 1):
@@ -61,24 +56,22 @@ def promo_retrieval_node(state: ChatState) -> dict:
             t_start = promo.travel_start_date.strftime("%d/%m/%Y") if promo.travel_start_date else "N/A"
             t_end = promo.travel_end_date.strftime("%d/%m/%Y") if promo.travel_end_date else "N/A"
             
-            result_string += f"\n▶ ƯU ĐÃI {idx}: {promo.promo_name}\n"
-            result_string += f"  - Mã áp dụng: {promo.promo_code or 'Không cần mã nhập tay'}\n"
-            result_string += f"  - Hạn đặt vé: Đến hết ngày {b_end}\n"
-            result_string += f"  - Giai đoạn bay: Từ {t_start} đến {t_end}\n"
-            result_string += f"  - Mô tả: {promo.description}\n"
-            result_string += f"  - Điều kiện: {promo.conditions}\n"
-            result_string += f"  - [Link tham khảo]: {promo.url}\n"
+            result_string += f"\n▶ {idx}. {promo.promo_name}\n"
+            result_string += f"   - Mã code: {promo.promo_code or 'Tự động áp dụng'}\n"
+            result_string += f"   - Hạn đặt: {b_end}\n"
+            result_string += f"   - Bay từ {t_start} đến {t_end}\n"
+            result_string += f"   - Nội dung: {promo.description}\n"
+            result_string += f"   - Điều kiện: {promo.conditions}\n"
+            result_string += f"   - [Link chi tiết]: {promo.url}\n"
                 
-        print(f"\n👉 [GỠ LỖI - KẾT QUẢ KHUYẾN MÃI]: Đã tìm thấy {len(docs)} chương trình ưu đãi bằng SQL.")
-        
         return {
             "node_results": [result_string.strip()], 
             "tasks": remaining_tasks 
         }
     
     except Exception as e:
-        print(f"❌ [LỖI SQL]: Lỗi khi truy xuất dữ liệu khuyến mãi: {e}")
+        print(f"ERROR - Promo SQL Node: {e}")
         return {
-            "node_results": ["[LỖI] Hệ thống tra cứu khuyến mãi đang bảo trì, vui lòng xin lỗi khách hàng."],
+            "node_results": [f"{ContextTag.SYS_ERROR}: Hệ thống tra cứu khuyến mãi đang gặp sự cố kết nối."],
             "tasks": remaining_tasks
         }

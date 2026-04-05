@@ -14,32 +14,21 @@ from app.ai_orchestrator.graph.nodes.pomo_retrieval_node import promo_retrieval_
 
 def route_tasks(state: ChatState) -> str:
     tasks = state.get("tasks", [])
-    current_id = state.get("current_search_id")
     
     if not tasks:
         return "final_response"
     
-    current_task = tasks[0]
-    intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
+    intent_val = tasks[0].intent.value if hasattr(tasks[0].intent, 'value') else str(tasks[0].intent)
 
-    print(f"👉 [DEBUG - ROUTER]: Đang điều hướng task '{intent_val}' | current_id: '{current_id}'")
+    intent_map = {
+        ChatIntent.SEARCH_FLIGHT.value: "search_flights",
+        ChatIntent.FILTER_SORT_FLIGHTS.value: "filter_sort_flights",
+        ChatIntent.ANALYZE_FLIGHTS.value: "analyze_flights",
+        ChatIntent.GENERAL_QUESTION.value: "policy_retrieval_node",
+        ChatIntent.PROMO_SEARCH.value: "promo_retrieval_node"
+    }
 
-    if intent_val == ChatIntent.SEARCH_FLIGHT.value:
-        return "search_flights"
-        
-    if intent_val == ChatIntent.FILTER_SORT_FLIGHTS.value:
-        return "filter_sort_flights"
-        
-    if intent_val == ChatIntent.ANALYZE_FLIGHTS.value:
-        return "analyze_flights"
-
-    if intent_val == ChatIntent.GENERAL_QUESTION.value:
-        return "policy_retrieval_node"
-        
-    if intent_val == ChatIntent.PROMO_SEARCH.value:
-        return "promo_retrieval_node"
-            
-    return "final_response"
+    return intent_map.get(intent_val, "final_response")
 
 def build_flight_graph():
     checkpointer = get_checkpointer()

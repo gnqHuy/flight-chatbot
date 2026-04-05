@@ -49,10 +49,10 @@ def check_and_inject_promos(current_search_id: str) -> str:
         
         if promo_messages:
             injected_text = (
-                "\n[[SYSTEM_CONTEXT: THÔNG TIN BÁN CHÉO (CROSS-SELL)]]\n"
+                "\n[THÔNG TIN GỢI Ý KHÁCH HÀNG VỀ KHUYẾN MÃI]\n"
                 "Hệ thống phát hiện các hãng bay trong danh sách Gợi ý phía trên ĐANG CÓ KHUYẾN MÃI CÒN HẠN:\n"
                 + "\n".join(promo_messages) +
-                "\n\n[[YÊU CẦU CHO AI]]: Hãy ĐÓNG VAI NHÂN VIÊN TƯ VẤN, khéo léo lồng ghép 1-2 khuyến mãi "
+                "\n\n[YÊU CẦU CHO AI]: Hãy ĐÓNG VAI NHÂN VIÊN TƯ VẤN, khéo léo lồng ghép 1-2 khuyến mãi "
                 "phù hợp nhất vào câu trả lời cuối cùng để kích thích khách hàng chốt vé. "
                 "Đừng liệt kê như một cái máy, hãy nói kiểu: 'Bật mí cho bạn là hãng X đang có mã Y...'"
             )

@@ -44,10 +44,6 @@ class ChatService:
         
         final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=graph_config)
 
-        print("\n🔸🔸🔸 --- KẾT QUẢ TỪ FLIGHT GRAPH ---")
-        print(final_state)
-        print("\n🔸🔸🔸 ------")
-
         bot_message_content = final_state.get("response_text")
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."

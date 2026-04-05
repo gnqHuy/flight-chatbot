@@ -3,12 +3,10 @@ from app.ai_orchestrator.graph.state import ChatState
 from app.core.llm_setup import llm
 from langchain_core.prompts import ChatPromptTemplate
 from app.utils.promo_injector import check_and_inject_promos
+from app.core.constants import ContextTag, ValidationTag
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
-    print("\n👉 [DEBUG - PREFS]: ", state.get("user_prefs", {}))
-    print("\n👉 [DEBUG - NODE]: ", state.get("node_results", {}))
-    print("\n🔹🔹🔹 ------------------------------------")
     
     lang = state.get("language") or "vi"
     user_message = state.get("user_message", "")
@@ -27,7 +25,7 @@ def final_response_node(state: ChatState):
     system_instructions = []
 
     if error_msg:
-        system_instructions.append(f"[LỖI HỆ THỐNG]: {error_msg}. Hãy xin lỗi khách và giải thích ngắn gọn.")
+        system_instructions.append(f"{ContextTag.SYS_ERROR}: {error_msg}. Hãy xin lỗi khách và giải thích ngắn gọn.")
 
     if not node_results and not action and not error_msg:
         system_instructions.append("[HỆ THỐNG]: Khách đang chào hỏi hoặc hỏi ngoài lề (không kích hoạt tác vụ tìm kiếm nào). Hãy giao tiếp lịch sự, tự nhiên và hướng họ về dịch vụ vé máy bay nếu cần.")
@@ -37,37 +35,41 @@ def final_response_node(state: ChatState):
             
             result_upper = result.upper()
             
-            if "[CẬP NHẬT THÔNG TIN]" in result_upper:
-                system_instructions.append(f"[CẬP NHẬT TỪ KHÁCH HÀNG]:\n{result}")
+            if ContextTag.USER_UPDATE in result_upper:
+                system_instructions.append(result)
                 
-            elif "[YÊU CẦU THÔNG TIN]" in result_upper or "[INVALID]" in result_upper:
-                system_instructions.append(f"[YÊU CẦU THÔNG TIN]:\n{result}")
+            elif ContextTag.VALIDATION in result_upper:
+                system_instructions.append(result)
                 
-            elif "[KHÔNG_TÌM_THẤY]" in result_upper or "[LỖI]" in result_upper:
-                system_instructions.append(f"[TRỤC TRẶC HỆ THỐNG]:\n{result}")
+            elif ContextTag.SYS_NOT_FOUND in result_upper or ContextTag.SYS_ERROR in result_upper:
+                system_instructions.append(result)
                 
-            elif "[BÁO CÁO PHÂN TÍCH]" in result_upper or "SO SÁNH" in result_upper:
-                system_instructions.append(f"[DỮ LIỆU SO SÁNH CHUYẾN BAY]: \n{result}")
+            elif ContextTag.FLIGHT_ANALYSIS in result_upper:
+                system_instructions.append(result)
+
+            elif ContextTag.FILTER_APPLIED in result_upper: 
+                system_instructions.append(result)
                 
-            elif "[TRA CỨU CHÍNH SÁCH]" in result_upper:
-                system_instructions.append(f"[KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)]: \n{result}")
+            elif ContextTag.POLICY_INFO in result_upper:
+                system_instructions.append(result)
                 
-            elif "[TRA CỨU KHUYẾN MÃI]" in result_upper: 
-                system_instructions.append(f"[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]: \n{result}")
+            elif ContextTag.PROMO_INFO in result_upper: 
+                system_instructions.append(result)
                 
-            elif "[THÔNG TIN CHUYẾN BAY]" in result_upper or "[TÌM_THẤY]" in result_upper: 
-                system_instructions.append(f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]:\n{result}")
+            elif ContextTag.FLIGHT_FOUND in result_upper: 
+                system_instructions.append(result)
                 
             else:
-                system_instructions.append(f"[THÔNG TIN BỔ SUNG]:\n{result}")
+                system_instructions.append(f"{ContextTag.MISC_INFO}:\n{result}")
 
     combined_context = "\n\n".join(system_instructions)
 
-    if "THÔNG TIN CHUYẾN BAY" in combined_context or "BÁO CÁO PHÂN TÍCH" in combined_context:
-        print("👉 [DEBUG]: Đang rà soát Khuyến mãi ẩn để bán chéo...")
+    print("\n👉 [DEBUG - CONTEXT]: ", combined_context)
+
+    if ContextTag.FLIGHT_FOUND in combined_context:
         promo_context = check_and_inject_promos(current_search_id)
         if promo_context:
-            combined_context += f"\n\n{promo_context}"
+            combined_context += f"\n\n{ContextTag.PROMO_INFO}:\n{promo_context}"
             print("👉 [DEBUG]: Đã tiêm thành công khuyến mãi vào Context cho LLM!")
 
     known_info = {k: v for k, v in user_prefs.items() if v and k != "current_search_id"}
@@ -81,7 +83,7 @@ def final_response_node(state: ChatState):
          "{history}\n\n"
          "--- QUY TẮC GIAO TIẾP SỐNG CÒN ---\n"
          "1. TRUNG THỰC VỚI DỮ LIỆU (CHỐNG BỊA ĐẶT): Bạn CHỈ ĐƯỢC PHÉP trả lời và cung cấp thông tin dựa trên những gì có trong phần [CHỈ THỊ NỘI BỘ] và [NGỮ CẢNH]. Tuyệt đối không tự suy diễn, đoán mò hay bịa đặt chính sách/giá vé. Nếu câu hỏi của khách hàng vượt ra ngoài thông tin bạn được cung cấp, hãy lịch sự thông báo rằng bạn chưa có hoặc không tìm thấy thông tin đó.\n"
-         "2. XÁC NHẬN THÔNG TIN: Dựa vào [NGỮ CẢNH], hãy lồng ghép khéo léo các thông tin đã biết (điểm đi, điểm đến, ngày...) vào câu trả lời để khách yên tâm.\n"
+         "2. XÁC NHẬN THÔNG TIN: Dựa vào [NGỮ CẢNH], hãy lồng ghép khéo léo các thông tin đã biết (điểm đi, điểm đến, ngày...) vào câu trả lời. TUYỆT ĐỐI KHÔNG tự tính toán lại ngày tháng dựa trên lời nói của khách (VD khách nói 'lùi 2 ngày', 'tuần sau'). Bạn CHỈ ĐƯỢC PHÉP đọc chính xác giá trị 'departureDate' và 'returnDate' đã được hệ thống tính toán sẵn trong phần [NGỮ CẢNH BẠN ĐANG CÓ] để báo lại cho khách.\n"
          "3. XỬ LÝ SỰ THAY ĐỔI: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [CẬP NHẬT TỪ KHÁCH HÀNG], bạn PHẢI chủ động thông báo bạn đã tìm kiếm lại/lọc lại dữ liệu theo tham số mới đó (VD: 'Dạ em đã cập nhật danh sách vé sang các chuyến bay buổi sáng theo ý chị rồi ạ...').\n"
          "4. GỢI Ý MỞ RỘNG TỰ NHIÊN (OPTIONAL): Đừng chỉ hỏi các thông tin bắt buộc. Dựa vào những gì khách CHƯA cung cấp, hãy khéo léo chọn 1-2 tiêu chí trong danh sách sau để gợi ý (TUYỆT ĐỐI không hỏi dồn dập như trả bài):\n"
          "   - Ngày về (để mua vé khứ hồi).\n"
@@ -98,7 +100,6 @@ def final_response_node(state: ChatState):
          "8. TRÍCH DẪN NGUỒN (RẤT QUAN TRỌNG): Khi trả lời dựa trên thông tin từ [KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)], bạn PHẢI sao chép Y NGUYÊN và đính kèm [Link tham khảo] ở cuối câu trả lời. TUYỆT ĐỐI không được bỏ qua link này.\n"
          "9. XỬ LÝ LOGIC GIỚI HẠN: Khi khách hàng hỏi về một mốc số liệu (ví dụ: đúng 32 tuần tuổi thai), hãy chú ý phân biệt rõ giữa 'ĐẾN 32 tuần' (được phép bay nhưng cần giấy tờ) và 'TRÊN 32 tuần' (từ chối vận chuyển) dựa trên tài liệu được cung cấp. Cung cấp cả 2 trường hợp để khách tự đối chiếu.\n\n"
          "--- CHỈ THỊ NỘI BỘ TỪ CÁC NODE ---\n"
-         "--- CHỈ THỊ NỘI BỘ TỪ CÁC NODE ---\n"
          "{context}"
         ),
         ("human", "{question}")
@@ -113,12 +114,11 @@ def final_response_node(state: ChatState):
         current_time=current_time_str
     )
 
-    print("\n👉 [DEBUG - PROMPT MESSAGES]: ", formatted_messages)
-    
     response = llm.invoke(formatted_messages)
 
     bot_reply = response.content 
     
     current_exchange = f"User: {state.get('user_message')}\nBot: {bot_reply}"
+    print("\n🔹🔹🔹 ------------------------------------")
 
     return {"response_text": response.content, "chat_history": {"messages": [current_exchange]}}
