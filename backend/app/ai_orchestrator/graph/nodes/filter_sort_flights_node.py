@@ -1,6 +1,4 @@
 import json
-from datetime import datetime
-import uuid
 from app.ai_orchestrator.graph.state import ChatState
 from app.services.redis_service import redis_service
 from app.utils.helpers import consume_task
@@ -9,12 +7,14 @@ from app.core.enums import ChatIntent
 from app.core.constants import ContextTag
 
 def filter_sort_flights_node(state: ChatState) -> dict:
-    user_prefs = state.get("user_prefs", {})
+    print("\n🔹🔹🔹 --- VÀO TRẠM LỌC & SẮP XẾP CHUYẾN BAY ---")
+    
+    search_filters = state.get("search_filters", {})
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])    
     
-    sort_pref = user_prefs.get("sort_preference")
-    sort_val = sort_pref.value if hasattr(sort_pref, 'value') else str(sort_pref)
+    sort_pref = search_filters.get("sort_preference")
+    sort_val = sort_pref.value if hasattr(sort_pref, 'value') else str(sort_pref) if sort_pref else "price_asc"
 
     if not current_search_id or current_search_id == "CLEAR":
         return {
@@ -40,10 +40,10 @@ def filter_sort_flights_node(state: ChatState) -> dict:
         
     all_flights = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
 
-    max_price = user_prefs.get("maxPrice")
-    start_hour = user_prefs.get("start_hour")
-    end_hour = user_prefs.get("end_hour")
-    is_non_stop = user_prefs.get("nonStop")
+    max_price = search_filters.get("maxPrice")
+    start_hour = search_filters.get("start_hour")
+    end_hour = search_filters.get("end_hour")
+    is_non_stop = search_filters.get("nonStop")
 
     filtered_flights = []
     

@@ -11,7 +11,8 @@ from app.core.constants import ContextTag
 def policy_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TRA CỨU CHÍNH SÁCH (RAG) ---")
     
-    user_prefs = state.get("user_prefs", {})
+    search_filters = state.get("search_filters", {})
+    action_targets = state.get("action_targets", {})
     tasks = state.get("tasks", [])
     remaining_tasks = consume_task(tasks, "general_question")
     
@@ -32,7 +33,13 @@ def policy_retrieval_node(state: ChatState) -> dict:
         }
 
     connection = os.environ.get("DATABASE_URL")
-    target_airlines = user_prefs.get("target_airline", []) 
+    
+    target_airlines = []
+    if action_targets.get("compare_airlines"):
+        target_airlines = action_targets.get("compare_airlines")
+    elif search_filters.get("preferred_airlines"):
+        target_airlines = search_filters.get("preferred_airlines")
+
     if isinstance(target_airlines, str):
         target_airlines = [target_airlines]
     

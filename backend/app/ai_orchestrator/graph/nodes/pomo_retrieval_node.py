@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from sqlmodel import Session, select
 from app.ai_orchestrator.graph.state import ChatState
@@ -10,16 +11,22 @@ from app.core.constants import ContextTag
 def promo_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (SQL REPO) ---")
     
-    user_prefs = state.get("user_prefs", {})
+    search_filters = state.get("search_filters", {})
+    action_targets = state.get("action_targets", {})
+    
     tasks = state.get("tasks", [])
     remaining_tasks = consume_task(tasks, "promo_search") 
     
-    target_airline_list = user_prefs.get("target_airline")
+    target_airline_list = []
+    if action_targets.get("compare_airlines"):
+        target_airline_list = action_targets.get("compare_airlines")
+    elif search_filters.get("preferred_airlines"):
+        target_airline_list = search_filters.get("preferred_airlines")
     
     target_airline_code = None
-    if target_airline_list and isinstance(target_airline_list, list) and target_airline_list[0] != "CLEAR":
+    if target_airline_list and isinstance(target_airline_list, list) and len(target_airline_list) > 0:
         target_airline_code = target_airline_list[0].upper()
-    elif isinstance(target_airline_list, str) and target_airline_list != "CLEAR":
+    elif isinstance(target_airline_list, str):
         target_airline_code = target_airline_list.upper()
         
     docs = []
@@ -37,8 +44,9 @@ def promo_retrieval_node(state: ChatState) -> dict:
             docs = repo.get_active_promotions(target_airline_id=target_airline_id)
             
         if not docs:
+            airline_msg = f" của hãng {target_airline_code}" if target_airline_code else ""
             return {
-                "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không có chương trình khuyến mãi nào đang diễn ra phù hợp với yêu cầu."],
+                "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không có chương trình khuyến mãi nào đang diễn ra{airline_msg}."],
                 "tasks": remaining_tasks 
             }
         

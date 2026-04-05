@@ -8,23 +8,23 @@ from app.utils.helpers import consume_task
 def search_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM TỔNG THỂ (API SEARCH) ---")
     
-    user_prefs = state.get("user_prefs", {})
+    search_filters = state.get("search_filters", {})
     current_tasks = state.get("tasks", [])
     remaining_tasks = consume_task(current_tasks, ["search_flight"])
     
-    is_valid, error_msgs, state_updates = validate_flight_params(user_prefs)
+    is_valid, error_msgs, state_updates = validate_flight_params(search_filters)
     
     if not is_valid:
         return {
             "node_results": error_msgs, 
             "action": None, 
             "tasks": remaining_tasks,
-            "user_prefs": state_updates if state_updates else {}
+            "search_filters": state_updates if state_updates else {} 
         }
 
-    origin = user_prefs.get("origin")
-    destination = user_prefs.get("destination")
-    departureDate = user_prefs.get("departureDate")
+    origin = search_filters.get("origin")
+    destination = search_filters.get("destination")
+    departureDate = search_filters.get("departureDate")
 
     try:
         print(f"👉 [API CALL]: Đang kéo toàn bộ vé {origin}-{destination} ngày {departureDate}...")
@@ -33,10 +33,10 @@ def search_flights_node(state: ChatState) -> dict:
             origin=origin,
             destination=destination,
             departureDate=departureDate,
-            returnDate=user_prefs.get("returnDate"),
-            adults=user_prefs.get("adults", 1),
-            children=user_prefs.get("children", 0),
-            infants=user_prefs.get("infants", 0),
+            returnDate=search_filters.get("returnDate"),
+            adults=search_filters.get("adults", 1),
+            children=search_filters.get("children", 0),
+            infants=search_filters.get("infants", 0),
             includedAirlines=SUPPORTED_AIRLINES,
             max_offers=MAX_FLIGHTS_RETURNED
         )

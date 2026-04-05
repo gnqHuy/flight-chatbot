@@ -1,105 +1,82 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, TypedDict
 from app.core.enums import AnalysisCriteria, ChatIntent, SortPreference, TravelClass
 
-class FlightParameters(BaseModel):
-    # ==========================================
-    # 1. CORE PARAMS (Hành trình cốt lõi)
-    # ==========================================
+class SearchFiltersParams(BaseModel):
+    """Giỏ 1: Chứa các bộ lọc cố định, quyết định danh sách vé hiển thị trên UI"""
     origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI (VD: HAN).")
-    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN (VD: SGN). Nếu khách nói 'đi Sài Gòn' -> SGN là destination.")
+    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN (VD: SGN).")
     departureDate: Optional[str] = Field(None, description="Ngày đi (YYYY-MM-DD).")
     returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
-    is_roundtrip: bool = Field(False, description="True nếu khách nhắc đến vé khứ hồi, chiều về.")
-    travelClass: Optional[TravelClass] = Field(
-        default=None, 
-        description=(
-            "Hạng ghế khách yêu cầu. "
-            "Quy đổi: 'phổ thông' -> ECONOMY, 'thương gia' -> BUSINESS, 'hạng nhất' -> FIRST, 'phổ thông đặc biệt' -> PREMIUM_ECONOMY. "
-            "Nếu khách không nhắc đến, bắt buộc để null."
-        )
-    )
-    adults: int = Field(
-        default=1, 
-        ge=1,
-        description="Số lượng người lớn (từ 12 tuổi). LUÔN MẶC ĐỊNH LÀ 1. Nếu khách không nhắc số lượng, TUYỆT ĐỐI GIỮ LÀ 1."
-    )
+    is_roundtrip: bool = Field(False, description="True nếu khách nhắc đến vé khứ hồi.")
+    travelClass: Optional[TravelClass] = Field(None, description="Hạng ghế khách yêu cầu.")
+    adults: int = Field(1, ge=1, description="Số lượng người lớn. MẶC ĐỊNH LÀ 1.")
     children: int = Field(0, description="Số lượng trẻ em (2-11 tuổi).")
     infants: int = Field(0, description="Số lượng em bé (dưới 2 tuổi).")
+    need_age_confirmation: bool = Field(False, description="Đánh dấu TRUE nếu khách nói có trẻ em nhưng không báo tuổi.")
     
-    need_age_confirmation: bool = Field(
-        default=False, 
-        description="Đánh dấu TRUE NGAY LẬP TỨC nếu khách nói mang theo 'trẻ em', 'trẻ nhỏ' NHƯNG KHÔNG CUNG CẤP TUỔI. (VD: 'bé 3 tuổi' -> FALSE)."
-    )
-
-    # ==========================================
-    # 2. SOFT PARAMS (Bộ lọc Local Cache)
-    # ==========================================
-    target_airline: Optional[List[str]] = Field(
+    preferred_airlines: Optional[List[str]] = Field(
         default=None, 
         description=(
-            "Mã hãng khách MUỐN ĐI hoặc MUỐN TRA CỨU quy định/khuyến mãi (VD: ['VN', 'VJ']). "
-            "QUY TẮC CẬP NHẬT TRẠNG THÁI (Rất quan trọng): "
-            "- Khách KHÔNG nhắc đến hãng: Trả về null (Không cập nhật). "
-            "- Khách muốn THÊM hãng: Output mảng gồm hãng cũ + hãng mới. "
-            "- Khách muốn LOẠI BỎ 1 hãng (VD đang có VN, VJ, khách nói 'Bỏ VN'): Output mảng chỉ còn hãng giữ lại (['VJ']). "
-            "- Khách nói 'Hãng nào cũng được' / 'Xóa bộ lọc hãng': Output mảng rỗng []."
+            "Mã hãng bay khách MUỐN LỌC ĐỂ HIỂN THỊ CHUYẾN BAY (VD: ['VN', 'VJ']). "
+            "Nếu khách nói 'Hủy lọc hãng', trả về mảng rỗng []."
         )
     )
-    
-    excludedAirlines: Optional[List[str]] = Field(
-        default=None,
-        description="Mã hãng khách KIÊN QUYẾT TRÁNH, KHÔNG MUỐN ĐI (VD: 'Tránh Vietjet' -> ['VJ'])."
-    )
-
-    maxPrice: Optional[int] = Field(
-        default=None, 
-        description="Ngân sách/Giá tối đa (VNĐ). Nếu khách nói 'Hủy lọc giá', trả về 0."
-    )
-    
+    excludedAirlines: Optional[List[str]] = Field(None, description="Mã hãng kiên quyết tránh (VD: ['VJ']).")
+    maxPrice: Optional[int] = Field(None, description="Ngân sách/Giá tối đa (VNĐ).")
     nonStop: Optional[bool] = Field(None, description="True nếu chỉ muốn bay thẳng.")
-    maxPrice: Optional[int] = Field(None, description="Ngân sách tối đa.")
-    start_hour: Optional[int] = Field(
-        None, 
-        description="Giờ bay sớm nhất (0-23). Quy đổi: 'Sáng' (06), 'Chiều' (12), 'Tối' (18)."
-    )
-    end_hour: Optional[int] = Field(
-        None, 
-        description="Giờ bay muộn nhất (0-23). Quy đổi: 'Sáng' (12), 'Chiều' (18), 'Tối' (23)."
-    )
-    
-    sort_preference: Optional[SortPreference] = Field(
-        default=None, 
-        description=(
-            "CHỈ DÙNG 1 TIÊU CHÍ DUY NHẤT để sắp xếp danh sách vé. "
-            "Quy đổi: 'Rẻ nhất' / 'Giá tăng dần' -> price_asc, "
-            "'Đắt nhất' / 'Giá giảm dần' -> price_desc, "
-            "'Cất cánh sớm' -> departure_time, "
-            "'Hạ cánh muộn' -> arrival_time."
-        )
-    )
+    start_hour: Optional[int] = Field(None, description="Giờ bay sớm nhất (0-23).")
+    end_hour: Optional[int] = Field(None, description="Giờ bay muộn nhất (0-23).")
+    sort_preference: Optional[SortPreference] = Field(None, description="Tiêu chí sắp xếp bảng vé (price_asc, departure_time...).")
 
-    # ==========================================
-    # 3. ANALYSIS PARAMS (Cho tác vụ So sánh/Phân tích)
-    # ==========================================
-    target_flight: Optional[List[str]] = Field(
+class ActionTargetsParams(BaseModel):
+    """Giỏ 2: Chứa các mục tiêu tạm thời phục vụ cho câu hỏi So Sánh/Phân Tích hiện tại"""
+    compare_flights: Optional[List[str]] = Field(
         default=None, 
-        description="Mã chuyến bay cụ thể (VD: VN208) để phân tích chi tiết. KHÔNG điền mã hãng vào đây."
+        description="Mã chuyến bay CỤ THỂ khách muốn hỏi/phân tích (VD: ['VN208', 'VJ103']). KHÔNG điền mã hãng vào đây."
     )
-    
-    criteria: Optional[List[AnalysisCriteria]] = Field(
+    compare_airlines: Optional[List[str]] = Field(
         default=None,
         description=(
-            "Các khía cạnh khách muốn BỘ PHẬN TƯ VẤN so sánh/đánh giá giữa các vé. "
-            "Có thể chọn nhiều tiêu chí cùng lúc (VD: ['PRICE', 'BAGGAGE', 'LEGROOM']). "
-            "Phân biệt: sort_preference dùng để XẾP HÀNG, criteria dùng để PHÂN TÍCH ƯU NHƯỢC ĐIỂM."
+            "Mã hãng bay khách muốn ĐEM LÊN BÀN CÂN SO SÁNH / HỎI CHÍNH SÁCH. "
+            "(VD: Khách nói 'So sánh vé VJ và VN' -> ['VJ', 'VN']). "
+            "Lưu ý: Biến này độc lập với preferred_airlines ở trên."
         )
+    )
+    analysis_criteria: Optional[List[AnalysisCriteria]] = Field(
+        default=None,
+        description="Các khía cạnh khách muốn phân tích/đánh giá (VD: ['PRICE', 'BAGGAGE', 'LEGROOM'])."
     )
 
 class Task(BaseModel):
     intent: ChatIntent = Field(..., description="Phân loại ý định.")
-    parameters: Optional[FlightParameters] = Field(None, description="Các tham số đã trích xuất.")
-    query_context: Optional[str] = Field(None, description="Nội dung cần RAG (quy định, chính sách, v.v.).")
+    search_filters: Optional[SearchFiltersParams] = Field(None, description="Các tham số lọc hiển thị dài hạn.")
+    action_targets: Optional[ActionTargetsParams] = Field(None, description="Các tham số mục tiêu phân tích ngắn hạn.")
+    query_context: Optional[str] = Field(None, description="Nội dung cần RAG.")
 
 class ExtractionOutput(BaseModel):
-    tasks: List[Task] = Field(..., description="Danh sách tác vụ.")
+    tasks: List[Task] = Field(..., description="Danh sách tác vụ cần xử lý.")
+
+class SearchFiltersState(TypedDict, total=False):
+    origin: Optional[str]
+    destination: Optional[str]
+    departureDate: Optional[str]
+    returnDate: Optional[str]
+    is_roundtrip: bool
+    travelClass: Optional[str]
+    adults: int
+    children: int
+    infants: int
+    need_age_confirmation: bool
+    preferred_airlines: Optional[List[str]]
+    excludedAirlines: Optional[List[str]]
+    maxPrice: Optional[int]
+    nonStop: Optional[bool]
+    start_hour: Optional[int]
+    end_hour: Optional[int]
+    sort_preference: Optional[str]
+
+class ActionTargetsState(TypedDict, total=False):
+    compare_flights: Optional[List[str]]
+    compare_airlines: Optional[List[str]]
+    analysis_criteria: Optional[List[str]]

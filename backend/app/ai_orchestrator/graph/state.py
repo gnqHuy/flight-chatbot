@@ -1,12 +1,13 @@
 from typing import TypedDict, Annotated, List, Dict, Any, Optional
-from app.schemas.chat_state import Task
-from app.utils.helpers import merge_chat_history, merge_dicts, merge_node_results, merge_saved_flights, merge_search_id
+from app.schemas.chat_state import ActionTargetsState, SearchFiltersState, Task
+from app.utils.helpers import merge_chat_history, merge_dicts, merge_node_results, merge_saved_flights, merge_search_id, overwrite_dict
 
 class ChatState(TypedDict):
     user_message: str  
     tasks: List[Task] 
     node_results: Annotated[list[str], merge_node_results]
-    user_prefs: Annotated[Dict[str, Any], merge_dicts]
+    search_filters: Annotated[SearchFiltersState, merge_dicts]
+    action_targets: Annotated[ActionTargetsState, overwrite_dict]
     language: str
     action: Optional[dict]     
     error_msg: Optional[str]

@@ -3,7 +3,7 @@ from app.ai_orchestrator.graph.state import ChatState
 from app.core.llm_setup import llm
 from langchain_core.prompts import ChatPromptTemplate
 from app.utils.promo_injector import check_and_inject_promos
-from app.core.constants import ContextTag, ValidationTag
+from app.core.constants import ContextTag
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
@@ -30,41 +30,10 @@ def final_response_node(state: ChatState):
     if not node_results and not action and not error_msg:
         system_instructions.append("[HỆ THỐNG]: Khách đang chào hỏi hoặc hỏi ngoài lề (không kích hoạt tác vụ tìm kiếm nào). Hãy giao tiếp lịch sự, tự nhiên và hướng họ về dịch vụ vé máy bay nếu cần.")
     else:
-        for result in node_results:
-            if not result: continue
-            
-            result_upper = result.upper()
-            
-            if ContextTag.USER_UPDATE in result_upper:
-                system_instructions.append(result)
-                
-            elif ContextTag.VALIDATION in result_upper:
-                system_instructions.append(result)
-                
-            elif ContextTag.SYS_NOT_FOUND in result_upper or ContextTag.SYS_ERROR in result_upper:
-                system_instructions.append(result)
-                
-            elif ContextTag.FLIGHT_ANALYSIS in result_upper:
-                system_instructions.append(result)
-
-            elif ContextTag.FILTER_APPLIED in result_upper: 
-                system_instructions.append(result)
-                
-            elif ContextTag.POLICY_INFO in result_upper:
-                system_instructions.append(result)
-                
-            elif ContextTag.PROMO_INFO in result_upper: 
-                system_instructions.append(result)
-                
-            elif ContextTag.FLIGHT_FOUND in result_upper: 
-                system_instructions.append(result)
-                
-            else:
-                system_instructions.append(f"{ContextTag.MISC_INFO}:\n{result}")
+        valid_results = [res for res in node_results if res]
+        system_instructions.extend(valid_results)
 
     combined_context = "\n\n".join(system_instructions)
-
-    print("\n👉 [DEBUG - CONTEXT]: ", combined_context)
 
     if ContextTag.FLIGHT_FOUND in combined_context:
         promo_context = check_and_inject_promos(current_search_id)
@@ -84,21 +53,12 @@ def final_response_node(state: ChatState):
          "--- QUY TẮC GIAO TIẾP SỐNG CÒN ---\n"
          "1. TRUNG THỰC VỚI DỮ LIỆU (CHỐNG BỊA ĐẶT): Bạn CHỈ ĐƯỢC PHÉP trả lời và cung cấp thông tin dựa trên những gì có trong phần [CHỈ THỊ NỘI BỘ] và [NGỮ CẢNH]. Tuyệt đối không tự suy diễn, đoán mò hay bịa đặt chính sách/giá vé. Nếu câu hỏi của khách hàng vượt ra ngoài thông tin bạn được cung cấp, hãy lịch sự thông báo rằng bạn chưa có hoặc không tìm thấy thông tin đó.\n"
          "2. XÁC NHẬN THÔNG TIN: Dựa vào [NGỮ CẢNH], hãy lồng ghép khéo léo các thông tin đã biết (điểm đi, điểm đến, ngày...) vào câu trả lời. TUYỆT ĐỐI KHÔNG tự tính toán lại ngày tháng dựa trên lời nói của khách (VD khách nói 'lùi 2 ngày', 'tuần sau'). Bạn CHỈ ĐƯỢC PHÉP đọc chính xác giá trị 'departureDate' và 'returnDate' đã được hệ thống tính toán sẵn trong phần [NGỮ CẢNH BẠN ĐANG CÓ] để báo lại cho khách.\n"
-         "3. XỬ LÝ SỰ THAY ĐỔI: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [CẬP NHẬT TỪ KHÁCH HÀNG], bạn PHẢI chủ động thông báo bạn đã tìm kiếm lại/lọc lại dữ liệu theo tham số mới đó (VD: 'Dạ em đã cập nhật danh sách vé sang các chuyến bay buổi sáng theo ý chị rồi ạ...').\n"
-         "4. GỢI Ý MỞ RỘNG TỰ NHIÊN (OPTIONAL): Đừng chỉ hỏi các thông tin bắt buộc. Dựa vào những gì khách CHƯA cung cấp, hãy khéo léo chọn 1-2 tiêu chí trong danh sách sau để gợi ý (TUYỆT ĐỐI không hỏi dồn dập như trả bài):\n"
-         "   - Ngày về (để mua vé khứ hồi).\n"
-         "   - Số lượng người đi cùng (người lớn, trẻ em).\n"
-         "   - Khung giờ bay mong muốn (sáng, trưa, chiều, tối hoặc giờ cụ thể).\n"
-         "   - Hãng hàng không yêu thích hoặc hãng muốn tránh.\n"
-         "   - Ưu tiên bay thẳng (không điểm dừng).\n"
-         "   - Hạng ghế (Thương gia, Phổ thông, ...).\n"
-         "   - Ngân sách / Mức giá tối đa mong muốn.\n"
-         "   - Tiêu chí ưu tiên khi so sánh (muốn tìm chuyến rẻ nhất, bay nhanh nhất, hay cất cánh sớm nhất).\n"
+         "3. XỬ LÝ SỰ THAY ĐỔI: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [CẬP NHẬT TỪ KHÁCH HÀNG], bạn PHẢI chủ động thông báo bạn đã tìm kiếm/lọc lại dữ liệu theo tham số mới (VD: 'Dạ em đã cập nhật danh sách vé sang các chuyến bay buổi sáng theo ý chị rồi ạ...').\n"
+         "4. GỢI Ý MỞ RỘNG TỰ NHIÊN: Đừng chỉ hỏi các thông tin bắt buộc. Dựa vào những gì khách CHƯA cung cấp, hãy khéo léo chọn 1-2 tiêu chí để gợi ý (TUYỆT ĐỐI không hỏi dồn dập như trả bài): Ngày về, Số lượng người đi cùng, Khung giờ bay, Hãng hàng không, Mức giá tối đa.\n"
          "5. ĐÓNG VAI HOÀN HẢO: Dịch các trường dữ liệu thô sang lời nói tự nhiên. Tuyệt đối KHÔNG lộ các thẻ mã lệnh hệ thống (VD: [HÀNH ĐỘNG CỦA UI], [CẬP NHẬT...]) ra ngoài.\n"
          "6. MỜI XEM MÀN HÌNH: Nếu trong [CHỈ THỊ NỘI BỘ] có thẻ [DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC], bạn BẮT BUỘC phải thêm 1 câu mời khách xem danh sách vé/kết quả đang hiển thị trên giao diện.\n"
-         "7. KHÉO LÉO BÁN CHÉO (CROSS-SELL): Nếu trong [CHỈ THỊ NỘI BỘ] có cung cấp thông tin mã giảm giá/khuyến mãi cho các chuyến bay khách đang xem, BẮT BUỘC phải lồng ghép vào câu trả lời như một 'mẹo nhỏ' hoặc 'đặc quyền' để thôi thúc khách chốt vé.\n"
-         "8. TRÍCH DẪN NGUỒN (RẤT QUAN TRỌNG): Khi trả lời dựa trên thông tin từ [KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)], bạn PHẢI sao chép Y NGUYÊN và đính kèm [Link tham khảo] ở cuối câu trả lời. TUYỆT ĐỐI không được bỏ qua link này.\n"
-         "9. XỬ LÝ LOGIC GIỚI HẠN: Khi khách hàng hỏi về một mốc số liệu (ví dụ: đúng 32 tuần tuổi thai), hãy chú ý phân biệt rõ giữa 'ĐẾN 32 tuần' (được phép bay nhưng cần giấy tờ) và 'TRÊN 32 tuần' (từ chối vận chuyển) dựa trên tài liệu được cung cấp. Cung cấp cả 2 trường hợp để khách tự đối chiếu.\n\n"
+         "7. KHÉO LÉO BÁN CHÉO: Nếu trong [CHỈ THỊ NỘI BỘ] có cung cấp thông tin khuyến mãi cho các chuyến bay khách đang xem, BẮT BUỘC phải lồng ghép vào câu trả lời như một 'mẹo nhỏ' để thôi thúc khách chốt vé.\n"
+         "8. TRÍCH DẪN NGUỒN: Khi trả lời dựa trên thông tin từ [KIẾN THỨC NGHIỆP VỤ (CHÍNH SÁCH)], bạn PHẢI đính kèm [Link tham khảo] ở cuối câu trả lời nếu có.\n\n"
          "--- CHỈ THỊ NỘI BỘ TỪ CÁC NODE ---\n"
          "{context}"
         ),
@@ -115,10 +75,9 @@ def final_response_node(state: ChatState):
     )
 
     response = llm.invoke(formatted_messages)
-
     bot_reply = response.content 
     
     current_exchange = f"User: {state.get('user_message')}\nBot: {bot_reply}"
     print("\n🔹🔹🔹 ------------------------------------")
 
-    return {"response_text": response.content, "chat_history": {"messages": [current_exchange]}}
+    return {"response_text": bot_reply, "chat_history": {"messages": [current_exchange]}}
