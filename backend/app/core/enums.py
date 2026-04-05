@@ -25,9 +25,10 @@ class TravelClass(str, Enum):
     PREMIUM_ECONOMY = "PREMIUM_ECONOMY"
 
 class SortPreference(str, Enum):
-    PRICE = "price"
-    DURATION = "duration"
+    PRICE_ASC = "price_asc"
+    PRICE_DESC = "price_desc"
     DEPARTURE_TIME = "departure_time"
+    ARRIVAL_TIME = "arrival_time"
 
 class AnalysisCriteria(str, Enum):
     PRICE = "PRICE"              

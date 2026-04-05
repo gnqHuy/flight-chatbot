@@ -2,6 +2,7 @@ import os
 import json
 from typing import Optional, List, Any
 from amadeus import Client, ResponseError
+from app.core.constants import MAX_FLIGHTS_RETURNED
 from app.utils.flight_parser import format_amadeus_flight_display 
 
 class FlightService:
@@ -21,29 +22,16 @@ class FlightService:
         children: int = 0,
         infants: int = 0,
         includedAirlines: Optional[List[str]] = None,
-        nonStop: Optional[bool] = None,
         travelClass: Any = None,
-        maxPrice: Optional[int] = None,
-        start_hour: Optional[int] = None,
-        end_hour: Optional[int] = None,
-        max_offers: int = 50,
+        max_offers: int = MAX_FLIGHTS_RETURNED,
         lang: str = "vi"
     ):
         try:
-            dep_range = {"date": departureDate}
-            
-            if start_hour is not None and end_hour is not None:
-                mid_hour = (start_hour + end_hour) // 2
-                window = max(1, (end_hour - start_hour) // 2)
-                
-                dep_range["time"] = f"{mid_hour:02d}:00:00"
-                dep_range["timeWindow"] = f"{window}H"
-
             origin_destinations = [{
                 "id": "1",
                 "originLocationCode": origin,
                 "destinationLocationCode": destination,
-                "departureDateTimeRange": dep_range
+                "departureDateTimeRange": {"date": departureDate}
             }]
 
             if returnDate:
@@ -58,7 +46,7 @@ class FlightService:
 
             if travelClass:
                 od_ids = ["1"]
-                if returnDate:
+                if is_roundtrip or returnDate:
                     od_ids.append("2")
 
                 tc_value = travelClass.value if hasattr(travelClass, 'value') else str(travelClass).upper()
@@ -69,18 +57,10 @@ class FlightService:
                     "originDestinationIds": od_ids
                 }]
 
-            carrier_restrictions = {}
             if includedAirlines:
-                carrier_restrictions["includedCarrierCodes"] = includedAirlines
-
-            if carrier_restrictions:
-                flight_filters["carrierRestrictions"] = carrier_restrictions
-
-            if nonStop is not None:
-                flight_filters["connectionRestriction"] = {"maxNumberOfConnections": 0 if nonStop else 2}
-
-            if maxPrice:
-                flight_filters["priceRestriction"] = {"maxPrice": maxPrice}
+                flight_filters["carrierRestrictions"] = {
+                    "includedCarrierCodes": includedAirlines
+                }
 
             search_criteria = {
                 "maxFlightOffers": max_offers  
@@ -94,8 +74,9 @@ class FlightService:
             
             safe_adults = max(1, int(adults) if adults is not None else 1)
             for _ in range(safe_adults):
-                travelers.append({"id": str(current_id), "travelerType": "ADULT"})
-                adult_ids.append(str(current_id))
+                t_id = str(current_id)
+                travelers.append({"id": t_id, "travelerType": "ADULT"})
+                adult_ids.append(t_id)
                 current_id += 1
             
             safe_children = int(children) if children is not None else 0

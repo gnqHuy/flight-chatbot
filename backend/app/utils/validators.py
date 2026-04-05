@@ -11,22 +11,15 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
     destination = user_prefs.get("destination")
     departureDate = user_prefs.get("departureDate")
     returnDate = user_prefs.get("returnDate")
-    included = user_prefs.get("includedAirlines", [])
     
     adults = int(user_prefs.get("adults", 1))
     children = int(user_prefs.get("children", 0))
     infants = int(user_prefs.get("infants", 0))
-    pax_confirmed = user_prefs.get("pax_confirmed", False)
+    need_age_confirmation = user_prefs.get("need_age_confirmation", False)
     is_roundtrip = user_prefs.get("is_roundtrip", False)
 
     raw_errors = []
     state_updates = {}
-
-    if included and isinstance(included, list):
-        unsupported = [air for air in included if air not in SUPPORTED_AIRLINES_SET]
-        if unsupported:
-            raw_errors.append(f"Khách yêu cầu hãng ngoài luồng ({', '.join(unsupported)}). Hệ thống chỉ hỗ trợ VN, VJ, QH.")
-            state_updates["includedAirlines"] = "CLEAR"
 
     missing_fields = []
     if not origin: missing_fields.append("điểm đi (origin)")
@@ -44,7 +37,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
         raw_errors.append("Mỗi lượt tìm kiếm bắt buộc phải có ít nhất 1 người lớn.")
         state_updates["adults"] = 1 
 
-    if has_kids and not pax_confirmed:
+    if has_kids and not need_age_confirmation:
         raw_errors.append("Cần xác nhận lại độ tuổi chính xác của trẻ em để áp dụng giá vé ưu đãi nhất.")
     
     if total_passengers > 9:

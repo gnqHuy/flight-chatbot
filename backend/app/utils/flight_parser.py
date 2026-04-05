@@ -99,13 +99,13 @@ def get_final_airlines(user_prefs: dict) -> list:
     """
     Tính toán danh sách hãng bay cuối cùng từ State đã được merge hoàn chỉnh.
     """
-    included = user_prefs.get("includedAirlines", [])
+    target_airline = user_prefs.get("target_airline", [])
     excluded = user_prefs.get("excludedAirlines", [])
     
     active_airlines = set(SUPPORTED_AIRLINES)
     
-    if included:
-        active_airlines = set(included)
+    if target_airline:
+        active_airlines = set(target_airline)
     if excluded:
         active_airlines = active_airlines - set(excluded)
         

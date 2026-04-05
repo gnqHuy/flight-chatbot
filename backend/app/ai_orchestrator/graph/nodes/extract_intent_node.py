@@ -35,11 +35,10 @@ Dựa vào CÂU NÓI MỚI NHẤT và LỊCH SỬ, hãy chọn 1 ý định chí
 --- 2. TRÍCH XUẤT THỰC THỂ (ENTITY EXTRACTION) ---
 *QUAN TRỌNG: CHỈ trích xuất dữ liệu từ CÂU NÓI MỚI NHẤT của khách. KHÔNG tái sử dụng dữ liệu từ lịch sử.*
 
-1. TRUNG THỰC: Khách nói gì trích nấy. Không đoán mò. Khách không nhắc -> Để `null`.
+1. TRUNG THỰC: Khách nói gì trích nấy. Không đoán mò. Khách KHÔNG nhắc đến -> Bắt buộc để `null` (Không được tự bịa).
 2. MÃ IATA: Chuẩn hóa địa danh thành mã 3 chữ cái (VD: Hà Nội -> HAN, Sài Gòn/TPHCM -> SGN, Đà Nẵng -> DAD).
-3. LỌC PHỦ ĐỊNH: Bỏ qua các địa danh mà khách từ chối (VD: "Không đi Huế nữa" -> Huế KHÔNG phải là origin/destination).
-4. HỦY LỌC: Nếu khách muốn bỏ điều kiện (VD: "Không lọc hãng nữa"), đưa tên biến đó vào mảng `cleared_filters`.
-5. GẮN MÃ HÃNG: Luôn trích xuất mã hãng bay (VN, VJ, QH) vào `target_airline` nếu khách có nhắc đến.
+3. HỦY LỌC: Nếu khách muốn bỏ điều kiện lọc (VD: "Không lọc hãng nữa", "Hãng nào cũng được", "Bỏ lọc giá"), hãy trả về mảng rỗng `[]` (với target_airline) hoặc số `0` (với maxPrice).
+4. GẮN MÃ HÃNG: Luôn trích xuất mã hãng bay (VN, VJ, QH) vào trường `target_airline` khi khách có nhắc đến trong bất kỳ tình huống nào.
 """
 
 prompt_template = ChatPromptTemplate.from_messages([
@@ -94,33 +93,18 @@ def extract_intent_node(state: ChatState):
                 if intent_str in valid_intents_for_params and task.parameters:
                     raw_dump = task.parameters.model_dump(exclude_none=True)
                     
-                    filters_to_clear = raw_dump.get("cleared_filters", [])
-                    if filters_to_clear:
-                        for field in filters_to_clear:
-                            clean_params[field] = "CLEAR"
-                        clean_params["cleared_filters"] = "CLEAR"
-                            
                     for k, v in raw_dump.items():
-                        if k == "cleared_filters": continue
-                        if isinstance(v, str) and v.strip().lower() in ["", "null", "none", "clear"]: continue
-                            
-                        if v == "CLEAR" or v == ["CLEAR"]:
-                            clean_params[k] = v
-                        elif v is not None and v != []:
+                        if isinstance(v, str) and v.strip().lower() in ["clear", "none"]:
+                            clean_params[k] = [] if k in ["target_airline", "excludedAirlines"] else 0
+                        else:
                             clean_params[k] = v
 
-            if "target_flight" in clean_params:
-                raw_flights = clean_params["target_flight"]
-                if isinstance(raw_flights, list):
-                    clean_params["target_flight"] = [str(t).upper().replace(" ", "") for t in raw_flights if t]
-                    
-            if "target_airline" in clean_params:
-                raw_airlines = clean_params["target_airline"]
-                if isinstance(raw_airlines, list):
-                    clean_params["target_airline"] = [str(t).upper().replace(" ", "") for t in raw_airlines if t]
+            for arr_field in ["target_flight", "target_airline", "excludedAirlines"]:
+                if arr_field in clean_params and isinstance(clean_params[arr_field], list):
+                    clean_params[arr_field] = [str(t).upper().replace(" ", "") for t in clean_params[arr_field] if t]
 
-            CORE_PARAMS = ["origin", "destination", "departureDate", "returnDate", "adults", "children", "infants", "travelClass"]
-            SOFT_PARAMS = ["target_airline", "includedAirlines", "excludedAirlines", "nonStop", "maxPrice", "start_hour", "end_hour", "criteria", "sort_preference"]
+            CORE_PARAMS = ["origin", "destination", "departureDate", "returnDate", "is_roundtrip", "adults", "children", "infants", "travel_class"]
+            SOFT_PARAMS = ["target_airline", "excludedAirlines", "nonStop", "maxPrice", "start_hour", "end_hour", "criteria", "sort_preference", "target_flight"]
             
             core_changed = []
             soft_changed = []

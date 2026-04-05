@@ -14,8 +14,12 @@ class RedisService:
         )
         self.ttl_seconds = 1800 
 
-    def save_flight_offers(self, flight_data: list | dict) -> str:
-        search_id = f"search_{uuid.uuid4().hex[:8]}"
+    def save_flight_offers(self, flight_data: list | dict, parent_id: str = None) -> str:
+        if parent_id:
+            search_id = f"filter_{parent_id}_{uuid.uuid4().hex[:6]}"
+        else:
+            search_id = f"search_{uuid.uuid4().hex[:8]}"
+
         self.client.setex(
             name=search_id,
             time=self.ttl_seconds,
