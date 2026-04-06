@@ -105,7 +105,7 @@ def extract_intent_node(state: ChatState):
                             else:
                                 new_action_targets[k] = v
 
-            CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "is_roundtrip", "adults", "children", "infants"]
+            CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "roundTrip", "adults", "children", "infants"]
             
             core_changes_str = []
             filter_changes_str = []

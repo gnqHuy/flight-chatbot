@@ -21,6 +21,7 @@ class FlightService:
         adults: int = 1,
         children: int = 0,
         infants: int = 0,
+        roundTrip: bool = False,
         includedAirlines: Optional[List[str]] = None,
         travelClass: Any = None,
         max_offers: int = MAX_FLIGHTS_RETURNED,
@@ -34,7 +35,7 @@ class FlightService:
                 "departureDateTimeRange": {"date": departureDate}
             }]
 
-            if returnDate:
+            if returnDate and roundTrip:
                 origin_destinations.append({
                     "id": "2",
                     "originLocationCode": destination,
@@ -46,7 +47,7 @@ class FlightService:
 
             if travelClass:
                 od_ids = ["1"]
-                if is_roundtrip or returnDate:
+                if roundTrip and returnDate:
                     od_ids.append("2")
 
                 tc_value = travelClass.value if hasattr(travelClass, 'value') else str(travelClass).upper()

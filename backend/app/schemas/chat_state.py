@@ -8,7 +8,7 @@ class SearchFiltersParams(BaseModel):
     destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN (VD: SGN).")
     departureDate: Optional[str] = Field(None, description="Ngày đi (YYYY-MM-DD).")
     returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
-    is_roundtrip: bool = Field(False, description="True nếu khách nhắc đến vé khứ hồi.")
+    roundTrip: bool = Field(False, description="True nếu khách nhắc đến vé khứ hồi.")
     travelClass: Optional[TravelClass] = Field(None, description="Hạng ghế khách yêu cầu.")
     adults: int = Field(1, ge=1, description="Số lượng người lớn. MẶC ĐỊNH LÀ 1.")
     children: int = Field(0, description="Số lượng trẻ em (2-11 tuổi).")
@@ -62,7 +62,7 @@ class SearchFiltersState(TypedDict, total=False):
     destination: Optional[str]
     departureDate: Optional[str]
     returnDate: Optional[str]
-    is_roundtrip: bool
+    roundTrip: bool
     travelClass: Optional[str]
     adults: int
     children: int
@@ -80,3 +80,25 @@ class ActionTargetsState(TypedDict, total=False):
     compare_flights: Optional[List[str]]
     compare_airlines: Optional[List[str]]
     analysis_criteria: Optional[List[str]]
+
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
+
+class AnalysisStrategyDecision(BaseModel):
+    """Sử dụng để quyết định chiến lược phân tích vé máy bay"""
+    
+    reasoning: str = Field(..., description="Giải thích ngắn gọn lý do chọn chiến lược này dựa trên câu hỏi của khách.")
+    
+    strategy: Literal["MACRO_AIRLINE", "MICRO_FLIGHT", "HITL_REQUIRED"] = Field(
+        ..., 
+        description=(
+            "MACRO_AIRLINE: Khách hỏi chung chung về uy tín, dịch vụ, chính sách của hãng (VD: 'So sánh VJ và VN').\n"
+            "MICRO_FLIGHT: Khách muốn so sánh chi tiết giá/giờ của các chuyến bay cụ thể hoặc có gắn điều kiện thời gian (VD: 'So sánh chuyến sáng VJ và VN', 'Chuyến nào rẻ nhất').\n"
+            "HITL_REQUIRED: Khách nói quá mơ hồ, không nhắc đến hãng hay tiêu chí cụ thể nào, bắt buộc phải chọn trên màn hình (VD: 'So sánh cho tôi mấy chuyến đi')."
+        )
+    )
+    
+    time_filter: Optional[str] = Field(
+        None, 
+        description="Nếu khách nhắc đến thời gian (sáng, trưa, chiều, tối), hãy trích xuất vào đây. Rất quan trọng cho chiến lược MICRO_FLIGHT."
+    )

@@ -1,98 +1,82 @@
-import json
+from langchain_core.tools import tool
 from app.ai_orchestrator.graph.state import ChatState
-from app.services.redis_service import redis_service
-from app.services.airline_service import airline_service
-from app.utils.flight_analysis import format_flights_to_text
+from app.ai_orchestrator.graph.tools.flight_tools import fetch_airline_info, fetch_flight_details
 from app.utils.helpers import consume_task
 from app.core.constants import ContextTag
+from app.core.llm_setup import llm
+
+llm_with_tools = llm.bind_tools([fetch_airline_info, fetch_flight_details])
 
 def analyze_flights_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH CHUYẾN BAY & HÃNG BAY ---")
+    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH (TOOL CALLING AGENT) ---")
     
-    user_prefs = state.get("user_prefs", {})
+    user_message = state.get("user_message", "")
+    action_targets = state.get("action_targets", {})
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])
-    
     remaining_tasks = consume_task(tasks, "analyze_flights")
-    
-    raw_target_flights = user_prefs.get("target_flight", [])
-    raw_target_airlines = user_prefs.get("target_airline", [])
-    raw_criteria = user_prefs.get("criteria", [])
+    comp_airlines = action_targets.get("compare_airlines", [])
+    comp_flights = action_targets.get("compare_flights", [])
     
     if not current_search_id or current_search_id in ["CLEAR", "NOT_FOUND"]:
+        return _build_error("Vui lòng tìm kiếm chuyến bay trước khi phân tích.", remaining_tasks)
+
+    if not comp_airlines and not comp_flights:
         return {
-            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Không có danh sách chuyến bay hiện tại để so sánh. Vui lòng tìm kiếm trước."],
-            "tasks": remaining_tasks,
-            "user_prefs": {"target_flight": "CLEAR", "target_airline": "CLEAR", "criteria": "CLEAR"}
+            "node_results": ["[THÔNG BÁO]: Bạn chưa chọn chuyến bay hoặc hãng bay nào để phân tích. Vui lòng tick chọn ít nhất 1 chuyến hoặc 1 hãng."],
+            "action": {"type": "require_flight_selection", "payload": {"search_id": current_search_id}},
+            "tasks": [], 
         }
 
-    cached_data = redis_service.get_flight_offers(current_search_id)
-    if not cached_data:
-        return {
-            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Dữ liệu chuyến bay đã hết hạn. Vui lòng yêu cầu khách tìm kiếm lại."],
-            "tasks": remaining_tasks,
-            "user_prefs": {"target_flight": "CLEAR", "target_airline": "CLEAR", "criteria": "CLEAR"}
-        }
-
-    all_flights = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
-    t_flights_clean = [str(t).upper().replace(" ", "") for t in raw_target_flights if t and str(t).upper() != "CLEAR"]
-    t_airlines_clean = [str(t).upper().replace(" ", "") for t in raw_target_airlines if t and str(t).upper() != "CLEAR"]
-    criteria_clean = [c.value if hasattr(c, 'value') else str(c) for c in raw_criteria if str(c).upper() != "CLEAR"]
+    system_prompt = (
+        "Bạn là một AI quản lý dữ liệu. Dựa vào câu hỏi của khách và Danh sách Mục Tiêu bên dưới, "
+        "hãy quyết định gọi Tool nào để gom dữ liệu. Bạn có thể gọi CẢ 2 TOOL nếu khách muốn biết cả 2.\n"
+        f"Mục tiêu Hãng (compare_airlines): {comp_airlines}\n"
+        f"Mục tiêu Chuyến (compare_flights): {comp_flights}\n"
+        f"Search ID (Luôn truyền cái này vào tool): {current_search_id}"
+    )
     
-    if not criteria_clean:
-        criteria_clean = ["giá vé", "thời gian bay", "chính sách hãng"]
+    ai_msg = llm_with_tools.invoke([
+        ("system", system_prompt),
+        ("human", user_message)
+    ])
 
-    target_flights_to_analyze = []
-    if not t_flights_clean and not t_airlines_clean:
-        target_flights_to_analyze = all_flights[:3] if isinstance(all_flights, list) else []
-    elif isinstance(all_flights, list):
-        if t_flights_clean:
-            for target_f in t_flights_clean:
-                for f in all_flights:
-                    if str(f.get('flightNumber', '')).upper() == target_f:
-                        target_flights_to_analyze.append(f)
-                        break
-        if t_airlines_clean:
-            for target_a in t_airlines_clean:
-                count = 0
-                for f in all_flights:
-                    airlines_in_flight = [str(a).upper() for a in f.get('airlines', [])]
-                    if target_a in airlines_in_flight:
-                        target_flights_to_analyze.append(f)
-                        count += 1
-                        if count >= 2: break
-
-    unique_targets = list({f.get('id'): f for f in target_flights_to_analyze if f.get('id')}.values())
-
-    codes_for_db = set(t_airlines_clean)
-    for f in unique_targets:
-        for a in f.get('airlines', []):
-            codes_for_db.add(str(a).upper())
+    gathered_data = []
     
-    airline_info_context = airline_service.get_airlines_analysis_context(list(codes_for_db))
-
-    if unique_targets:
-        flights_text = format_flights_to_text(unique_targets)
-        criteria_str = ", ".join(criteria_clean)
-        
-        report = (
-            f"{ContextTag.FLIGHT_ANALYSIS}:\n"
-            f"### DỮ LIỆU CHUYẾN BAY THỰC TẾ (REAL-TIME):\n"
-            f"{flights_text}\n\n"
-            f"### KIẾN THỨC NỀN TẢNG VỀ HÃNG (DATABASE):\n"
-            f"{airline_info_context}\n\n"
-            f"**YÊU CẦU PHÂN TÍCH**: Hãy dựa vào dữ liệu trên để so sánh theo các tiêu chí: {criteria_str}.\n"
-            "Chỉ ra chuyến nào rẻ nhất, chuyến nào giờ bay đẹp nhất và ưu thế của từng hãng để khách hàng dễ dàng lựa chọn."
-        )
+    if not ai_msg.tool_calls:
+        print("⚠️ LLM không gọi tool, tự động fallback gọi tool bằng Python...")
+        if comp_airlines: gathered_data.append(fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id}))
+        if comp_flights: gathered_data.append(fetch_flight_details.invoke({"flight_ids": comp_flights, "search_id": current_search_id}))
     else:
-        report = f"{ContextTag.SYS_NOT_FOUND}: Không tìm thấy chuyến bay khớp với yêu cầu để so sánh."
+        for tool_call in ai_msg.tool_calls:
+            print(f"🧠 [AGENT GỌI TOOL]: {tool_call['name']} với args: {tool_call['args']}")
+            
+            if tool_call["name"] == "fetch_airline_info":
+                res = fetch_airline_info.invoke(tool_call["args"])
+                gathered_data.append(res)
+                
+            elif tool_call["name"] == "fetch_flight_details":
+                res = fetch_flight_details.invoke(tool_call["args"])
+                gathered_data.append(res)
+
+    final_context = "\n\n".join(gathered_data) if gathered_data else "Không lấy được dữ liệu."
+    
+    report = (
+        f"{ContextTag.FLIGHT_ANALYSIS}:\n"
+        f"--- DỮ LIỆU ĐƯỢC GOM TỪ AGENT ---\n"
+        f"{final_context}\n\n"
+        f"⚠️ CHỈ THỊ: Dựa vào Dữ liệu trên và Yêu cầu của khách, hãy viết một bài phân tích/so sánh khách quan, rõ ràng. Không tự bịa số liệu."
+    )
 
     return {
         "node_results": [report],
         "tasks": remaining_tasks,
-        "user_prefs": {
-            "target_flight": "CLEAR",
-            "target_airline": "CLEAR",
-            "criteria": "CLEAR"
-        }
+        "action_targets": {}
+    }
+
+def _build_error(msg: str, tasks: list) -> dict:
+    return {
+        "node_results": [f"{ContextTag.SYS_ERROR}: {msg}"],
+        "tasks": tasks,
+        "action_targets": {}
     }

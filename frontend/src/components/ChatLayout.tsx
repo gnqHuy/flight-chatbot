@@ -11,7 +11,10 @@ type Props = {
 export default function ChatLayout({ conversationId }: Props) {
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'VN' | 'VJ' | 'QH'>('ALL');
+
+  // 🌟 SỬA: Đổi default tab thành 'VN' và giới hạn kiểu dữ liệu
+  const [activeTab, setActiveTab] = useState<'VN' | 'VJ' | 'QH'>('VN');
+
   const [externalTrigger, setExternalTrigger] = useState<string>('');
 
   const handleActionDetected = (action: any) => {
@@ -27,6 +30,15 @@ export default function ChatLayout({ conversationId }: Props) {
 
   const handlePromptClick = (promptText: string) => {
     setExternalTrigger(`${promptText} `);
+  };
+
+  // 🌟 MỚI: Xử lý sự kiện khi API Resume (so sánh vé) gọi xong
+  const handleCompareComplete = (botResponse: any) => {
+    console.log('Đã so sánh xong, response từ Backend:', botResponse);
+    // TODO: Tùy thuộc vào cách ChatWindow của bạn hoạt động,
+    // bạn có thể gọi một hàm để ép ChatWindow re-fetch lại danh sách tin nhắn,
+    // hoặc trigger một tín hiệu giả vào externalTrigger để ChatWindow cập nhật.
+    // VD: setExternalTrigger(`[REFRESH_CHAT]_${Date.now()}`);
   };
 
   return (
@@ -58,8 +70,8 @@ export default function ChatLayout({ conversationId }: Props) {
                 Danh sách chuyến bay
               </h2>
               <div className="flex space-x-1 border-b border-gray-200">
+                {/* 🌟 SỬA: Đã xóa object { id: 'ALL', label: 'Tất cả' } */}
                 {[
-                  { id: 'ALL', label: 'Tất cả' },
                   { id: 'VN', label: 'Vietnam Airlines' },
                   { id: 'VJ', label: 'Vietjet Air' },
                   { id: 'QH', label: 'Bamboo Airways' },
@@ -82,9 +94,11 @@ export default function ChatLayout({ conversationId }: Props) {
             {/* 2. Danh sách vé thực tế */}
             <div className="scrollbar-thin scrollbar-thumb-gray-300 flex-1 overflow-y-auto pr-2">
               <FlightListContainer
+                conversationId={conversationId}
                 searchId={currentSearchId}
                 activeTab={activeTab}
                 onAskAI={handlePromptClick}
+                onCompareComplete={handleCompareComplete}
               />
             </div>
 

@@ -14,3 +14,6 @@ class ChatResponse(BaseModel):
     content: str
     slots: Dict[str, Any] = Field(default_factory=dict)
     action: Optional[ClientAction] = None
+
+class ResumeRequest(BaseModel):
+    selected_flight_ids: List[str]

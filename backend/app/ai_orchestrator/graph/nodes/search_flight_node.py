@@ -33,6 +33,7 @@ def search_flights_node(state: ChatState) -> dict:
             origin=origin,
             destination=destination,
             departureDate=departureDate,
+            roundTrip=search_filters.get("isRoundTrip", False),
             returnDate=search_filters.get("returnDate"),
             adults=search_filters.get("adults", 1),
             children=search_filters.get("children", 0),

@@ -27,13 +27,15 @@ class ChatService:
         )
 
         graph_config = {"configurable": {"thread_id": conversation_id}}
+        
         inputs = {
             "user_message": user_message,
             "node_results": ["CLEAR"],  
             "action": None,
             "error_msg": None,
             "tasks": [],
-            "user_prefs": {},
+            "search_filters": {},
+            "action_targets": {},
             "current_search_id": None
         }
         
@@ -42,16 +44,39 @@ class ChatService:
         
         final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=graph_config)
 
+        return self._format_and_save_response(conversation_id, final_state)
+
+    async def resume_message(self, conversation_id: str, selected_flight_ids: list[str]):
+        graph_config = {"configurable": {"thread_id": conversation_id}}
+
+        from app.schemas.chat_state import Task
+        from app.core.enums import ChatIntent
+
+        fake_task = Task(intent=ChatIntent.ANALYZE_FLIGHTS, parameters=None)
+
+        inputs = {
+            "user_message": "Tôi đã tick chọn các chuyến bay trên màn hình.",
+            "action_targets": {"compare_flights": selected_flight_ids},
+            "tasks": [fake_task],
+            "action": None,
+            "node_results": ["CLEAR"]
+        }
+
+        final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=graph_config)
+
+        return self._format_and_save_response(conversation_id, final_state)
+
+    def _format_and_save_response(self, conversation_id: str, final_state: dict):
         bot_message_content = final_state.get("response_text")
         if not bot_message_content:
              bot_message_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
 
-        user_prefs = final_state.get("user_prefs", {})
+        search_filters = final_state.get("search_filters", {})
 
         extracted_slots = {
-            "origin": user_prefs.get("origin"),
-            "destination": user_prefs.get("destination"),
-            "departureDate": user_prefs.get("departureDate"),
+            "origin": search_filters.get("origin"),
+            "destination": search_filters.get("destination"),
+            "departureDate": search_filters.get("departureDate"),
             "current_search_id": final_state.get("current_search_id")
         }
 

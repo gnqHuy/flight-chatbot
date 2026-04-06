@@ -16,7 +16,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
     children = int(user_prefs.get("children", 0))
     infants = int(user_prefs.get("infants", 0))
     need_age_confirmation = user_prefs.get("need_age_confirmation", False)
-    is_roundtrip = user_prefs.get("is_roundtrip", False)
+    roundTrip = user_prefs.get("roundTrip", False)
 
     raw_errors = []
     state_updates = {}
@@ -47,7 +47,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
         raw_errors.append("Số lượng trẻ sơ sinh (infants) không được vượt quá số lượng người lớn (adults).")
         state_updates["infants"] = 0 
 
-    if is_roundtrip and not returnDate:
+    if roundTrip and not returnDate:
         raw_errors.append("Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về.")
 
     if departureDate: 
