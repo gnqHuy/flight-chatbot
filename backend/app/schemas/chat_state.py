@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, TypedDict
+from typing import Literal, Optional, List, TypedDict
 from app.core.enums import AnalysisCriteria, ChatIntent, SortPreference, TravelClass
 
 class SearchFiltersParams(BaseModel):
@@ -22,7 +22,6 @@ class SearchFiltersParams(BaseModel):
             "Nếu khách nói 'Hủy lọc hãng', trả về mảng rỗng []."
         )
     )
-    excludedAirlines: Optional[List[str]] = Field(None, description="Mã hãng kiên quyết tránh (VD: ['VJ']).")
     maxPrice: Optional[int] = Field(None, description="Ngân sách/Giá tối đa (VNĐ).")
     nonStop: Optional[bool] = Field(None, description="True nếu chỉ muốn bay thẳng.")
     start_hour: Optional[int] = Field(None, description="Giờ bay sớm nhất (0-23).")
@@ -33,7 +32,7 @@ class ActionTargetsParams(BaseModel):
     """Giỏ 2: Chứa các mục tiêu tạm thời phục vụ cho câu hỏi So Sánh/Phân Tích hiện tại"""
     compare_flights: Optional[List[str]] = Field(
         default=None, 
-        description="Mã chuyến bay CỤ THỂ khách muốn hỏi/phân tích (VD: ['VN208', 'VJ103']). KHÔNG điền mã hãng vào đây."
+        description="Mã chuyến bay CỤ THỂ khách muốn hỏi/phân tích (VD: ['VN208', 'VJ103']). KHÔNG điền mã hãng bay vào đây."
     )
     compare_airlines: Optional[List[str]] = Field(
         default=None,
@@ -56,49 +55,3 @@ class Task(BaseModel):
 
 class ExtractionOutput(BaseModel):
     tasks: List[Task] = Field(..., description="Danh sách tác vụ cần xử lý.")
-
-class SearchFiltersState(TypedDict, total=False):
-    origin: Optional[str]
-    destination: Optional[str]
-    departureDate: Optional[str]
-    returnDate: Optional[str]
-    roundTrip: bool
-    travelClass: Optional[str]
-    adults: int
-    children: int
-    infants: int
-    need_age_confirmation: bool
-    preferred_airlines: Optional[List[str]]
-    excludedAirlines: Optional[List[str]]
-    maxPrice: Optional[int]
-    nonStop: Optional[bool]
-    start_hour: Optional[int]
-    end_hour: Optional[int]
-    sort_preference: Optional[str]
-
-class ActionTargetsState(TypedDict, total=False):
-    compare_flights: Optional[List[str]]
-    compare_airlines: Optional[List[str]]
-    analysis_criteria: Optional[List[str]]
-
-from pydantic import BaseModel, Field
-from typing import Literal, Optional
-
-class AnalysisStrategyDecision(BaseModel):
-    """Sử dụng để quyết định chiến lược phân tích vé máy bay"""
-    
-    reasoning: str = Field(..., description="Giải thích ngắn gọn lý do chọn chiến lược này dựa trên câu hỏi của khách.")
-    
-    strategy: Literal["MACRO_AIRLINE", "MICRO_FLIGHT", "HITL_REQUIRED"] = Field(
-        ..., 
-        description=(
-            "MACRO_AIRLINE: Khách hỏi chung chung về uy tín, dịch vụ, chính sách của hãng (VD: 'So sánh VJ và VN').\n"
-            "MICRO_FLIGHT: Khách muốn so sánh chi tiết giá/giờ của các chuyến bay cụ thể hoặc có gắn điều kiện thời gian (VD: 'So sánh chuyến sáng VJ và VN', 'Chuyến nào rẻ nhất').\n"
-            "HITL_REQUIRED: Khách nói quá mơ hồ, không nhắc đến hãng hay tiêu chí cụ thể nào, bắt buộc phải chọn trên màn hình (VD: 'So sánh cho tôi mấy chuyến đi')."
-        )
-    )
-    
-    time_filter: Optional[str] = Field(
-        None, 
-        description="Nếu khách nhắc đến thời gian (sáng, trưa, chiều, tối), hãy trích xuất vào đây. Rất quan trọng cho chiến lược MICRO_FLIGHT."
-    )

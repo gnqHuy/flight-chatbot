@@ -22,7 +22,7 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
                         flights_of_airline = [f for f in all_flights if code in [str(a).upper() for a in f.get('airlines', [])]]
                         if flights_of_airline:
                             flights_of_airline.sort(key=lambda x: float(x.get('price', 99999999)))
-                            example_flights.append(flights_of_airline[0]) # Lấy 1 vé rẻ nhất
+                            example_flights.append(flights_of_airline[0])
                             
                 if example_flights:
                     example_text = format_flights_to_text(example_flights)
