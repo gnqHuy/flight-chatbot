@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import FlightOfferCard from './FlightOfferCard';
-import { FlightOffer } from '@/types/FlightOffer'; // Lưu ý: Bạn cần update lại Type này nhé
+import { FlightOffer } from '@/types/FlightOffer';
 import { chatAPI } from '@/services/chatAPI';
 
 type Props = {
@@ -11,6 +11,9 @@ type Props = {
   activeTab: 'VN' | 'VJ' | 'QH';
   onAskAI: (prompt: string) => void;
   onCompareComplete?: (botResponse: any) => void;
+  // 🌟 MỚI: Nhận thêm 2 Props từ ChatLayout
+  activeFilters?: Record<string, any>;
+  activeSort?: string | null;
 };
 
 const FlightListContainer = ({
@@ -19,6 +22,8 @@ const FlightListContainer = ({
   activeTab,
   onAskAI,
   onCompareComplete,
+  activeFilters = {},
+  activeSort = null,
 }: Props) => {
   const [allFlights, setAllFlights] = useState<FlightOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,17 +53,109 @@ const FlightListContainer = ({
     fetchFlights();
   }, [searchId]);
 
-  // CẬP NHẬT THEO CẤU TRÚC MỚI
-  const displayedFlights = allFlights.filter((flight) => {
-    // Ưu tiên check trong mảng airlines mới được thêm vào
-    if (flight.airlines && flight.airlines.length > 0) {
-      return flight.airlines.includes(activeTab);
+  // 🌟 MỚI: ENGINE LỌC & SẮP XẾP TẠI FRONTEND (Dùng useMemo để tối ưu hiệu năng)
+  const displayedFlights = useMemo(() => {
+    if (!allFlights || allFlights.length === 0) return [];
+
+    let result = [...allFlights];
+
+    // 1. Lọc theo Active Tab (Hãng bay)
+    result = result.filter((flight) => {
+      if (flight.airlines && flight.airlines.length > 0) {
+        return flight.airlines.includes(activeTab);
+      }
+      const firstItinerary = flight.itineraries?.[0];
+      const carrierCode =
+        firstItinerary?.flightNumber?.substring(0, 2)?.toUpperCase() ||
+        firstItinerary?.segmentDetails?.[0]?.carrierCode;
+      return carrierCode === activeTab;
+    });
+
+    // 2. Lọc theo Active Filters (Giá, Giờ, Bay thẳng)
+    if (Object.keys(activeFilters).length > 0) {
+      result = result.filter((f) => {
+        let isMatch = true;
+
+        // Lọc giá
+        if (activeFilters.maxPrice) {
+          if (Number(f.price || 0) > Number(activeFilters.maxPrice)) isMatch = false;
+        }
+
+        // Lọc bay thẳng
+        if (isMatch && activeFilters.nonStop === true) {
+          const segmentDetails = f.itineraries?.[0]?.segmentDetails || [];
+          if (segmentDetails.length > 1 || f.itineraries?.[0]?.stops < 2) isMatch = false;
+        }
+
+        if (
+          isMatch &&
+          (activeFilters.start_hour !== undefined || activeFilters.end_hour !== undefined)
+        ) {
+          const depTimeStr =
+            (f as any).departureTime || f.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at;
+          if (depTimeStr && depTimeStr.includes('T')) {
+            try {
+              const hour = parseInt(depTimeStr.split('T')[1].split(':')[0], 10);
+              if (activeFilters.start_hour !== undefined && hour < Number(activeFilters.start_hour))
+                isMatch = false;
+              if (activeFilters.end_hour !== undefined && hour > Number(activeFilters.end_hour))
+                isMatch = false;
+            } catch (e) {
+              console.error('Lỗi parse giờ bay', e);
+            }
+          }
+        }
+
+        return isMatch;
+      });
     }
-    // Fallback: Lấy carrier code từ chuyến bay của chiều đi (itineraries[0])
-    const firstItinerary = flight.itineraries?.[0];
-    const carrierCode = firstItinerary?.flightNumber?.substring(0, 2)?.toUpperCase();
-    return carrierCode === activeTab;
-  });
+
+    // 3. Sắp xếp (Active Sort)
+    if (activeSort) {
+      result.sort((a, b) => {
+        const priceA = Number(a.price || 0);
+        const priceB = Number(b.price || 0);
+
+        // Amadeus thường để thời gian sâu bên trong, fallback an toàn
+        const timeA =
+          (a as any).departureTime ||
+          a.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at ||
+          '9999';
+        const timeB =
+          (b as any).departureTime ||
+          b.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at ||
+          '9999';
+
+        switch (activeSort) {
+          case 'price_desc':
+            return priceB - priceA;
+          case 'price_asc':
+            return priceA - priceB;
+          case 'departure_time':
+            return timeA.localeCompare(timeB);
+          case 'arrival_time':
+            const arrA =
+              (a as any).arrivalTime ||
+              a.itineraries?.[0]?.segmentDetails?.[a.itineraries[0].segmentDetails.length - 1]
+                ?.arrival?.at ||
+              '9999';
+            const arrB =
+              (b as any).arrivalTime ||
+              b.itineraries?.[0]?.segmentDetails?.[b.itineraries[0].segmentDetails.length - 1]
+                ?.arrival?.at ||
+              '9999';
+            return arrA.localeCompare(arrB);
+          default:
+            return 0;
+        }
+      });
+    } else {
+      // Mặc định luôn sắp xếp giá tăng dần nếu không có lệnh gì
+      result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+
+    return result;
+  }, [allFlights, activeTab, activeFilters, activeSort]);
 
   const toggleFlightSelection = (flightId: string) => {
     setSelectedFlights((prev) => {
@@ -149,7 +246,7 @@ const FlightListContainer = ({
           <span className="text-4xl">📭</span>
           <p className="mt-4 font-semibold text-slate-700">Không tìm thấy chuyến bay</p>
           <p className="mt-1 text-sm text-slate-500">
-            Không có chuyến bay nào phù hợp với hãng {activeTab}.
+            Không có chuyến bay nào phù hợp với bộ lọc hiện tại.
           </p>
         </div>
       </div>
@@ -159,7 +256,6 @@ const FlightListContainer = ({
   return (
     <div className="relative flex flex-col gap-3 pb-24">
       {displayedFlights.map((flight, idx) => {
-        // CẬP NHẬT: Ưu tiên dùng ID của flight, bỏ flightNumber ở root đi
         const flightId = flight.id || `flight-${idx}`;
         const isSelected = selectedFlights.includes(flightId);
 
@@ -172,7 +268,6 @@ const FlightListContainer = ({
                 : 'border-transparent bg-transparent hover:bg-slate-50'
             }`}
           >
-            {/* Vùng chỉ dành riêng cho Checkbox */}
             <div
               className="flex h-full cursor-pointer items-center justify-center pl-2"
               onClick={() => toggleFlightSelection(flightId)}
@@ -185,7 +280,6 @@ const FlightListContainer = ({
               />
             </div>
 
-            {/* Vùng hiển thị Card */}
             <div className="w-full flex-1 overflow-hidden">
               <FlightOfferCard flight={flight} onAskAI={onAskAI} />
             </div>

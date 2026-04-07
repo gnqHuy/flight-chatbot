@@ -12,8 +12,8 @@ def parse_datetime(dt_str: str) -> str:
 
 def format_flights_to_text(parsed_flights: list) -> str:
     """
-    Biến danh sách vé đã được làm sạch (từ format_amadeus_flight_display) 
-    thành chuỗi văn bản chuẩn mực để cung cấp cho LLM phân tích.
+    Biến danh sách vé đã được làm sạch thành chuỗi văn bản chuẩn mực 
+    để cung cấp cho LLM phân tích (Hỗ trợ cấu trúc Itineraries mới).
     """
     if not parsed_flights:
         return "Không có dữ liệu chi tiết cho các chuyến bay này."
@@ -22,41 +22,58 @@ def format_flights_to_text(parsed_flights: list) -> str:
     
     for idx, f in enumerate(parsed_flights, 1):
         try:
-            price_str = f"{f['price']:,.0f} {f['currency']}".replace(",", ".")
+            flight_id = f.get('id', str(idx))
+            price_str = f"{f.get('price', 0):,.0f} {f.get('currency', 'VND')}".replace(",", ".")
             
             blocks = [
-                f"=== [LỰA CHỌN {idx}] ===",
-                f"- Hành trình chính: {f['departure']['city']} ({f['departure']['iata']}) đi {f['arrival']['city']} ({f['arrival']['iata']})",
-                f"- Chuyến bay: {f.get('flightNumber', 'N/A')} (Các hãng: {', '.join(f.get('airlines', []))})",
+                f"=== [VÉ ID: {flight_id}] ===",
                 f"- Giá vé tổng cộng: {price_str}",
+                f"- Các hãng hàng không: {', '.join(f.get('airlines', []))}",
                 f"- Hạng vé: {f.get('cabin', 'N/A')} (Gói: {f.get('fareOption', 'N/A')})",
                 f"- Số ghế trống hiện tại: {f.get('bookableSeats', 'N/A')} ghế",
                 f"- Hành lý xách tay: {f.get('cabinBaggage', 'N/A')}",
                 f"- Hành lý ký gửi: {f.get('checkedBaggage', 'N/A')}",
-                f"- Tổng thời gian di chuyển: {f.get('duration', 'N/A')}",
-                f"- Số điểm nối chuyến: {f.get('stops', 0)}",
                 f"- Hạn chót xuất vé: {f.get('lastTicketingDate', 'N/A')}"
             ]
             
-            blocks.append("\n* CHI TIẾT CÁC CHẶNG BAY:")
-            for s_idx, seg in enumerate(f.get('segmentDetails', [])):
-                dep_time = parse_datetime(seg['departure']['at'])
-                arr_time = parse_datetime(seg['arrival']['at'])
+            itineraries = f.get('itineraries', [])
+            if not itineraries:
+                blocks.append("- Lỗi: Không có thông tin hành trình.")
                 
-                op_carrier = seg.get('operatingCarrier', seg['carrierCode'])
-                op_str = f" (Khai thác thực tế bởi: {op_carrier})" if op_carrier != seg['carrierCode'] else ""
+            for it_idx, it in enumerate(itineraries):
+                direction = "Chiều đi" if it_idx == 0 else "Chiều về"
                 
-                blocks.append(f"  + Chặng {s_idx + 1}: {seg['departure']['iata']} -> {seg['arrival']['iata']}")
-                blocks.append(f"    Mã chuyến: {seg['flightNumber']}{op_str}")
-                blocks.append(f"    Khởi hành: {dep_time} - Cổng/Terminal: {seg['departure'].get('terminal', 'N/A')}")
-                blocks.append(f"    Hạ cánh: {arr_time} - Cổng/Terminal: {seg['arrival'].get('terminal', 'N/A')}")
-                blocks.append(f"    Thời gian bay: {seg.get('duration', 'N/A')} | Máy bay: {seg.get('aircraft', 'N/A')} | Hạng ghế: {seg.get('cabin', 'N/A')}")
-                blocks.append(f"    Phân loại vé: Class {seg.get('bookingClass', 'N/A')} | Fare Basis: {seg.get('fareBasis', 'N/A')}")
+                dep = it.get('departure', {})
+                arr = it.get('arrival', {})
+                
+                blocks.append(f"\n[Hành trình {it_idx + 1}: {direction}]")
+                blocks.append(f"  - Tuyến: {dep.get('city', 'N/A')} ({dep.get('iata', 'N/A')}) -> {arr.get('city', 'N/A')} ({arr.get('iata', 'N/A')})")
+                blocks.append(f"  - Chuyến bay chính: {it.get('flightNumber', 'N/A')}")
+                blocks.append(f"  - Tổng thời gian: {it.get('duration', 'N/A')} | Điểm dừng: {it.get('stops', 0)}")
+                
+                blocks.append("  * CHI TIẾT CÁC CHẶNG BAY:")
+                
+                segments = it.get('segments', it.get('segmentDetails', [])) 
+                
+                for s_idx, seg in enumerate(segments):
+                    dep_time = seg.get('departure', {}).get('at', 'N/A').replace('T', ' ')
+                    arr_time = seg.get('arrival', {}).get('at', 'N/A').replace('T', ' ')
+                    
+                    op_carrier = seg.get('operatingCarrier', seg.get('carrierCode', 'N/A'))
+                    carrier = seg.get('carrierCode', 'N/A')
+                    op_str = f" (Khai thác thực tế bởi: {op_carrier})" if op_carrier != carrier else ""
+                    
+                    blocks.append(f"    + Chặng {s_idx + 1}: {seg.get('departure', {}).get('iata', 'N/A')} -> {seg.get('arrival', {}).get('iata', 'N/A')}")
+                    blocks.append(f"      Mã chuyến: {seg.get('flightNumber', 'N/A')}{op_str}")
+                    blocks.append(f"      Khởi hành: {dep_time} - Cổng/Terminal: {seg.get('departure', {}).get('terminal', 'N/A')}")
+                    blocks.append(f"      Hạ cánh: {arr_time} - Cổng/Terminal: {seg.get('arrival', {}).get('terminal', 'N/A')}")
+                    blocks.append(f"      Thời gian bay: {seg.get('duration', 'N/A')} | Máy bay: {seg.get('aircraft', 'N/A')} | Hạng ghế: {seg.get('cabin', 'N/A')}")
+                    blocks.append(f"      Phân loại vé: Class {seg.get('bookingClass', 'N/A')} | Fare Basis: {seg.get('fareBasis', 'N/A')}")
             
             formatted_texts.append("\n".join(blocks))
             
         except Exception as e:
             print(f"Lỗi khi text-format chuyến bay thứ {idx}: {e}")
-            formatted_texts.append(f"=== [LỖI TRÍCH XUẤT DỮ LIỆU TÙY CHỌN {idx}] ===")
+            formatted_texts.append(f"=== [LỖI TRÍCH XUẤT DỮ LIỆU VÉ ID {f.get('id', idx)}] ===")
             
     return "\n\n".join(formatted_texts)

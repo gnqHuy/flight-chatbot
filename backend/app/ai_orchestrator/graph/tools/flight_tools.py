@@ -36,6 +36,8 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
 @tool
 def fetch_flight_details(flight_ids: list[str], search_id: str) -> str:
     """Gọi tool này khi cần lấy thông tin chi tiết (giá, giờ bay) của TẤT CẢ các chuyến bay cụ thể được yêu cầu."""
+    print(f"⚡ [TOOL] fetch_flight_details được gọi với flight_ids={flight_ids} và search_id={search_id}")
+    
     if not search_id or search_id in ["CLEAR", "NOT_FOUND"]:
         return "Lỗi: Yêu cầu khách tìm kiếm chuyến bay trước."
 
@@ -49,12 +51,22 @@ def fetch_flight_details(flight_ids: list[str], search_id: str) -> str:
         if not isinstance(all_flights, list):
             return "Lỗi: Dữ liệu vé không hợp lệ."
 
-        matched_flights = [f for f in all_flights if str(f.get('flightNumber', '')).upper() in flight_ids]
-        
+        if isinstance(flight_ids, str):
+            flight_ids = [fid.strip() for fid in flight_ids.split(',')]
+        elif not isinstance(flight_ids, list):
+            flight_ids = [str(flight_ids)]
+
+        flight_ids_str = [str(fid).strip() for fid in flight_ids]
+    
+        matched_flights = [
+            f for f in all_flights 
+            if str(f.get('id', '')).strip() in flight_ids_str
+        ]
+                
         if not matched_flights:
-            return f"Không tìm thấy thông tin cho các mã chuyến bay: {flight_ids}"
+            return f"Không tìm thấy thông tin cho các mã vé: {flight_ids_str}. (Hệ thống hiện đang có {len(all_flights)} vé)."
             
-        return f"[CHI TIẾT CHUYẾN BAY {flight_ids}]:\n{format_flights_to_text(matched_flights)}"
+        return f"[CHI TIẾT VÉ {flight_ids_str}]:\n{format_flights_to_text(matched_flights)}"
         
     except Exception as e:
         return f"Lỗi khi kéo chi tiết chuyến bay: {str(e)}"

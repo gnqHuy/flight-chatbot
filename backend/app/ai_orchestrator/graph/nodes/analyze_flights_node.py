@@ -68,6 +68,8 @@ def analyze_flights_node(state: ChatState) -> dict:
         f"⚠️ CHỈ THỊ: Dựa vào Dữ liệu trên và Yêu cầu của khách, hãy viết một bài phân tích/so sánh khách quan, rõ ràng. Không tự bịa số liệu."
     )
 
+    print("👉 [DEBUG]: Kết quả phân tích sơ bộ từ Agent:\n", report)
+
     return {
         "node_results": [report],
         "tasks": remaining_tasks,

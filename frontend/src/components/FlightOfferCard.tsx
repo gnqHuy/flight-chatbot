@@ -24,7 +24,7 @@ const FlightOfferCard: React.FC<Props> = ({ flight, onAskAI }) => {
     return ptString.replace('PT', '').replace('H', 'h ').replace('M', 'm').toLowerCase();
   };
 
-  // Tổng hợp tất cả mã chuyến bay để AI phân tích
+  // Vẫn giữ lại flightNumbers để AI hiển thị trong câu trả lời cho tự nhiên
   const allFlightNumbers = flight.itineraries?.map((it) => it.flightNumber).join(' và ') || '';
 
   return (
@@ -108,16 +108,15 @@ const FlightOfferCard: React.FC<Props> = ({ flight, onAskAI }) => {
 
         <button
           onClick={(e) => {
-            e.stopPropagation(); // Cực kỳ quan trọng để không click nhầm vào checkbox chọn vé ở ngoài
+            e.stopPropagation();
+            // 🌟 ĐÃ SỬA: Bắn ID vé vào đầu prompt để AI dùng ID truy xuất Redis
             onAskAI(
-              `Phân tích ưu nhược điểm và hành lý của chuyến bay ${allFlightNumbers} (Hãng: ${
-                flight.airlines?.join(', ') || 'N/A'
-              }).`
+              `Phân tích ưu nhược điểm và hành lý của vé [ID: ${flight.id}] (Chuyến: ${allFlightNumbers}).`
             );
           }}
           className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-100 px-4 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
         >
-          ✨ Hỏi AI chuyến này
+          ✨ Hỏi AI vé này
         </button>
       </div>
     </div>

@@ -12,19 +12,67 @@ export default function ChatLayout({ conversationId }: Props) {
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null);
 
-  // 🌟 SỬA: Đổi default tab thành 'VN' và giới hạn kiểu dữ liệu
   const [activeTab, setActiveTab] = useState<'VN' | 'VJ' | 'QH'>('VN');
-
   const [externalTrigger, setExternalTrigger] = useState<string>('');
 
+  // 🌟 MỚI: Thêm State để lưu bộ lọc và tiêu chí sắp xếp từ AI
+  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+  const [activeSort, setActiveSort] = useState<string | null>(null);
+
   const handleActionDetected = (action: any) => {
-    if (
-      action &&
-      (action.type === 'flight_list' || action.type === 'FLIGHT_LIST') &&
-      action.payload?.search_id
-    ) {
-      setCurrentSearchId(action.payload.search_id);
+    if (!action) return;
+
+    // 1. LUỒNG TÌM KIẾM MỚI (Load lại danh sách gốc từ đầu)
+    if (action.type === 'flight_list' || action.type === 'FLIGHT_LIST') {
+      if (action.payload?.search_id) {
+        setCurrentSearchId(action.payload.search_id);
+        setIsWorkspaceOpen(true);
+        // Reset lại toàn bộ lọc/sort khi có phiên tìm kiếm mới
+        setActiveFilters({});
+        setActiveSort(null);
+      }
+    }
+
+    // 2. 🌟 MỚI: LUỒNG ÁP DỤNG BỘ LỌC/SẮP XẾP TẠI FRONTEND
+    if (action.type === 'apply_filters' || action.type === 'APPLY_FILTERS') {
+      const { search_id, filters, sort } = action.payload || {};
+
+      if (search_id) setCurrentSearchId(search_id);
       setIsWorkspaceOpen(true);
+
+      // Xử lý bộ lọc (Merge cái mới vào cái cũ, xóa nếu gặp chữ "CLEAR")
+      if (filters) {
+        setActiveFilters((prevFilters) => {
+          const newFilters = { ...prevFilters };
+
+          Object.keys(filters).forEach((key) => {
+            if (filters[key] === 'CLEAR' || filters[key] === null) {
+              delete newFilters[key]; // Khách hủy lọc -> Xóa khỏi state
+            } else {
+              newFilters[key] = filters[key]; // Khách thêm lọc -> Cập nhật/Ghi đè
+            }
+          });
+
+          return newFilters;
+        });
+
+        // Tự động chuyển Tab nếu AI ra lệnh đổi hãng bay
+        if (filters.preferred_airlines && Array.isArray(filters.preferred_airlines)) {
+          const firstAirline = filters.preferred_airlines[0];
+          if (['VN', 'VJ', 'QH'].includes(firstAirline)) {
+            setActiveTab(firstAirline as 'VN' | 'VJ' | 'QH');
+          }
+        }
+      }
+
+      // Xử lý tiêu chí sắp xếp
+      if (sort !== undefined) {
+        if (sort === 'CLEAR' || sort === null) {
+          setActiveSort(null); // Trở về sắp xếp mặc định
+        } else {
+          setActiveSort(sort);
+        }
+      }
     }
   };
 
@@ -32,13 +80,9 @@ export default function ChatLayout({ conversationId }: Props) {
     setExternalTrigger(`${promptText} `);
   };
 
-  // 🌟 MỚI: Xử lý sự kiện khi API Resume (so sánh vé) gọi xong
   const handleCompareComplete = (botResponse: any) => {
     console.log('Đã so sánh xong, response từ Backend:', botResponse);
-    // TODO: Tùy thuộc vào cách ChatWindow của bạn hoạt động,
-    // bạn có thể gọi một hàm để ép ChatWindow re-fetch lại danh sách tin nhắn,
-    // hoặc trigger một tín hiệu giả vào externalTrigger để ChatWindow cập nhật.
-    // VD: setExternalTrigger(`[REFRESH_CHAT]_${Date.now()}`);
+    // TODO: Xử lý refetch hoặc thông báo
   };
 
   return (
@@ -64,13 +108,12 @@ export default function ChatLayout({ conversationId }: Props) {
       >
         {isWorkspaceOpen && currentSearchId && (
           <div className="animate-in fade-in flex h-full w-full flex-col p-6 duration-500">
-            {/* 1. Header & Tabs */}
+            {/* Header & Tabs */}
             <div className="mb-4 shrink-0">
               <h2 className="mb-4 text-2xl font-bold tracking-tight text-slate-800">
                 Danh sách chuyến bay
               </h2>
               <div className="flex space-x-1 border-b border-gray-200">
-                {/* 🌟 SỬA: Đã xóa object { id: 'ALL', label: 'Tất cả' } */}
                 {[
                   { id: 'VN', label: 'Vietnam Airlines' },
                   { id: 'VJ', label: 'Vietjet Air' },
@@ -91,7 +134,7 @@ export default function ChatLayout({ conversationId }: Props) {
               </div>
             </div>
 
-            {/* 2. Danh sách vé thực tế */}
+            {/* Danh sách vé thực tế */}
             <div className="scrollbar-thin scrollbar-thumb-gray-300 flex-1 overflow-y-auto pr-2">
               <FlightListContainer
                 conversationId={conversationId}
@@ -99,10 +142,13 @@ export default function ChatLayout({ conversationId }: Props) {
                 activeTab={activeTab}
                 onAskAI={handlePromptClick}
                 onCompareComplete={handleCompareComplete}
+                // 🌟 MỚI: Truyền filter và sort xuống cho Component con tự xử
+                activeFilters={activeFilters}
+                activeSort={activeSort}
               />
             </div>
 
-            {/* 3. Prompt Chips */}
+            {/* Prompt Chips */}
             <div className="mt-4 shrink-0 border-t border-gray-200 bg-[#F8FAFC] pt-4">
               <p className="mb-3 text-[11px] font-bold tracking-widest text-slate-400 uppercase">
                 💡 Gợi ý thao tác nhanh

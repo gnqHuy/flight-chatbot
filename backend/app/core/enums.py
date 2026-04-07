@@ -10,6 +10,7 @@ class ComponentType(str, Enum):
     ERROR = "error"
     FLIGHT_LIST = "flight_list"
     REQUIRE_FLIGHT_SELECTION = "require_flight_selection"
+    APPLY_FILTERS = "apply_filters"
 
 class ChatIntent(str, Enum):
     SEARCH_FLIGHT = "search_flight"
