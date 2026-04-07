@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.state import ChatState
 from app.core.constants import ContextTag
 from app.core.llm_setup import llm
-from app.schemas.chat_state import ExtractionOutput, SearchFiltersParams, ActionTargetsParams
+from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
 
 SYSTEM_PROMPT = """Bạn là AI chuyên bóc tách Ý định (Intent) và Thực thể (Entity) cho hệ thống Đặt vé máy bay.
@@ -133,7 +133,6 @@ def extract_intent_node(state: ChatState):
     except Exception as e:
         print(f"❌ [LỖI EXTRACT INTENT]: Không thể bóc tách dữ liệu: {e}")
         
-    # Trả về State mới
     result_dict = {
         "tasks": all_tasks,
         "search_filters": new_search_filters,
