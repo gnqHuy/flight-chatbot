@@ -3,12 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from uuid import UUID
 from sqlmodel import Session
+from pydantic import BaseModel
+
 from app.api.deps import get_current_user
 from app.database.database import get_session
 from app.database.models.user import User
 from app.schemas.conversation import ConversationRead
 from app.schemas.message import MessageCreateBody, MessageRead
-from app.schemas.chat_response import ChatResponse
+from app.schemas.chat_response import ChatResponse, ResumeRequest
 from app.repositories.conversation_repo import ConversationRepository
 from app.repositories.message_repo import MessageRepository
 from app.services.conversation_service import ConversationService
@@ -89,4 +91,36 @@ async def send_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"Lỗi hệ thống: {str(e)}"
+        )
+
+@router.post("/{conversation_id}/resume", response_model=ChatResponse)
+async def resume_graph(
+    conversation_id: UUID,
+    body: ResumeRequest, 
+    db: Session = Depends(get_session)
+):
+    conv_repo = ConversationRepository(db)
+    msg_repo = MessageRepository(db)
+    service = ChatService(conv_repo, msg_repo) 
+    
+    try:
+        result = await service.resume_message(
+            conversation_id=str(conversation_id),
+            selected_flight_ids=body.selected_flight_ids
+        )
+        
+        return ChatResponse(
+            conversation_id=result["conversation_id"],
+            message_id=result["message_id"],
+            role=result["role"],
+            content=result["content"],
+            slots=result["slots"],
+            action=result["action"]
+        )
+        
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi khi tiếp tục luồng AI: {str(e)}"
         )

@@ -1,27 +1,6 @@
 import { Role } from './enums/Role';
 import { ComponentType } from './enums/ComponentType';
 
-export interface FlightLocation {
-  iata: string;
-  city: string;
-  at: string;
-  terminal: string;
-}
-
-export interface FlightOffer {
-  id: string;
-  price: number;
-  currency: string;
-  cabin: string;
-  baggage: string;
-  duration: string;
-  stops: number;
-  airlines: string[];
-  flightNumber: string;
-  departure: FlightLocation;
-  arrival: FlightLocation;
-}
-
 export interface FlightListPayload {
   search_id: string;
 }

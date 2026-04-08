@@ -1,23 +1,47 @@
+// Nơi đi/Nơi đến
+export interface FlightEndpoint {
+  iata: string;
+  city?: string; // Có thể optional vì bên trong segmentDetails không map city
+  at: string;
+  terminal: string;
+}
+
+// Chi tiết từng chặng bay (segment)
+export interface SegmentDetail {
+  carrierCode: string;
+  operatingCarrier: string;
+  flightNumber: string;
+  aircraft: string;
+  duration: string;
+  cabin: string;
+  bookingClass: string;
+  fareBasis: string;
+  departure: FlightEndpoint;
+  arrival: FlightEndpoint;
+}
+
+// Thông tin 1 chiều bay (có thể gồm nhiều chặng/segments)
+export interface Itinerary {
+  duration: string;
+  stops: number;
+  flightNumber: string;
+  departure: FlightEndpoint;
+  arrival: FlightEndpoint;
+  segmentDetails: SegmentDetail[];
+}
+
+// Cấu trúc tổng thể của 1 vé
 export interface FlightOffer {
   id: string;
   price: number;
   currency: string;
   cabin: string;
-  baggage: string;
-  duration: string;
-  stops: number;
+  fareOption: string;
+  bookableSeats: number | string; // Có thể là số hoặc "N/A"
+  lastTicketingDate: string;
+  validatingAirline: string;
+  checkedBaggage: string;
+  cabinBaggage: string;
   airlines: string[];
-  flightNumber: string;
-  departure: {
-    iata: string;
-    city: string;
-    at: string;
-    terminal: string;
-  };
-  arrival: {
-    iata: string;
-    city: string;
-    at: string;
-    terminal: string;
-  };
+  itineraries: Itinerary[]; // Mảng chứa chiều đi, chiều về,...
 }

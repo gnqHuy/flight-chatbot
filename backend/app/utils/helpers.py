@@ -80,3 +80,8 @@ def merge_node_results(left: list, right: list) -> list:
     if right == ["CLEAR"]: 
         return []
     return (left or []) + (right or [])
+
+def overwrite_dict(left: dict, right: dict) -> dict:
+    if not right:
+        return {}
+    return right

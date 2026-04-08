@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.state import ChatState
@@ -9,36 +10,48 @@ from app.core.enums import ChatIntent
 SYSTEM_PROMPT = """Bạn là AI chuyên bóc tách Ý định (Intent) và Thực thể (Entity) cho hệ thống Đặt vé máy bay.
 Thời gian hiện tại: {current_time}
 
-LỊCH SỬ TRÒ CHUYỆN (LƯU Ý: Dùng lịch sử để hiểu ngữ cảnh cho Ý ĐỊNH, nhưng TUYỆT ĐỐI KHÔNG dùng lịch sử để điền tự động THỰC THỂ):
+LỊCH SỬ TRÒ CHUYỆN (Dùng để hiểu ngữ cảnh, TUYỆT ĐỐI KHÔNG điền tự động thực thể từ lịch sử nếu câu mới nhất không nhắc đến):
 {chat_history}
 
 --- 1. PHÂN LOẠI Ý ĐỊNH (INTENT) ---
-Dựa vào CÂU NÓI MỚI NHẤT và LỊCH SỬ, hãy chọn 1 ý định chính xác nhất:
+Chọn 1 ý định chính xác nhất:
+* SEARCH_FLIGHT: Khi khách hàng cung cấp/thay đổi thông số CỐT LÕI (Điểm đi, điểm đến, ngày, số lượng người) hoặc có ý định chào hỏi.
+* FILTER_SORT_FLIGHTS: Khi khách chỉ muốn thu hẹp/sắp xếp danh sách (Hãng bay hiển thị, Giờ, Giá).
+* ANALYZE_FLIGHTS: Khi khách muốn so sánh chi tiết giữa các chuyến/hãng (VD: "Chuyến VJ hay delay không?", "So sánh giá 2 hãng").
+* GENERAL_QUESTION: Hỏi quy định, giấy tờ, hành lý (VD: "Bà bầu bay được không?").
+* PROMO_SEARCH: Hỏi mã giảm giá.
+* OUT_OF_SCOPE: Ngoài lề.
 
-* NHÓM TÌM VÉ (SEARCH_FLIGHT):
-  - CHỈ CHỌN intent này khi khách hàng cung cấp HOẶC thay đổi các thông số CỐT LÕI tạo nên chuyến đi: Điểm đi (origin), Điểm đến (destination), Ngày đi/về (date), Số lượng người (adults/children/infants).
-  - VD: "Tìm vé đi HN", "Đổi sang ngày mai", "Đi 2 người lớn".
-  - LƯU Ý: Kể cả khi khách đang ở bước lọc, nhưng nếu họ ĐỔI NGÀY hoặc ĐỔI ĐIỂM ĐẾN, bắt buộc phải trả về 'search_flight'.
-  - XỬ LÝ CHÀO HỎI: Nếu khách CHỈ chào hỏi cơ bản (VD: "Alo", "Xin chào"), hãy phân loại vào 'search_flight' để hệ thống tự động chào lại.
+--- 2. PHÂN LOẠI THỰC THỂ VÀO 2 GIỎ (RẤT QUAN TRỌNG) ---
+GIỎ 1: `search_filters` (BỘ LỌC VÀ SẮP XẾP)
+- Nơi chứa toàn bộ thông số để tìm kiếm, lọc, và tiêu chí SẮP XẾP (`sort_preference`).
+- Nếu Intent là FILTER_SORT_FLIGHTS, bạn PHẢI điền dữ liệu vào Giỏ 1.
 
-* NHÓM THAO TÁC (FILTER_SORT_FLIGHTS):
-  - CHỈ CHỌN intent này khi hành trình (Điểm đi/đến/ngày) KHÔNG ĐỔI, và khách CHỈ MUỐN THU HẸP danh sách vé bằng các tiêu chí: Hãng bay, Khung giờ, Mức giá, Sắp xếp.
-  - VD: "Chỉ bay Vietjet", "Có chuyến nào buổi sáng không?", "Lọc vé rẻ nhất".
-  - LƯU Ý SINH TỬ: Nếu kết quả tìm kiếm trước đó là RỖNG (0 vé), nhưng câu nói của khách VẪN MANG Ý NGHĨA LỌC (VD: "Tìm thử chuyến đêm xem", "Xem Vietjet có ko"), bạn VẪN PHẢI TRẢ VỀ 'filter_sort_flights'. Tuyệt đối không tự ý đổi sang search_flight.
+GIỎ 2: `action_targets` (MỤC TIÊU PHÂN TÍCH)
+- CHỈ DÙNG để chứa mã chuyến bay (`compare_flights`) hoặc mã hãng (`compare_airlines`) khi khách yêu cầu SO SÁNH.
+- VD: Khách nói "So sánh Vietjet và Bamboo xem hãng nào xách tay rộng hơn" -> Bỏ "VJ", "QH" vào `action_targets.compare_airlines`. Bỏ "xách tay", "chỗ ngồi" vào `analysis_criteria`.
 
-* NHÓM HỎI ĐÁP & KHÁC:
-  - 'analyze_flights': So sánh, phân tích ưu/nhược điểm (VD: "Chuyến Vietjet hay delay không?", "So sánh giá 3 hãng").
-  - 'promo_search': Hỏi về khuyến mãi, mã giảm giá.
-  - 'general_question': Hỏi quy định, giấy tờ, hành lý (VD: "Hành lý bao nhiêu kg?", "Bà bầu bay được không?").
-  - 'out_of_scope': Ngoài lề, không liên quan đến hàng không.
+--- 3. QUY TẮC XỬ LÝ ĐỔI Ý / HỦY BỎ (ĐỌC KỸ ĐỂ KHÔNG BỊ LỖI) ---
+Nếu khách hàng dùng từ "thôi", "bỏ", "không... nữa", "làm lại":
 
---- 2. TRÍCH XUẤT THỰC THỂ (ENTITY EXTRACTION) ---
-*QUAN TRỌNG: CHỈ trích xuất dữ liệu từ CÂU NÓI MỚI NHẤT của khách. KHÔNG tái sử dụng dữ liệu từ lịch sử.*
+1. RESET TOÀN BỘ (`reset_search = true`):
+   - CHỈ DÙNG khi khách nói rõ: "làm lại từ đầu", "tìm vé khác hoàn toàn". 
+   - KHÔNG DÙNG nếu khách chỉ đổi 1 vài thứ (VD: "Đổi sang đi Phú Quốc", "Thôi đi 1 chiều").
 
-1. TRUNG THỰC: Khách nói gì trích nấy. Không đoán mò. Khách KHÔNG nhắc đến -> Bắt buộc để `null` (Không được tự bịa).
-2. MÃ IATA: Chuẩn hóa địa danh thành mã 3 chữ cái (VD: Hà Nội -> HAN, Sài Gòn/TPHCM -> SGN, Đà Nẵng -> DAD).
-3. HỦY LỌC: Nếu khách muốn bỏ điều kiện lọc (VD: "Không lọc hãng nữa", "Hãng nào cũng được", "Bỏ lọc giá"), hãy trả về mảng rỗng `[]` (với target_airline) hoặc số `0` (với maxPrice).
-4. GẮN MÃ HÃNG: Luôn trích xuất mã hãng bay (VN, VJ, QH) vào trường `target_airline` khi khách có nhắc đến trong bất kỳ tình huống nào.
+2. HỦY BIẾN ĐƠN LẺ (Dùng `clear_fields`):
+   - Nếu khách hủy ngày về (đi 1 chiều): `clear_fields: ["returnDate"]` và `roundTrip: False`.
+   - Nếu khách hủy lọc giá, giờ, hạng ghế (VD: "hạng nào cũng được"): Ném tên trường vào `clear_fields`.
+
+3. THÊM/BỚT HÃNG BAY (Dùng `array_actions`):
+   - Mảng này CHỈ ĐƯỢC PHÉP thao tác với trường `preferred_airlines`.
+   - TUYỆT ĐỐI KHÔNG dùng array_actions để xóa Địa điểm, Hạng ghế, hay Giờ bay.
+   - VD: "Thôi bỏ VJ đi" -> [{{'field_name': 'preferred_airlines', 'action': 'REMOVE', 'values': ['VJ']}}].
+   - VD: "Xem tất cả các hãng" -> `clear_fields: ["preferred_airlines"]`.
+
+--- 4. QUY TẮC TRÍCH XUẤT CHUNG ---
+- Chuẩn hóa địa danh thành mã IATA 3 chữ cái (Hà Nội=HAN, Sài Gòn=SGN, Đà Nẵng=DAD, Phú Quốc=PQC).
+- Nếu khách yêu cầu "vé thường/vé rẻ", chọn `travelClass` = ECONOMY.
+- Khách KHÔNG nhắc đến -> Bắt buộc để `null` (ĐỂ TRỐNG). Tuyệt đối không tự bịa thông số.
 """
 
 prompt_template = ChatPromptTemplate.from_messages([
@@ -57,13 +70,18 @@ def extract_intent_node(state: ChatState):
     all_tasks = []
     node_result = [] 
     
-    old_prefs = state.get("user_prefs", {}) or {}
-    current_prefs = old_prefs.copy()
+    old_search_filters = state.get("search_filters", {}) or {}
+    new_search_filters = {}
+    new_action_targets = {}
+    
+    global_clear_fields = set()
+    global_reset = False
+    core_changed = False
     
     history_dict = state.get("chat_history", {"messages": [], "search_ids": []})
     history_list = history_dict.get("messages", [])
     history_str = "\n".join(history_list[-10:]) if history_list else "Chưa có lịch sử trò chuyện."
-    
+
     try:
         result: ExtractionOutput = extraction_chain.invoke({
             "query": state.get("user_message", ""),
@@ -73,12 +91,9 @@ def extract_intent_node(state: ChatState):
 
         if result and result.tasks:
             all_tasks = result.tasks
-            
-            all_tasks.sort(
-                key=lambda t: (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) == "out_of_scope"
-            )
+            all_tasks.sort(key=lambda t: (t.intent.value if hasattr(t.intent, 'value') else str(t.intent)) == "out_of_scope")
 
-            valid_intents_for_params = [
+            valid_intents = [
                 ChatIntent.SEARCH_FLIGHT.value, 
                 ChatIntent.FILTER_SORT_FLIGHTS.value,
                 ChatIntent.ANALYZE_FLIGHTS.value, 
@@ -86,63 +101,107 @@ def extract_intent_node(state: ChatState):
                 ChatIntent.GENERAL_QUESTION.value
             ]
             
-            clean_params = {}
             for task in all_tasks:
                 intent_str = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
                 
-                if intent_str in valid_intents_for_params and task.parameters:
-                    raw_dump = task.parameters.model_dump(exclude_none=True)
-                    
-                    for k, v in raw_dump.items():
-                        if isinstance(v, str) and v.strip().lower() in ["clear", "none"]:
-                            clean_params[k] = [] if k in ["target_airline", "excludedAirlines"] else 0
-                        else:
-                            clean_params[k] = v
+                if intent_str in valid_intents:
+                    if task.search_filters:
+                        raw_filters = task.search_filters.model_dump(exclude_unset=True, exclude_none=True)
+                        
+                        if raw_filters.pop("reset_search", False):
+                            global_reset = True
+                            
+                        global_clear_fields.update(raw_filters.pop("clear_fields", []))
+                        array_actions = raw_filters.pop("array_actions", [])
+                        
+                        for k, v in raw_filters.items():
+                            new_search_filters[k] = v
+                            
+                        for action in array_actions:
+                            field = action.get("field_name")
+                            if field != "preferred_airlines": continue
+                            
+                            act = action.get("action")
+                            vals = action.get("values", [])
+                            
+                            current_array = new_search_filters.get(field) or old_search_filters.get(field) or []
+                            if global_reset: current_array = new_search_filters.get(field) or [] 
+                            
+                            current_set = set([str(x).upper().replace(" ", "") for x in current_array])
+                            target_vals = [str(x).upper().replace(" ", "") for x in vals]
+                            
+                            if act == "ADD":
+                                current_set.update(target_vals)
+                            elif act == "REMOVE":
+                                current_set.difference_update(target_vals)
+                                
+                            new_search_filters[field] = list(current_set) if current_set else None
 
-            for arr_field in ["target_flight", "target_airline", "excludedAirlines"]:
-                if arr_field in clean_params and isinstance(clean_params[arr_field], list):
-                    clean_params[arr_field] = [str(t).upper().replace(" ", "") for t in clean_params[arr_field] if t]
+                    if task.action_targets:
+                        raw_targets = task.action_targets.model_dump(exclude_unset=True, exclude_none=True)
+                        for k, v in raw_targets.items():
+                            if isinstance(v, list):
+                                new_action_targets[k] = [str(i).upper().replace(" ", "") for i in v if i]
+                            else:
+                                new_action_targets[k] = v
 
-            CORE_PARAMS = ["origin", "destination", "departureDate", "returnDate", "is_roundtrip", "adults", "children", "infants", "travel_class"]
-            SOFT_PARAMS = ["target_airline", "excludedAirlines", "nonStop", "maxPrice", "start_hour", "end_hour", "criteria", "sort_preference", "target_flight"]
+            for field in global_clear_fields:
+                new_search_filters[field] = "CLEAR"
+                
+            if not global_reset:
+                for k, v in old_search_filters.items():
+                    if k not in new_search_filters and k not in global_clear_fields:
+                        new_search_filters[k] = v
+            else:
+                core_changed = True
+
+            CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "roundTrip", "adults", "children", "infants"]
+            core_changes_str = []
+            filter_changes_str = []
             
-            core_changed = []
-            soft_changed = []
-            
-            for param in CORE_PARAMS:
-                if param in clean_params and clean_params[param] != old_prefs.get(param):
-                    core_changed.append(f"{param}: {clean_params[param]}")
-
-            for param in SOFT_PARAMS:
-                if param in clean_params and clean_params[param] != old_prefs.get(param):
-                    soft_changed.append(f"{param}: {clean_params[param]}")
+            for k, v in new_search_filters.items():
+                if v != old_search_filters.get(k):
+                    if k in CORE_FIELDS:
+                        core_changed = True
+                        core_changes_str.append(f"{k}: {v}")
+                    else:
+                        filter_changes_str.append(f"{k}: {v if v is not None else 'Đã Hủy'}")
+                        
+            for k, v in old_search_filters.items():
+                if k not in new_search_filters and v is not None:
+                    if k in CORE_FIELDS:
+                        core_changed = True
+                        core_changes_str.append(f"{k}: Đã Hủy")
+                    else:
+                        filter_changes_str.append(f"{k}: Đã Hủy")
 
             if core_changed:
-                change_info = ", ".join(core_changed)
-                node_result.append(f"{ContextTag.USER_UPDATE}: Thay đổi CORE Param ({change_info}). Yêu cầu tìm kiếm mới.")
-                # for param in SOFT_PARAMS:
-                #     if param in current_prefs and current_prefs[param] not in ["CLEAR", "", None]:
-                #         if param not in clean_params:
-                #             clean_params[param] = "CLEAR"
-            elif soft_changed:
-                change_info = ", ".join(soft_changed)
-                node_result.append(f"{ContextTag.USER_UPDATE}: Thay đổi SOFT Param ({change_info}). Áp dụng lọc cục bộ.")
-
-            current_prefs.update(clean_params)
+                node_result.append(f"{ContextTag.USER_UPDATE}: Đổi thông số cốt lõi ({', '.join(core_changes_str)}). Yêu cầu gọi API mới.")
+            elif filter_changes_str:
+                node_result.append(f"{ContextTag.USER_UPDATE}: Đổi bộ lọc hiển thị ({', '.join(filter_changes_str)}).")
+                
+            if new_action_targets:
+                targets_info = []
+                if new_action_targets.get("compare_airlines"): targets_info.append(f"Hãng: {new_action_targets['compare_airlines']}")
+                if new_action_targets.get("compare_flights"): targets_info.append(f"Chuyến: {new_action_targets['compare_flights']}")
+                if targets_info:
+                    node_result.append(f"{ContextTag.USER_UPDATE}: Yêu cầu thao tác trên mục tiêu: {', '.join(targets_info)}.")
 
     except Exception as e:
         print(f"❌ [LỖI EXTRACT INTENT]: Không thể bóc tách dữ liệu: {e}")
         
     result_dict = {
         "tasks": all_tasks,
-        "user_prefs": current_prefs,
+        "search_filters": new_search_filters,
+        "action_targets": new_action_targets,
         "node_results": node_result
     }
 
     if core_changed:
         result_dict["current_search_id"] = "CLEAR"
 
-    print("👉 [DEBUG - NEW PREFS]: ", current_prefs)
+    print("👉 [DEBUG - NEW FILTERS]: ", new_search_filters)
+    print("👉 [DEBUG - NEW TARGETS]: ", new_action_targets)
     print("👉 [DEBUG - TASK]: ", [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in all_tasks])
     print("🔹🔹🔹 ------------------------------------")
 

@@ -1,31 +1,46 @@
+# === Core Backend ===
 fastapi
 uvicorn[standard]
+python-dotenv
+
+# === AI / LLM ===
 langchain
 langchain-openai
 langgraph
-sqlmodel
-psycopg2-binary
+langsmith[claude-agent-sdk]
+google-genai
+
+# === Data Modeling ===
 pydantic
-httpx
-amadeus
-python-dotenv
-passlib[bcrypt]
-python-jose[cryptography]
-python-multipart
-argon2-cffi
+sqlmodel
 
-langgraph-checkpoint-postgres 
-psycopg-pool
+# === Database ===
+psycopg2-binary
+psycopg
 psycopg[binary]
+psycopg-pool
+pgvector
+langchain-postgres
+langgraph-checkpoint-postgres
 
+# === Cache ===
 redis
 
-langchain-postgres 
-psycopg 
-pgvector
-pypdf
+# === External API ===
+httpx
 requests
+amadeus
+
+# === Auth ===
+passlib[bcrypt]
+argon2-cffi
+python-jose[cryptography]
+python-multipart
+
+# === RAG / Docs ===
+pypdf
+
+# === Crawling ===
 beautifulsoup4
-google-genai 
 playwright
 chromium
