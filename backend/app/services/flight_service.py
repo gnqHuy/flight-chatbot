@@ -23,7 +23,7 @@ class FlightService:
         infants: int = 0,
         roundTrip: bool = False,
         includedAirlines: Optional[List[str]] = None,
-        travelClass: Optional[str] = "BUSINESS",
+        travelClass: Optional[str] = None,
         max_offers: int = MAX_FLIGHTS_RETURNED,
         lang: str = "vi"
     ):

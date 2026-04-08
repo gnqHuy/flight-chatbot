@@ -1,4 +1,5 @@
 from langchain_core.tools import tool
+from app.ai_orchestrator.graph.prompts.analyze_prompt import ANALYZE_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
 from app.ai_orchestrator.graph.tools.flight_tools import fetch_airline_info, fetch_flight_details
 from app.utils.helpers import consume_task
@@ -27,17 +28,9 @@ def analyze_flights_node(state: ChatState) -> dict:
             "action": {"type": "require_flight_selection", "payload": {"search_id": current_search_id}},
             "tasks": [], 
         }
-
-    system_prompt = (
-        "Bạn là một AI quản lý dữ liệu. Dựa vào câu hỏi của khách và Danh sách Mục Tiêu bên dưới, "
-        "hãy quyết định gọi Tool nào để gom dữ liệu. Bạn có thể gọi CẢ 2 TOOL nếu khách muốn biết cả 2.\n"
-        f"Mục tiêu Hãng (compare_airlines): {comp_airlines}\n"
-        f"Mục tiêu Chuyến (compare_flights): {comp_flights}\n"
-        f"Search ID (Luôn truyền cái này vào tool): {current_search_id}"
-    )
     
     ai_msg = llm_with_tools.invoke([
-        ("system", system_prompt),
+        ("system", ANALYZE_SYSTEM_PROMPT),
         ("human", user_message)
     ])
 
