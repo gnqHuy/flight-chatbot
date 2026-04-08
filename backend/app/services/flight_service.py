@@ -23,7 +23,7 @@ class FlightService:
         infants: int = 0,
         roundTrip: bool = False,
         includedAirlines: Optional[List[str]] = None,
-        travelClass: Any = None,
+        travelClass: Optional[str] = "BUSINESS",
         max_offers: int = MAX_FLIGHTS_RETURNED,
         lang: str = "vi"
     ):
@@ -46,17 +46,20 @@ class FlightService:
             flight_filters = {}
 
             if travelClass:
-                od_ids = ["1"]
-                if roundTrip and returnDate:
-                    od_ids.append("2")
-
                 tc_value = travelClass.value if hasattr(travelClass, 'value') else str(travelClass).upper()
                 
-                flight_filters["cabinRestrictions"] = [{
-                    "cabin": tc_value,
-                    "coverage": "MOST_SEGMENTS",
-                    "originDestinationIds": od_ids
-                }]
+                valid_cabins = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"]
+                
+                if tc_value in valid_cabins:
+                    od_ids = ["1"]
+                    if roundTrip and returnDate:
+                        od_ids.append("2")
+
+                    flight_filters["cabinRestrictions"] = [{
+                        "cabin": tc_value,
+                        "coverage": "MOST_SEGMENTS",
+                        "originDestinationIds": od_ids
+                    }]
 
             if includedAirlines:
                 flight_filters["carrierRestrictions"] = {

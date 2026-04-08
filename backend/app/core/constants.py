@@ -13,7 +13,7 @@ AIRLINE_PROMO_LIST_URLS = {
     "QH": "https://www.bambooairways.com/vn/vi/explore/offers"
 }
 
-MAX_FLIGHTS_RETURNED = 100
+MAX_FLIGHTS_RETURNED = 200
 
 class ContextTag:
     """Quy chuẩn Thẻ (Tags) nhúng vào Context cho LLM đọc trong Final Node"""

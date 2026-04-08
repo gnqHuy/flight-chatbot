@@ -34,9 +34,9 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
 
 
 @tool
-def fetch_flight_details(flight_ids: list[str], search_id: str) -> str:
-    """Gọi tool này khi cần lấy thông tin chi tiết (giá, giờ bay) của TẤT CẢ các chuyến bay cụ thể được yêu cầu."""
-    print(f"⚡ [TOOL] fetch_flight_details được gọi với flight_ids={flight_ids} và search_id={search_id}")
+def fetch_flight_details(flight_numbers: list[str], search_id: str) -> str:
+    """Gọi tool này khi cần lấy thông tin chi tiết các hạng vé/tùy chọn của MỘT HOẶC NHIỀU MÃ CHUYẾN BAY (VD: VN135, VJ197)."""
+    print(f"⚡ [TOOL] fetch_flight_details được gọi với flight_numbers={flight_numbers} và search_id={search_id}")
     
     if not search_id or search_id in ["CLEAR", "NOT_FOUND"]:
         return "Lỗi: Yêu cầu khách tìm kiếm chuyến bay trước."
@@ -51,22 +51,31 @@ def fetch_flight_details(flight_ids: list[str], search_id: str) -> str:
         if not isinstance(all_flights, list):
             return "Lỗi: Dữ liệu vé không hợp lệ."
 
-        if isinstance(flight_ids, str):
-            flight_ids = [fid.strip() for fid in flight_ids.split(',')]
-        elif not isinstance(flight_ids, list):
-            flight_ids = [str(flight_ids)]
+        if isinstance(flight_numbers, str):
+            flight_numbers = [fn.strip() for fn in flight_numbers.split(',')]
+        elif not isinstance(flight_numbers, list):
+            flight_numbers = [str(flight_numbers)]
 
-        flight_ids_str = [str(fid).strip() for fid in flight_ids]
+        target_flights = [str(fn).strip().upper().replace(" ", "").replace("-", "") for fn in flight_numbers]
     
-        matched_flights = [
-            f for f in all_flights 
-            if str(f.get('id', '')).strip() in flight_ids_str
-        ]
+        matched_flights = []
+        
+        for f in all_flights:
+            itineraries = f.get('itineraries', [])
+            if not itineraries:
+                continue
+                
+            flight_num_raw = str(itineraries[0].get('flightNumber', '')).strip().upper().replace(" ", "")
+
+            if flight_num_raw in target_flights:
+                matched_flights.append(f)
                 
         if not matched_flights:
-            return f"Không tìm thấy thông tin cho các mã vé: {flight_ids_str}. (Hệ thống hiện đang có {len(all_flights)} vé)."
+            return f"Không tìm thấy thông tin cho các mã chuyến bay: {target_flights}. (Hệ thống hiện đang có {len(all_flights)} vé)."
             
-        return f"[CHI TIẾT VÉ {flight_ids_str}]:\n{format_flights_to_text(matched_flights)}"
+        matched_flights.sort(key=lambda x: float(x.get('price', 0)))
+            
+        return f"[CHI TIẾT CÁC HẠNG VÉ CỦA CHUYẾN BAY {target_flights}]:\n\n{format_flights_to_text(matched_flights)}"
         
     except Exception as e:
         return f"Lỗi khi kéo chi tiết chuyến bay: {str(e)}"

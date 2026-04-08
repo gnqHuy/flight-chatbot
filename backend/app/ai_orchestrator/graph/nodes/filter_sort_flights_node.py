@@ -3,6 +3,7 @@ from app.utils.helpers import consume_task
 from app.schemas.chat_state import Task
 from app.core.enums import ChatIntent 
 from app.core.constants import ContextTag
+from app.services.redis_service import redis_service
 
 def filter_sort_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM LỌC & SẮP XẾP CHUYẾN BAY ---")
@@ -12,8 +13,22 @@ def filter_sort_flights_node(state: ChatState) -> dict:
     tasks = state.get("tasks", [])    
     print(f"👉 [DEBUG] Search Filters tại trạm filter_sort_flights: {search_filters}")
     print(f"👉 [DEBUG] Current Search ID: {current_search_id}")
+    
     if not current_search_id or current_search_id == "CLEAR":
         return {
+            "current_search_id": "CLEAR", 
+            "tasks": consume_task(
+                tasks, 
+                ["filter_sort_flights"], 
+                next_task=Task(intent=ChatIntent.SEARCH_FLIGHT, parameters=None)
+            )
+        }
+
+    cached_data = redis_service.get_flight_offers(current_search_id)
+    if not cached_data:
+        print(f"❌ [LỖI] Phiên tìm kiếm {current_search_id} đã hết hạn trên Redis!")
+        return {
+            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Phiên tìm kiếm đã hết hạn hoặc không tìm thấy dữ liệu. Hệ thống sẽ tự động tìm lại."],
             "current_search_id": "CLEAR", 
             "tasks": consume_task(
                 tasks, 

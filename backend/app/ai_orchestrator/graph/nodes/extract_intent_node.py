@@ -1,61 +1,15 @@
 import os
 from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
+from app.ai_orchestrator.graph.prompts.extract_prompt import EXTRACT_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
 from app.core.constants import ContextTag
 from app.core.llm_setup import llm
 from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
 
-SYSTEM_PROMPT = """Bạn là AI chuyên bóc tách Ý định (Intent) và Thực thể (Entity) cho hệ thống Đặt vé máy bay.
-Thời gian hiện tại: {current_time}
-
-LỊCH SỬ TRÒ CHUYỆN (Dùng để hiểu ngữ cảnh, TUYỆT ĐỐI KHÔNG điền tự động thực thể từ lịch sử nếu câu mới nhất không nhắc đến):
-{chat_history}
-
---- 1. PHÂN LOẠI Ý ĐỊNH (INTENT) ---
-Chọn 1 ý định chính xác nhất:
-* SEARCH_FLIGHT: Khi khách hàng cung cấp/thay đổi thông số CỐT LÕI (Điểm đi, điểm đến, ngày, số lượng người) hoặc có ý định chào hỏi.
-* FILTER_SORT_FLIGHTS: Khi khách chỉ muốn thu hẹp/sắp xếp danh sách (Hãng bay hiển thị, Giờ, Giá).
-* ANALYZE_FLIGHTS: Khi khách muốn so sánh chi tiết giữa các chuyến/hãng (VD: "Chuyến VJ hay delay không?", "So sánh giá 2 hãng").
-* GENERAL_QUESTION: Hỏi quy định, giấy tờ, hành lý (VD: "Bà bầu bay được không?").
-* PROMO_SEARCH: Hỏi mã giảm giá.
-* OUT_OF_SCOPE: Ngoài lề.
-
---- 2. PHÂN LOẠI THỰC THỂ VÀO 2 GIỎ (RẤT QUAN TRỌNG) ---
-GIỎ 1: `search_filters` (BỘ LỌC VÀ SẮP XẾP)
-- Nơi chứa toàn bộ thông số để tìm kiếm, lọc, và tiêu chí SẮP XẾP (`sort_preference`).
-- Nếu Intent là FILTER_SORT_FLIGHTS, bạn PHẢI điền dữ liệu vào Giỏ 1.
-
-GIỎ 2: `action_targets` (MỤC TIÊU PHÂN TÍCH)
-- CHỈ DÙNG để chứa mã chuyến bay (`compare_flights`) hoặc mã hãng (`compare_airlines`) khi khách yêu cầu SO SÁNH.
-- VD: Khách nói "So sánh Vietjet và Bamboo xem hãng nào xách tay rộng hơn" -> Bỏ "VJ", "QH" vào `action_targets.compare_airlines`. Bỏ "xách tay", "chỗ ngồi" vào `analysis_criteria`.
-
---- 3. QUY TẮC XỬ LÝ ĐỔI Ý / HỦY BỎ (ĐỌC KỸ ĐỂ KHÔNG BỊ LỖI) ---
-Nếu khách hàng dùng từ "thôi", "bỏ", "không... nữa", "làm lại":
-
-1. RESET TOÀN BỘ (`reset_search = true`):
-   - CHỈ DÙNG khi khách nói rõ: "làm lại từ đầu", "tìm vé khác hoàn toàn". 
-   - KHÔNG DÙNG nếu khách chỉ đổi 1 vài thứ (VD: "Đổi sang đi Phú Quốc", "Thôi đi 1 chiều").
-
-2. HỦY BIẾN ĐƠN LẺ (Dùng `clear_fields`):
-   - Nếu khách hủy ngày về (đi 1 chiều): `clear_fields: ["returnDate"]` và `roundTrip: False`.
-   - Nếu khách hủy lọc giá, giờ, hạng ghế (VD: "hạng nào cũng được"): Ném tên trường vào `clear_fields`.
-
-3. THÊM/BỚT HÃNG BAY (Dùng `array_actions`):
-   - Mảng này CHỈ ĐƯỢC PHÉP thao tác với trường `preferred_airlines`.
-   - TUYỆT ĐỐI KHÔNG dùng array_actions để xóa Địa điểm, Hạng ghế, hay Giờ bay.
-   - VD: "Thôi bỏ VJ đi" -> [{{'field_name': 'preferred_airlines', 'action': 'REMOVE', 'values': ['VJ']}}].
-   - VD: "Xem tất cả các hãng" -> `clear_fields: ["preferred_airlines"]`.
-
---- 4. QUY TẮC TRÍCH XUẤT CHUNG ---
-- Chuẩn hóa địa danh thành mã IATA 3 chữ cái (Hà Nội=HAN, Sài Gòn=SGN, Đà Nẵng=DAD, Phú Quốc=PQC).
-- Nếu khách yêu cầu "vé thường/vé rẻ", chọn `travelClass` = ECONOMY.
-- Khách KHÔNG nhắc đến -> Bắt buộc để `null` (ĐỂ TRỐNG). Tuyệt đối không tự bịa thông số.
-"""
-
 prompt_template = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
+    ("system", EXTRACT_SYSTEM_PROMPT),
     ("human", "{query}")
 ])
 
@@ -88,6 +42,7 @@ def extract_intent_node(state: ChatState):
             "current_time": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "chat_history": history_str
         })
+        print (f"👉 [DEBUG - EXTRACTED RESULT]: {result}")
 
         if result and result.tasks:
             all_tasks = result.tasks

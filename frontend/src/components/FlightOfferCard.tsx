@@ -109,14 +109,15 @@ const FlightOfferCard: React.FC<Props> = ({ flight, onAskAI }) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            // 🌟 ĐÃ SỬA: Bắn ID vé vào đầu prompt để AI dùng ID truy xuất Redis
             onAskAI(
-              `Phân tích ưu nhược điểm và hành lý của vé [ID: ${flight.id}] (Chuyến: ${allFlightNumbers}).`
+              `Phân tích ưu nhược điểm và hành lý của chuyến bay ${allFlightNumbers} (Hãng: ${
+                flight.airlines?.join(', ') || 'N/A'
+              }).`
             );
           }}
           className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-100 px-4 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
         >
-          ✨ Hỏi AI vé này
+          ✨ Hỏi AI chuyến này
         </button>
       </div>
     </div>
