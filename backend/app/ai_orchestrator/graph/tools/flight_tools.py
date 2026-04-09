@@ -11,7 +11,7 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
         db_info = airline_service.get_airlines_analysis_context(airline_codes)
         
         example_text = "Không tìm thấy vé ví dụ."
-        if search_id and search_id not in ["CLEAR", "NOT_FOUND"]:
+        if not search_id or search_id == "CLEAR":
             cached_data = redis_service.get_flight_offers(search_id)
             if cached_data:
                 all_flights = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
@@ -37,7 +37,7 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
 def fetch_flight_details(flight_numbers: list[str], search_id: str) -> str:
     """Gọi tool này khi cần lấy thông tin chi tiết các hạng vé/tùy chọn của MỘT HOẶC NHIỀU MÃ CHUYẾN BAY (VD: VN135, VJ197)."""
     
-    if not search_id or search_id in ["CLEAR", "NOT_FOUND"]:
+    if not search_id or search_id == "CLEAR":
         return "Lỗi: Yêu cầu khách tìm kiếm chuyến bay trước."
 
     try:

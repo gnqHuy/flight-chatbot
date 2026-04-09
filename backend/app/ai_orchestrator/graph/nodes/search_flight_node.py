@@ -23,7 +23,7 @@ def search_flights_node(state: ChatState) -> dict:
             "search_filters": state_updates if state_updates else {} 
         }
 
-    if current_search_id and current_search_id not in ["CLEAR", "NOT_FOUND"]:
+    if current_search_id and current_search_id != "CLEAR":
         cached_data = redis_service.get_flight_offers(current_search_id)
         if cached_data:
             print(f"⚡ [CACHE HIT]: Dữ liệu vé vẫn còn sống. Tái sử dụng Search ID: {current_search_id}")
@@ -64,7 +64,7 @@ def search_flights_node(state: ChatState) -> dict:
                 "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không tìm thấy chuyến bay nào của VN, VJ, QH cho hành trình này."], 
                 "action": None, 
                 "tasks": remaining_tasks,
-                "current_search_id": "NOT_FOUND"
+                "current_search_id": "CLEAR"
             }
         
         search_id = redis_service.save_flight_offers(flights)

@@ -12,7 +12,7 @@ class RedisService:
             db=0,
             decode_responses=True
         )
-        self.ttl_seconds = 1800 
+        self.ttl_seconds = 3600 
 
     def save_flight_offers(self, flight_data: list | dict, parent_id: str = None) -> str:
         if parent_id:

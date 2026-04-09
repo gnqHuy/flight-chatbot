@@ -3,31 +3,30 @@ import os
 from typing import Optional
 
 from typing import Union, List
-# Giả sử bạn đã import TaskItem từ schemas của bạn
-# from app.schemas.chat_state import TaskItem 
+
+from typing import Union
 
 def consume_task(tasks: list, expected_intents: Union[str, list], next_task=None) -> list:
     """
-    Kiểm tra task đầu tiên trong danh sách.
-    Nếu đúng là nhiệm vụ của Node hiện tại (nằm trong expected_intents), thì "nuốt" nó (xóa đi).
-    Nếu không phải, giữ nguyên danh sách.
-    ĐẶC BIỆT: Nếu có next_task (Dùng cho Fallback), chèn nó vào vị trí ưu tiên cao nhất.
+    Tìm và "nuốt" (xóa) task ĐẦU TIÊN trong hàng đợi khớp với expected_intents (Bất kể vị trí nào).
+    Nếu không tìm thấy, giữ nguyên danh sách.
+    ĐẶC BIỆT: Nếu có next_task (Dùng cho Fallback), chèn nó vào vị trí ưu tiên cao nhất (index 0).
     """
-    remaining_tasks = []
-    
-    if tasks:
+    if not tasks:
+        remaining_tasks = []
+    else:
         if isinstance(expected_intents, str):
             expected_intents = [expected_intents]
             
-        current_task = tasks[0]
+        remaining_tasks = tasks.copy()
         
-        intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
-        
-        if intent_val in expected_intents:
-            remaining_tasks = tasks[1:]
-        else:
-            remaining_tasks = tasks.copy()
-
+        for i, task in enumerate(remaining_tasks):
+            intent_val = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
+            
+            if intent_val in expected_intents:
+                remaining_tasks.pop(i)
+                break
+            
     if next_task:
         remaining_tasks.insert(0, next_task)
         

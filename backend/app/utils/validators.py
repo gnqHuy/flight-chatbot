@@ -61,6 +61,9 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
                 
             if returnDate:
                 ret_dt = datetime.strptime(returnDate, "%Y-%m-%d")
+                if ret_dt.date() < today.date():
+                    raw_errors.append("Ngày về (returnDate) nằm trong quá khứ.")
+                    state_updates["returnDate"] = "CLEAR"
                 if ret_dt.date() < dep_dt.date():
                     raw_errors.append("Ngày về diễn ra trước ngày đi.")
                     state_updates["returnDate"] = "CLEAR"

@@ -1,14 +1,18 @@
-import os
+
 from langchain_openai import OpenAIEmbeddings
-from langchain_postgres.vectorstores import PGVector
+from langchain_postgres import PGVector
+from app.core.config import DATABASE_URL
 
-connection = os.environ.get("DATABASE_URL")
-collection_name = "flight_policies"
-embeddings = OpenAIEmbeddings()
+shared_embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-vector_store = PGVector(
-    embeddings=embeddings,
-    collection_name=collection_name,
-    connection=connection,
-    use_jsonb=True,
+policy_vector_store = PGVector(
+    embeddings=shared_embeddings,
+    connection=DATABASE_URL,
+    collection_name="flight_policies"
+)
+
+promo_vector_store = PGVector(
+    embeddings=shared_embeddings,
+    connection=DATABASE_URL,
+    collection_name="flight_promos"
 )

@@ -19,7 +19,7 @@ def filter_sort_flights_node(state: ChatState) -> dict:
             "current_search_id": "CLEAR", 
             "tasks": consume_task(
                 tasks, 
-                ["filter_sort_flights"], 
+                "filter_sort_flights", 
                 next_task=Task(intent=ChatIntent.SEARCH_FLIGHT, parameters=None)
             )
         }
@@ -32,14 +32,14 @@ def filter_sort_flights_node(state: ChatState) -> dict:
             "current_search_id": "CLEAR", 
             "tasks": consume_task(
                 tasks, 
-                ["filter_sort_flights"], 
+                "filter_sort_flights", 
                 next_task=Task(intent=ChatIntent.SEARCH_FLIGHT, parameters=None)
             )
         }
 
     target_filter_keys = [
         "maxPrice", "start_hour", "end_hour", "nonStop", 
-        "preferred_airlines", "travelClass"
+        "preferred_airlines", "travelClass", "clear_fields"
     ]
     
     fe_filters = {}
@@ -62,5 +62,5 @@ def filter_sort_flights_node(state: ChatState) -> dict:
                 "sort": sort_val
             }
         },
-        "tasks": consume_task(tasks, ["filter_sort_flights"])
+        "tasks": consume_task(tasks, "filter_sort_flights")
     }

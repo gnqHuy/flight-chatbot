@@ -11,7 +11,7 @@ def final_response_node(state: ChatState):
     
     lang = state.get("language") or "vi"
     user_message = state.get("user_message", "")
-    user_prefs = state.get("user_prefs", {})
+    search_filters = state.get("search_filters", {})
     node_results = state.get("node_results", [])
     action = state.get("action")
     error_msg = state.get("error_msg")
@@ -30,6 +30,7 @@ def final_response_node(state: ChatState):
 
     if not node_results and not action and not error_msg:
         system_instructions.append("[HỆ THỐNG]: Khách đang chào hỏi hoặc hỏi ngoài lề (không kích hoạt tác vụ tìm kiếm nào). Hãy giao tiếp lịch sự, tự nhiên và hướng họ về dịch vụ vé máy bay nếu cần.")
+    
     else:
         valid_results = [res for res in node_results if res]
         system_instructions.extend(valid_results)
@@ -42,7 +43,7 @@ def final_response_node(state: ChatState):
             combined_context += f"\n\n{ContextTag.PROMO_INFO}:\n{promo_context}"
             print("👉 [DEBUG]: Đã tiêm thành công khuyến mãi vào Context cho LLM!")
 
-    known_info = {k: v for k, v in user_prefs.items() if v and k != "current_search_id"}
+    known_info = {k: v for k, v in search_filters.items() if v and k != "current_search_id"}
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", FINAL_NODE_SYSTEM_PROMPT),
@@ -64,4 +65,7 @@ def final_response_node(state: ChatState):
     current_exchange = f"User: {state.get('user_message')}\nBot: {bot_reply}"
     print("\n🔹🔹🔹 ------------------------------------")
 
-    return {"response_text": bot_reply, "chat_history": {"messages": [current_exchange]}}
+    return {
+        "response_text": bot_reply, 
+        "chat_history": {"messages": [current_exchange]}
+    }

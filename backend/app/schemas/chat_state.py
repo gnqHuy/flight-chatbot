@@ -27,9 +27,9 @@ class SearchFiltersParams(BaseModel):
     start_hour: Optional[int] = Field(None, description="Giờ bay sớm nhất (0-23).")
     end_hour: Optional[int] = Field(None, description="Giờ bay muộn nhất (0-23).")
     
-    sort_preference: Optional[Literal["price_asc", "price_desc", "departure_time", "arrival_time"]] = Field(
+    sort_preference: Optional[SortPreference] = Field(
         None, 
-        description="Tiêu chí sắp xếp: 'price_asc' (rẻ nhất), 'price_desc' (giảm dần/đắt nhất), 'departure_time' (bay sớm), 'arrival_time'."
+        description="Tiêu chí sắp xếp vé sau khi lọc: GIÁ (price), THỜI GIAN BAY (duration), GIỜ BAY (departure_time)."
     )
 
     reset_search: Optional[bool] = Field(None, description="True nếu khách muốn TÌM LẠI TỪ ĐẦU / Xóa sạch bộ lọc cũ.")

@@ -1,12 +1,11 @@
-import os
 from collections import defaultdict
 from app.ai_orchestrator.graph.state import ChatState
-from langchain_openai import OpenAIEmbeddings
-from langchain_postgres.vectorstores import PGVector
 
 from app.core.enums import ChatIntent
 from app.utils.helpers import consume_task
-from app.core.constants import ContextTag
+from app.core.constants import SUPPORTED_AIRLINES, ContextTag
+
+from app.ai_orchestrator.rag.vector_store import policy_vector_store 
 
 def policy_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TRA CỨU CHÍNH SÁCH (RAG) ---")
@@ -24,7 +23,7 @@ def policy_retrieval_node(state: ChatState) -> dict:
             break
             
     if not query:
-        query = state.get("user_message", "")
+        query = state["user_message"] or ""
 
     if not query:
         return {
@@ -32,8 +31,6 @@ def policy_retrieval_node(state: ChatState) -> dict:
             "tasks": remaining_tasks
         }
 
-    connection = os.environ.get("DATABASE_URL")
-    
     target_airlines = []
     if action_targets.get("compare_airlines"):
         target_airlines = action_targets.get("compare_airlines")
@@ -44,24 +41,15 @@ def policy_retrieval_node(state: ChatState) -> dict:
         target_airlines = [target_airlines]
     
     try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        vector_store = PGVector(
-            embeddings=embeddings,
-            collection_name="flight_policies",
-            connection=connection,
-            use_jsonb=True,
-        )
-        
         docs = []
         if target_airlines and target_airlines != ["CLEAR"]:
             for al in target_airlines:
                 search_kwargs = {"k": 3, "filter": {"airline": al.upper()}}
-                res = vector_store.similarity_search(query, **search_kwargs)
+                res = policy_vector_store.similarity_search(query, **search_kwargs)
                 docs.extend(res)
         else:
-            supported_airlines = ["VN", "VJ", "QH"]
-            for al in supported_airlines:
-                res = vector_store.similarity_search(
+            for al in SUPPORTED_AIRLINES:
+                res = policy_vector_store.similarity_search(
                     query, 
                     k=2, 
                     filter={"airline": al}

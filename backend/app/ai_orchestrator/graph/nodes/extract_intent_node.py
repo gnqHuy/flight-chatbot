@@ -15,7 +15,7 @@ prompt_template = ChatPromptTemplate.from_messages([
 
 extraction_chain = prompt_template | llm.with_structured_output(ExtractionOutput)
 
-def extract_intent_node(state: ChatState):
+def extract_intent_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM NHẬN DIỆN Ý ĐỊNH (EXTRACT INTENT) ---")
     
     if state.get("tasks"):
@@ -24,7 +24,7 @@ def extract_intent_node(state: ChatState):
     all_tasks = []
     node_result = [] 
     
-    old_search_filters = state.get("search_filters", {}) or {}
+    old_search_filters = state.get("search_filters", {})
     new_search_filters = {}
     new_action_targets = {}
     

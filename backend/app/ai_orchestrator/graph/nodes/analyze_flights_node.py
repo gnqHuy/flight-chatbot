@@ -16,10 +16,11 @@ def analyze_flights_node(state: ChatState) -> dict:
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])
     remaining_tasks = consume_task(tasks, "analyze_flights")
+    
     comp_airlines = action_targets.get("compare_airlines", [])
     comp_flights = action_targets.get("compare_flights", [])
     
-    if not current_search_id or current_search_id in ["CLEAR", "NOT_FOUND"]:
+    if not current_search_id or current_search_id == "CLEAR":
         return _build_error("Vui lòng tìm kiếm chuyến bay trước khi phân tích.", remaining_tasks)
 
     if not comp_airlines and not comp_flights:
@@ -38,14 +39,20 @@ def analyze_flights_node(state: ChatState) -> dict:
     
     if not ai_msg.tool_calls:
         print("⚠️ LLM không gọi tool, tự động fallback gọi tool bằng Python...")
-        if comp_airlines: gathered_data.append(fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id}))
-        if comp_flights: gathered_data.append(fetch_flight_details.invoke({"flight_ids": comp_flights, "search_id": current_search_id}))
+        if comp_airlines: 
+            gathered_data.append(fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id}))
+        if comp_flights: 
+            gathered_data.append(fetch_flight_details.invoke({"flight_ids": comp_flights, "search_id": current_search_id}))
     else:
         for tool_call in ai_msg.tool_calls:
             print(f"🧠 [AGENT GỌI TOOL]: {tool_call['name']} với args: {tool_call['args']}")
             
+            args = tool_call["args"]
+            
+            args["search_id"] = current_search_id
+            
             if tool_call["name"] == "fetch_airline_info":
-                res = fetch_airline_info.invoke(tool_call["args"])
+                res = fetch_airline_info.invoke(args)
                 gathered_data.append(res)
                 
             elif tool_call["name"] == "fetch_flight_details":

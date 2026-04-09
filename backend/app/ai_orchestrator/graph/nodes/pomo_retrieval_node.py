@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from sqlmodel import Session, select, or_
-from langchain_openai import OpenAIEmbeddings
 
 from app.ai_orchestrator.graph.state import ChatState
 from app.database.database import engine
@@ -9,6 +8,7 @@ from app.database.models.airline import Airline
 from app.database.models.flight_promotion import FlightPromotion
 from app.utils.helpers import consume_task
 from app.core.constants import ContextTag
+from app.ai_orchestrator.rag.vector_store import shared_embeddings
 
 def promo_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (HYBRID RAG + SQL) ---")
@@ -28,8 +28,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
     docs = []
     
     try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        query_vector = embeddings.embed_query(query)
+        query_vector = shared_embeddings.embed_query(query)
         
         with Session(engine) as session:
             stmt = select(FlightPromotion)
