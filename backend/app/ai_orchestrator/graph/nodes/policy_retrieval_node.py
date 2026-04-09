@@ -14,12 +14,12 @@ def policy_retrieval_node(state: ChatState) -> dict:
     search_filters = state.get("search_filters", {})
     action_targets = state.get("action_targets", {})
     tasks = state.get("tasks", [])
-    remaining_tasks = consume_task(tasks, "general_question")
+    remaining_tasks = consume_task(tasks, "policy_question")
     
     query = ""
     for task in tasks:
         intent_val = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
-        if intent_val == ChatIntent.GENERAL_QUESTION.value or intent_val == "general_question":
+        if intent_val == ChatIntent.POLICY_QUESTION.value or intent_val == "POLICY_QUESTION":
             query = getattr(task, 'query_context', "")
             break
             

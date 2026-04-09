@@ -10,9 +10,11 @@ export interface FlightEndpoint {
 export interface SegmentDetail {
   carrierCode: string;
   operatingCarrier: string;
+  isCodeshare: boolean;
   flightNumber: string;
   aircraft: string;
   duration: string;
+  layoverTime?: string;
   cabin: string;
   bookingClass: string;
   fareBasis: string;
@@ -34,14 +36,16 @@ export interface Itinerary {
 export interface FlightOffer {
   id: string;
   price: number;
+  basePrice: number;
+  taxAndFees: number;
   currency: string;
   cabin: string;
   fareOption: string;
-  bookableSeats: number | string; // Có thể là số hoặc "N/A"
+  bookableSeats: number | string;
   lastTicketingDate: string;
   validatingAirline: string;
   checkedBaggage: string;
   cabinBaggage: string;
   airlines: string[];
-  itineraries: Itinerary[]; // Mảng chứa chiều đi, chiều về,...
+  itineraries: Itinerary[];
 }

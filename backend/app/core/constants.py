@@ -22,6 +22,7 @@ class ContextTag:
     FLIGHT_ANALYSIS = "[DỮ LIỆU SO SÁNH CHUYẾN BAY]"
     PROMO_INFO = "[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]"
     POLICY_INFO = "[KIẾN THỨC NGHIỆP VỤ CHÍNH SÁCH]"
+    OUT_OF_SCOPE = "[CÂU HỎI NGOÀI PHẠM VI HỖ TRỢ]"
     
     USER_UPDATE = "[CẬP NHẬT TỪ KHÁCH HÀNG]"
     VALIDATION = "[THÔNG TIN ĐẶT VÉ CẦN KHÁCH KIỂM TRA LẠI]"
@@ -30,7 +31,7 @@ class ContextTag:
     MISC_INFO = "[THÔNG TIN BỔ SUNG]"
 
 class ValidationTag:
-    """Quy chuẩn phân loại lỗi khi Validate (Dùng chung với LLMTag.VALIDATION_ISSUE)"""
+    """Quy chuẩn phân loại lỗi khi Validate (Dùng chung với LLMTag.VALIDATION)"""
     MISSING_INFO = "[THIẾU THÔNG TIN]"
     INVALID_AIRLINE = "[HÃNG KHÔNG HỖ TRỢ]"
     NEED_AGE = "[CẦN XÁC NHẬN TUỔI]"

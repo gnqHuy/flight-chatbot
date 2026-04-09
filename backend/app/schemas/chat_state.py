@@ -8,8 +8,8 @@ class ArrayAction(BaseModel):
     values: List[str] = Field(..., description="Mã hãng bay. VD: ['VJ']")
 
 class SearchFiltersParams(BaseModel):
-    origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI (VD: HAN).")
-    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN (VD: SGN).")
+    origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI")
+    destination: Optional[str] = Field(None, description="Mã IATA điểm ĐẾN")
     departureDate: Optional[str] = Field(None, description="Ngày đi (YYYY-MM-DD).")
     returnDate: Optional[str] = Field(None, description="Ngày về (YYYY-MM-DD).")
     roundTrip: Optional[bool] = Field(None, description="True nếu là vé khứ hồi.")
@@ -32,7 +32,7 @@ class SearchFiltersParams(BaseModel):
         description="Tiêu chí sắp xếp: 'price_asc' (rẻ nhất), 'price_desc' (giảm dần/đắt nhất), 'departure_time' (bay sớm), 'arrival_time'."
     )
 
-    reset_search: Optional[bool] = Field(False, description="True nếu khách muốn TÌM LẠI TỪ ĐẦU / Xóa sạch bộ lọc cũ.")
+    reset_search: Optional[bool] = Field(None, description="True nếu khách muốn TÌM LẠI TỪ ĐẦU / Xóa sạch bộ lọc cũ.")
     clear_fields: Optional[List[str]] = Field(None, description="Tên các biến muốn HỦY BỎ. VD: Bỏ lọc giá -> ['maxPrice'].")
     array_actions: Optional[List[ArrayAction]] = Field(None, description="Dùng để THÊM/BỚT hãng bay. VD: Bỏ VJ -> action: REMOVE, values: ['VJ']")
 
@@ -63,7 +63,10 @@ class Task(BaseModel):
         description="CHỈ CHỨA ĐỐI TƯỢNG ĐỂ SO SÁNH (Mã chuyến bay, Mã hãng bay). TUYỆT ĐỐI KHÔNG điền giá tiền hay bộ lọc vào giỏ này."
     )
     
-    query_context: Optional[str] = Field(None, description="Nội dung cần tìm kiếm trong tài liệu RAG.")
+    query_context: Optional[str] = Field(
+        None, 
+        description="Trích xuất NGUYÊN VĂN đoạn chat của khách hàng tương ứng với tác vụ này. BẮT BUỘC giữ nguyên từng chữ, từng dấu câu. TUYỆT ĐỐI KHÔNG tóm tắt, diễn đạt lại hay sửa lỗi chính tả."
+    )
 
 class ExtractionOutput(BaseModel):
     tasks: List[Task] = Field(..., description="Danh sách tác vụ bóc tách.")

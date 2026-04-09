@@ -1,3 +1,4 @@
+from datetime import datetime
 from app.core.i18n_service import i18n
 from app.core.constants import SUPPORTED_AIRLINES
 
@@ -7,6 +8,10 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
         last_ticketing = raw_offer.get("lastTicketingDate", "N/A")
         validating_airline = raw_offer.get("validatingAirlineCodes", [""])[0]
         bookable_seats = raw_offer.get("numberOfBookableSeats", "N/A")
+
+        grand_total = float(price_info["grandTotal"])
+        base_price = float(price_info.get("base", grand_total))
+        tax_and_fees = grand_total - base_price
 
         traveler_pricing = raw_offer["travelerPricings"][0]
         fare_details_list = traveler_pricing.get("fareDetailsBySegment", [])
@@ -41,7 +46,7 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
             formatted_duration = raw_duration.replace("PT", "").replace("H", "h ").replace("M", "m").lower()
 
             detailed_segments = []
-            for seg in segments:
+            for i, seg in enumerate(segments):
                 seg_id = seg.get("id")
                 seg_fare = fare_map.get(seg_id, first_fare)
                 
@@ -50,12 +55,31 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
                 
                 operating_carrier = seg.get("operating", {}).get("carrierCode", carrier_code)
                 
+                is_codeshare = carrier_code != operating_carrier
+                
+                layover_time = None
+                if i < len(segments) - 1:
+                    next_seg = segments[i+1]
+                    try:
+                        arrival_time = datetime.strptime(seg["arrival"]["at"], "%Y-%m-%dT%H:%M:%S")
+                        next_departure_time = datetime.strptime(next_seg["departure"]["at"], "%Y-%m-%dT%H:%M:%S")
+                        
+                        diff = next_departure_time - arrival_time
+                        minutes = int(diff.total_seconds() / 60)
+                        hours = minutes // 60
+                        mins = minutes % 60
+                        layover_time = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+                    except Exception as e:
+                        print(f"Lỗi tính layover: {e}")
+                
                 detailed_segments.append({
                     "carrierCode": carrier_code,
                     "operatingCarrier": operating_carrier,
+                    "isCodeshare": is_codeshare,
                     "flightNumber": f"{carrier_code}{seg['number']}",
                     "aircraft": seg.get("aircraft", {}).get("code", "N/A"),
                     "duration": seg.get("duration", "").replace("PT", "").replace("H", "h ").replace("M", "m").lower(),
+                    "layoverTime": layover_time,
                     "cabin": seg_fare.get("cabin", cabin),
                     "bookingClass": seg_fare.get("class", "N/A"),
                     "fareBasis": seg_fare.get("fareBasis", "N/A"),
@@ -92,7 +116,9 @@ def format_amadeus_flight_display(raw_offer: dict, lang: str = "vi") -> dict | N
 
         return {
             "id": raw_offer["id"],
-            "price": float(price_info["grandTotal"]),
+            "price": grand_total,
+            "basePrice": base_price,
+            "taxAndFees": tax_and_fees,
             "currency": price_info["currency"],
             "cabin": cabin,
             "fareOption": fare_option,

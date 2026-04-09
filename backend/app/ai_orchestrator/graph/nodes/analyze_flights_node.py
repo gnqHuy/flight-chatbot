@@ -58,10 +58,8 @@ def analyze_flights_node(state: ChatState) -> dict:
         f"{ContextTag.FLIGHT_ANALYSIS}:\n"
         f"--- DỮ LIỆU ĐƯỢC GOM TỪ AGENT ---\n"
         f"{final_context}\n\n"
-        f"⚠️ CHỈ THỊ: Dựa vào Dữ liệu trên và Yêu cầu của khách, hãy viết một bài phân tích/so sánh khách quan, rõ ràng. Không tự bịa số liệu."
+        f"CHỈ THỊ: Dựa vào Dữ liệu trên và Yêu cầu của khách, hãy viết một bài phân tích/so sánh khách quan, chi tiết và rõ ràng. Không tự bịa số liệu."
     )
-
-    print("👉 [DEBUG]: Kết quả phân tích sơ bộ từ Agent:\n", report)
 
     return {
         "node_results": [report],

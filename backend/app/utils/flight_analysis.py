@@ -13,7 +13,7 @@ def parse_datetime(dt_str: str) -> str:
 def format_flights_to_text(parsed_flights: list) -> str:
     """
     Biến danh sách vé đã được làm sạch thành chuỗi văn bản chuẩn mực 
-    để cung cấp cho LLM phân tích (Hỗ trợ cấu trúc Itineraries mới).
+    để cung cấp cho LLM phân tích (Đã tích hợp Thuế phí, Nối chuyến, Codeshare).
     """
     if not parsed_flights:
         return "Không có dữ liệu chi tiết cho các chuyến bay này."
@@ -23,11 +23,14 @@ def format_flights_to_text(parsed_flights: list) -> str:
     for idx, f in enumerate(parsed_flights, 1):
         try:
             flight_id = f.get('id', str(idx))
+            
             price_str = f"{f.get('price', 0):,.0f} {f.get('currency', 'VND')}".replace(",", ".")
+            base_str = f"{f.get('basePrice', 0):,.0f} {f.get('currency', 'VND')}".replace(",", ".")
+            tax_str = f"{f.get('taxAndFees', 0):,.0f} {f.get('currency', 'VND')}".replace(",", ".")
             
             blocks = [
                 f"=== [VÉ ID: {flight_id}] ===",
-                f"- Giá vé tổng cộng: {price_str}",
+                f"- Giá vé tổng cộng: {price_str} (Giá gốc: {base_str} | Thuế/Phí: {tax_str})",
                 f"- Các hãng hàng không: {', '.join(f.get('airlines', []))}",
                 f"- Hạng vé: {f.get('cabin', 'N/A')} (Gói: {f.get('fareOption', 'N/A')})",
                 f"- Số ghế trống hiện tại: {f.get('bookableSeats', 'N/A')} ghế",
@@ -53,15 +56,15 @@ def format_flights_to_text(parsed_flights: list) -> str:
                 
                 blocks.append("  * CHI TIẾT CÁC CHẶNG BAY:")
                 
-                segments = it.get('segments', it.get('segmentDetails', [])) 
+                segments = it.get('segmentDetails', []) 
                 
                 for s_idx, seg in enumerate(segments):
                     dep_time = seg.get('departure', {}).get('at', 'N/A').replace('T', ' ')
                     arr_time = seg.get('arrival', {}).get('at', 'N/A').replace('T', ' ')
                     
-                    op_carrier = seg.get('operatingCarrier', seg.get('carrierCode', 'N/A'))
-                    carrier = seg.get('carrierCode', 'N/A')
-                    op_str = f" (Khai thác thực tế bởi: {op_carrier})" if op_carrier != carrier else ""
+                    is_codeshare = seg.get('isCodeshare', False)
+                    op_carrier = seg.get('operatingCarrier', 'N/A')
+                    op_str = f" (⚠️ Khai thác thực tế bởi hãng: {op_carrier})" if is_codeshare else ""
                     
                     blocks.append(f"    + Chặng {s_idx + 1}: {seg.get('departure', {}).get('iata', 'N/A')} -> {seg.get('arrival', {}).get('iata', 'N/A')}")
                     blocks.append(f"      Mã chuyến: {seg.get('flightNumber', 'N/A')}{op_str}")
@@ -69,6 +72,10 @@ def format_flights_to_text(parsed_flights: list) -> str:
                     blocks.append(f"      Hạ cánh: {arr_time} - Cổng/Terminal: {seg.get('arrival', {}).get('terminal', 'N/A')}")
                     blocks.append(f"      Thời gian bay: {seg.get('duration', 'N/A')} | Máy bay: {seg.get('aircraft', 'N/A')} | Hạng ghế: {seg.get('cabin', 'N/A')}")
                     blocks.append(f"      Phân loại vé: Class {seg.get('bookingClass', 'N/A')} | Fare Basis: {seg.get('fareBasis', 'N/A')}")
+                    
+                    layover = seg.get('layoverTime')
+                    if layover:
+                        blocks.append(f"      ⏳ TRẠM DỪNG: Khách chờ nối chuyến tại {seg.get('arrival', {}).get('iata', 'N/A')} trong {layover}")
             
             formatted_texts.append("\n".join(blocks))
             

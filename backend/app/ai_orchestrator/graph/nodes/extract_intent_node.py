@@ -53,11 +53,20 @@ def extract_intent_node(state: ChatState):
                 ChatIntent.FILTER_SORT_FLIGHTS.value,
                 ChatIntent.ANALYZE_FLIGHTS.value, 
                 ChatIntent.PROMO_SEARCH.value,
-                ChatIntent.GENERAL_QUESTION.value
+                ChatIntent.POLICY_QUESTION.value
             ]
             
             for task in all_tasks:
                 intent_str = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
+
+                if intent_str == "out_of_scope" or (hasattr(ChatIntent, 'OUT_OF_SCOPE') and intent_str == getattr(ChatIntent, 'OUT_OF_SCOPE', '').value):
+                    context_detail = f"Chủ đề khách hỏi: '{task.query_context}'" if getattr(task, 'query_context', None) else ""
+                    
+                    node_result.append(
+                        f"{ContextTag.OUT_OF_SCOPE}: {context_detail} nằm ngoài phạm vi hỗ trợ "
+                        f"(kiến thức chung, phiếm luận...). Bắt buộc phải từ chối trả lời lịch sự."
+                    )
+                    continue
                 
                 if intent_str in valid_intents:
                     if task.search_filters:
@@ -110,7 +119,7 @@ def extract_intent_node(state: ChatState):
             else:
                 core_changed = True
 
-            CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "roundTrip", "adults", "children", "infants"]
+            CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "roundTrip", "adults", "children", "infants", "travelClass"]
             core_changes_str = []
             filter_changes_str = []
             

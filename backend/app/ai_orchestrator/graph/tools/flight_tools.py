@@ -36,7 +36,6 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
 @tool
 def fetch_flight_details(flight_numbers: list[str], search_id: str) -> str:
     """Gọi tool này khi cần lấy thông tin chi tiết các hạng vé/tùy chọn của MỘT HOẶC NHIỀU MÃ CHUYẾN BAY (VD: VN135, VJ197)."""
-    print(f"⚡ [TOOL] fetch_flight_details được gọi với flight_numbers={flight_numbers} và search_id={search_id}")
     
     if not search_id or search_id in ["CLEAR", "NOT_FOUND"]:
         return "Lỗi: Yêu cầu khách tìm kiếm chuyến bay trước."
