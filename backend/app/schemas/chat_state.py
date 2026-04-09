@@ -19,8 +19,7 @@ class SearchFiltersParams(BaseModel):
     adults: Optional[int] = Field(None, ge=1, description="Số lượng người lớn.")
     children: Optional[int] = Field(None, description="Số lượng trẻ em (2-11 tuổi).")
     infants: Optional[int] = Field(None, description="Số lượng em bé (dưới 2 tuổi).")
-    need_age_confirmation: Optional[bool] = Field(None, description="True nếu khách có trẻ em nhưng chưa rõ tuổi.")
-    
+    need_age_confirmation: Optional[bool] = Field(None, description="CHỈ trả về True NẾU khách KHÔNG nói rõ số tuổi/tháng tuổi cụ thể. Nếu khách ĐÃ CUNG CẤP TUỔI rõ ràng (VD: '7 tuổi', '18 tháng'), TUYỆT ĐỐI set bằng False hoặc Null.")
     preferred_airlines: Optional[List[str]] = Field(None, description="Mã hãng bay khách CHỈ ĐỊNH lọc (VD: ['VN']).")
     maxPrice: Optional[int] = Field(None, description="Mức giá tối đa (VNĐ) khách yêu cầu.")
     nonStop: Optional[bool] = Field(None, description="True nếu chỉ tìm chuyến bay thẳng.")

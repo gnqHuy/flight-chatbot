@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 def get_env(var_name: str, default_value: str = None, required: bool = False) -> str:
     value = os.getenv(var_name)
@@ -12,8 +12,8 @@ def get_env(var_name: str, default_value: str = None, required: bool = False) ->
     return default_value
 
 OPENAI_API_KEY = get_env("OPENAI_API_KEY", required=True)
-AMADEUS_API_KEY = get_env("AMADEUS_API_KEY_1", required=True)
-AMADEUS_API_SECRET = get_env("AMADEUS_API_SECRET_1", required=True)
+AMADEUS_API_KEY = get_env("AMADEUS_API_KEY", required=True)
+AMADEUS_API_SECRET = get_env("AMADEUS_API_SECRET", required=True)
 DATABASE_URL = get_env("DATABASE_URL", required=True)
 SECRET_KEY = get_env("SECRET_KEY", required=True)
 

@@ -94,13 +94,25 @@ def load_test_cases(file_path: str):
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
     
-def evaluate_turn_with_llm(judge_chain, user_query, exp_behavior, exp_intent, actual_intent, bot_action, bot_response) -> dict:
+import json
+
+def evaluate_turn_with_llm(
+    judge_chain, 
+    user_query, 
+    exp_behavior, 
+    expected_tasks_json,
+    actual_tasks_json,
+    bot_action, 
+    bot_response
+) -> dict:
     try:
         safe_data = {
             "user_query": str(user_query or "None"),
             "expected_behavior": str(exp_behavior or "None"),
-            "expected_intent": str(exp_intent or "None"),
-            "actual_intent": str(actual_intent or "None"),
+            
+            "expected_tasks_json": expected_tasks_json, 
+            "actual_tasks_json": actual_tasks_json,     
+            
             "bot_action": json.dumps(bot_action, ensure_ascii=False) if bot_action else "None",
             "bot_response": "\n".join([str(x) for x in bot_response]) if isinstance(bot_response, list) else str(bot_response or "None")
         }
@@ -111,7 +123,10 @@ def evaluate_turn_with_llm(judge_chain, user_query, exp_behavior, exp_intent, ac
 
 def evaluate_scenario_with_llm(scenario_judge_chain, description, conversation_history) -> dict:
     try:
-        result = scenario_judge_chain.invoke({"description": description, "conversation_history": conversation_history})
+        result = scenario_judge_chain.invoke({
+            "description": description, 
+            "conversation_history": conversation_history
+        })
         return {"scenario_score": result.scenario_score, "scenario_reason": result.scenario_reason}
     except Exception as e:
         return {"scenario_score": 0, "scenario_reason": f"Lỗi chấm điểm kịch bản: {str(e)}"}

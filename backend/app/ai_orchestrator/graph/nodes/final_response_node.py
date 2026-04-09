@@ -1,10 +1,9 @@
-from datetime import datetime
 from app.ai_orchestrator.graph.prompts.final_prompt import FINAL_NODE_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
 from app.core.llm_setup import llm
 from langchain_core.prompts import ChatPromptTemplate
 from app.utils.promo_injector import check_and_inject_promos
-from app.core.constants import ContextTag
+from app.core.constants import CURRENT_TIME, ContextTag
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
@@ -21,7 +20,7 @@ def final_response_node(state: ChatState):
     history_list = history_dict.get("messages", []) if isinstance(history_dict, dict) else []
     history_str = "\n".join(history_list[-10:]) if history_list else "Chưa có lịch sử."
     
-    current_time_str = datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
+    current_time_str = CURRENT_TIME
 
     system_instructions = []
 
@@ -37,11 +36,12 @@ def final_response_node(state: ChatState):
 
     combined_context = "\n\n".join(system_instructions)
 
+    print("combined_context  ", combined_context)
+
     if ContextTag.FLIGHT_FOUND in combined_context:
         promo_context = check_and_inject_promos(current_search_id)
         if promo_context:
             combined_context += f"\n\n{ContextTag.PROMO_INFO}:\n{promo_context}"
-            print("👉 [DEBUG]: Đã tiêm thành công khuyến mãi vào Context cho LLM!")
 
     known_info = {k: v for k, v in search_filters.items() if v and k != "current_search_id"}
 

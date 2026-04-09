@@ -1,9 +1,8 @@
 import os
-from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.prompts.extract_prompt import EXTRACT_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
-from app.core.constants import ContextTag
+from app.core.constants import CURRENT_TIME, ContextTag
 from app.core.llm_setup import llm
 from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
@@ -39,9 +38,10 @@ def extract_intent_node(state: ChatState) -> dict:
     try:
         result: ExtractionOutput = extraction_chain.invoke({
             "query": state.get("user_message", ""),
-            "current_time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "current_time": CURRENT_TIME,
             "chat_history": history_str
         })
+        print(f"👉 [DEBUG - RAW EXTRACTION RESULT]: {CURRENT_TIME}")
         print (f"👉 [DEBUG - EXTRACTED RESULT]: {result}")
 
         if result and result.tasks:
@@ -55,7 +55,8 @@ def extract_intent_node(state: ChatState) -> dict:
                 ChatIntent.PROMO_SEARCH.value,
                 ChatIntent.POLICY_QUESTION.value
             ]
-            
+
+            filtered_tasks = []
             for task in all_tasks:
                 intent_str = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
 
@@ -67,7 +68,8 @@ def extract_intent_node(state: ChatState) -> dict:
                         f"(kiến thức chung, phiếm luận...). Bắt buộc phải từ chối trả lời lịch sự."
                     )
                     continue
-                
+
+                filtered_tasks.append(task)
                 if intent_str in valid_intents:
                     if task.search_filters:
                         raw_filters = task.search_filters.model_dump(exclude_unset=True, exclude_none=True)
@@ -153,9 +155,10 @@ def extract_intent_node(state: ChatState) -> dict:
 
     except Exception as e:
         print(f"❌ [LỖI EXTRACT INTENT]: Không thể bóc tách dữ liệu: {e}")
+        filtered_tasks = all_tasks 
         
     result_dict = {
-        "tasks": all_tasks,
+        "tasks": filtered_tasks if 'filtered_tasks' in locals() else all_tasks, 
         "search_filters": new_search_filters,
         "action_targets": new_action_targets,
         "node_results": node_result
@@ -166,7 +169,9 @@ def extract_intent_node(state: ChatState) -> dict:
 
     print("👉 [DEBUG - NEW FILTERS]: ", new_search_filters)
     print("👉 [DEBUG - NEW TARGETS]: ", new_action_targets)
-    print("👉 [DEBUG - TASK]: ", [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in all_tasks])
+    
+    tasks_to_print = filtered_tasks if 'filtered_tasks' in locals() else all_tasks
+    print("👉 [DEBUG - TASK]: ", [t.intent.value if hasattr(t.intent, 'value') else str(t.intent) for t in tasks_to_print])
     print("🔹🔹🔹 ------------------------------------")
 
     return result_dict

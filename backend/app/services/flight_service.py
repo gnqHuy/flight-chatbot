@@ -1,15 +1,15 @@
-import os
 import json
 from typing import Optional, List, Any
 from amadeus import Client, ResponseError
+from app.core.config import AMADEUS_API_KEY, AMADEUS_API_SECRET
 from app.core.constants import MAX_FLIGHTS_RETURNED
 from app.utils.flight_parser import format_amadeus_flight_display 
 
 class FlightService:
     def __init__(self):
         self.amadeus = Client(
-            client_id=os.getenv('AMADEUS_API_KEY'),
-            client_secret=os.getenv('AMADEUS_API_SECRET')
+            client_id=AMADEUS_API_KEY,
+            client_secret=AMADEUS_API_SECRET
         )
 
     def search_flights(

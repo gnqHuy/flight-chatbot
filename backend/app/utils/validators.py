@@ -2,21 +2,21 @@ from datetime import datetime
 from typing import Tuple, List, Dict
 from app.core.constants import SUPPORTED_AIRLINES_SET, ContextTag
 
-def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
+def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]:
     """
     Kiểm tra tính hợp lệ của các tham số chuyến bay.
     """
     
-    origin = user_prefs.get("origin")
-    destination = user_prefs.get("destination")
-    departureDate = user_prefs.get("departureDate")
-    returnDate = user_prefs.get("returnDate")
+    origin = search_filters.get("origin")
+    destination = search_filters.get("destination")
+    departureDate = search_filters.get("departureDate")
+    returnDate = search_filters.get("returnDate")
     
-    adults = int(user_prefs.get("adults", 1))
-    children = int(user_prefs.get("children", 0))
-    infants = int(user_prefs.get("infants", 0))
-    need_age_confirmation = user_prefs.get("need_age_confirmation", False)
-    roundTrip = user_prefs.get("roundTrip", False)
+    adults = int(search_filters.get("adults", 1))
+    children = int(search_filters.get("children", 0))
+    infants = int(search_filters.get("infants", 0))
+    need_age_confirmation = search_filters.get("need_age_confirmation", False)
+    roundTrip = search_filters.get("roundTrip", False)
 
     raw_errors = []
     state_updates = {}
@@ -37,7 +37,7 @@ def validate_flight_params(user_prefs: dict) -> Tuple[bool, List[str], Dict]:
         raw_errors.append("Mỗi lượt tìm kiếm bắt buộc phải có ít nhất 1 người lớn.")
         state_updates["adults"] = 1 
 
-    if has_kids and not need_age_confirmation:
+    if has_kids and need_age_confirmation:
         raw_errors.append("Cần xác nhận lại độ tuổi chính xác của trẻ em để áp dụng giá vé ưu đãi nhất.")
     
     if total_passengers > 9:

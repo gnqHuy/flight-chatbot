@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from sqlmodel import Session, select, or_
 
@@ -7,7 +6,7 @@ from app.database.database import engine
 from app.database.models.airline import Airline
 from app.database.models.flight_promotion import FlightPromotion
 from app.utils.helpers import consume_task
-from app.core.constants import ContextTag
+from app.core.constants import CURRENT_TIME, ContextTag
 from app.ai_orchestrator.rag.vector_store import shared_embeddings
 
 def promo_retrieval_node(state: ChatState) -> dict:
@@ -57,7 +56,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 "tasks": remaining_tasks 
             }
         
-        current_date_str = datetime.now().strftime("%d/%m/%Y")
+        current_date_str = CURRENT_TIME
         result_string = (
             f"{ContextTag.PROMO_INFO}\n"
             f"--- KẾT QUẢ TRA CỨU KHUYẾN MÃI TƯƠNG ĐỒNG ---\n"
