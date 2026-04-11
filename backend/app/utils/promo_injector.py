@@ -49,7 +49,7 @@ def check_and_inject_promos(current_search_id: str) -> str:
         
         if promo_messages:
             injected_text = (
-                "\n[THÔNG TIN GỢI Ý KHÁCH HÀNG VỀ KHUYẾN MÃI]\n"
+                "[THÔNG TIN GỢI Ý KHÁCH HÀNG VỀ KHUYẾN MÃI]\n"
                 "Hệ thống phát hiện các hãng bay trong danh sách Gợi ý phía trên ĐANG CÓ KHUYẾN MÃI CÒN HẠN:\n"
                 + "\n".join(promo_messages) +
                 "\n\n[YÊU CẦU CHO AI]: Hãy ĐÓNG VAI NHÂN VIÊN TƯ VẤN, khéo léo lồng ghép 1-2 khuyến mãi "

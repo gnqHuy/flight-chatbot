@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Tuple, List, Dict
-from app.core.constants import SUPPORTED_AIRLINES_SET, ContextTag
+from app.core.constants import CURRENT_TIME, SUPPORTED_AIRLINES_SET, ContextTag
 
 def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]:
     """
@@ -30,7 +30,7 @@ def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]
         missing_str = ", ".join(missing_fields)
         raw_errors.append(f"Khách chưa cung cấp đủ {missing_str}.")
 
-    total_passengers = adults + children
+    total_passengers = adults + children + infants
     has_kids = (children > 0 or infants > 0)
 
     if adults < 1:
@@ -53,7 +53,7 @@ def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]
     if departureDate: 
         try:
             dep_dt = datetime.strptime(departureDate, "%Y-%m-%d")
-            today = datetime.now()
+            today = CURRENT_TIME
             
             if dep_dt.date() < today.date():
                 raw_errors.append("Ngày đi (departureDate) nằm trong quá khứ.")

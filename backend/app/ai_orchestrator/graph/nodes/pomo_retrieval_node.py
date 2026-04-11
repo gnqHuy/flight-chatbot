@@ -6,7 +6,7 @@ from app.database.database import engine
 from app.database.models.airline import Airline
 from app.database.models.flight_promotion import FlightPromotion
 from app.utils.helpers import consume_task
-from app.core.constants import CURRENT_TIME, ContextTag
+from app.core.constants import CURRENT_TIME, CURRENT_TIME_STR, ContextTag
 from app.ai_orchestrator.rag.vector_store import shared_embeddings
 
 def promo_retrieval_node(state: ChatState) -> dict:
@@ -37,7 +37,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 if airline_obj:
                     stmt = stmt.where(FlightPromotion.airline_id == airline_obj.id)
             
-            today = datetime.now().date()
+            today = CURRENT_TIME.date()
             stmt = stmt.where(
                 or_(
                     FlightPromotion.booking_end_date == None,
@@ -56,7 +56,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 "tasks": remaining_tasks 
             }
         
-        current_date_str = CURRENT_TIME
+        current_date_str = CURRENT_TIME_STR
         result_string = (
             f"{ContextTag.PROMO_INFO}\n"
             f"--- KẾT QUẢ TRA CỨU KHUYẾN MÃI TƯƠNG ĐỒNG ---\n"

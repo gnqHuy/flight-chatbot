@@ -15,13 +15,11 @@ AIRLINE_PROMO_LIST_URLS = {
     "QH": "https://www.bambooairways.com/vn/vi/explore/offers"
 }
 
-MAX_FLIGHTS_RETURNED = 100
-
 class ContextTag:
     """Quy chuẩn Thẻ (Tags) nhúng vào Context cho LLM đọc trong Final Node"""
     FLIGHT_FOUND = "[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]"
     FILTER_APPLIED = "[BỘ LỌC ĐƯỢC ÁP DỤNG]"
-    FLIGHT_ANALYSIS = "[DỮ LIỆU SO SÁNH CHUYẾN BAY]"
+    FLIGHT_ANALYSIS = "[DỮ LIỆU SO SÁNH CHUYẾN BAY/HÃNG BAY]"
     PROMO_INFO = "[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]"
     POLICY_INFO = "[KIẾN THỨC NGHIỆP VỤ CHÍNH SÁCH]"
     OUT_OF_SCOPE = "[CÂU HỎI NGOÀI PHẠM VI HỖ TRỢ]"
@@ -41,5 +39,8 @@ class ValidationTag:
     INVALID_PAX = "[SỐ KHÁCH KHÔNG HỢP LỆ]"
     INVALID_DATE = "[NGÀY BAY KHÔNG HỢP LỆ]"
 
-CURRENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M")
-# CURRENT_TIME = "2026-05-15 00:00"
+# CURRENT_TIME = datetime.now().strftime("%Y-%m-%d %H:%M")
+CURRENT_TIME = datetime(2026, 5, 15, 0, 0)
+CURRENT_TIME_STR = CURRENT_TIME.strftime("%Y-%m-%d %H:%M")
+MAX_HISTORY_TURNS = 6
+MAX_FLIGHTS_RETURNED = 200

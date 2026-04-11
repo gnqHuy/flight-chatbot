@@ -4,34 +4,43 @@ from app.services.redis_service import redis_service
 from app.services.airline_service import airline_service
 from app.utils.flight_analysis import format_flights_to_text
 
+import json
+from langchain_core.tools import tool
+
 @tool
 def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
     """Gọi tool này khi cần lấy thông tin chính sách, uy tín, dịch vụ của các Hãng bay để so sánh."""
     try:
+        # 1. Lấy context kiến thức từ Database
         db_info = airline_service.get_airlines_analysis_context(airline_codes)
         
-        example_text = "Không tìm thấy vé ví dụ."
-        if not search_id or search_id == "CLEAR":
+        example_text = "Không tìm thấy vé minh họa phù hợp cho các hãng này."
+        
+        # 2. Lấy dữ liệu từ Redis nếu có search_id
+        if search_id and search_id != "CLEAR":
             cached_data = redis_service.get_flight_offers(search_id)
             if cached_data:
-                all_flights = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
+                flights_list = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
                 example_flights = []
                 
-                if isinstance(all_flights, list):
+                if flights_list:
                     for code in airline_codes:
-                        flights_of_airline = [f for f in all_flights if code in [str(a).upper() for a in f.get('airlines', [])]]
+                        flights_of_airline = [
+                            f for f in flights_list 
+                            if isinstance(f, dict) and code.upper() in [str(a).upper() for a in f.get('airlines', [])]
+                        ]
+                        
                         if flights_of_airline:
                             flights_of_airline.sort(key=lambda x: float(x.get('price', 99999999)))
                             example_flights.append(flights_of_airline[0])
                             
-                if example_flights:
-                    example_text = format_flights_to_text(example_flights)
+                    if example_flights:
+                        example_text = format_flights_to_text(example_flights)
 
-        return f"[THÔNG TIN HÃNG BAY (SQL)]:\n{db_info}\n\n[VÉ MINH HỌA (REDIS)]:\n{example_text}"
+        return f"\n{db_info}\n\n[VÉ MINH HỌA CỦA CÁC HÃNG BAY]:\n{example_text}"
     
     except Exception as e:
         return f"Lỗi khi lấy thông tin hãng bay: {str(e)}"
-
 
 @tool
 def fetch_flight_details(flight_numbers: list[str], search_id: str) -> str:

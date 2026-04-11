@@ -14,6 +14,7 @@ def get_env(var_name: str, default_value: str = None, required: bool = False) ->
 OPENAI_API_KEY = get_env("OPENAI_API_KEY", required=True)
 AMADEUS_API_KEY = get_env("AMADEUS_API_KEY", required=True)
 AMADEUS_API_SECRET = get_env("AMADEUS_API_SECRET", required=True)
+DUFFEL_ACCESS_TOKEN = get_env("DUFFEL_ACCESS_TOKEN", required=True)
 DATABASE_URL = get_env("DATABASE_URL", required=True)
 SECRET_KEY = get_env("SECRET_KEY", required=True)
 

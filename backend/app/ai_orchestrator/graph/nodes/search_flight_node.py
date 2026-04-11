@@ -26,7 +26,6 @@ def search_flights_node(state: ChatState) -> dict:
     if current_search_id and current_search_id != "CLEAR":
         cached_data = redis_service.get_flight_offers(current_search_id)
         if cached_data:
-            print(f"⚡ [CACHE HIT]: Dữ liệu vé vẫn còn sống. Tái sử dụng Search ID: {current_search_id}")
             return {
                 "node_results": [f"{ContextTag.FLIGHT_FOUND}: Đã tải lại danh sách vé từ bộ nhớ tạm."],
                 "action": {

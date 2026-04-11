@@ -2,7 +2,7 @@ import os
 from langchain_core.prompts import ChatPromptTemplate
 from app.ai_orchestrator.graph.prompts.extract_prompt import EXTRACT_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
-from app.core.constants import CURRENT_TIME, ContextTag
+from app.core.constants import CURRENT_TIME, CURRENT_TIME_STR, MAX_HISTORY_TURNS, ContextTag
 from app.core.llm_setup import llm
 from app.schemas.chat_state import ExtractionOutput
 from app.core.enums import ChatIntent
@@ -28,20 +28,19 @@ def extract_intent_node(state: ChatState) -> dict:
     new_action_targets = {}
     
     global_clear_fields = set()
-    global_reset = False
     core_changed = False
     
     history_dict = state.get("chat_history", {"messages": [], "search_ids": []})
     history_list = history_dict.get("messages", [])
-    history_str = "\n".join(history_list[-10:]) if history_list else "Chưa có lịch sử trò chuyện."
+    history_str = "\n".join(history_list[-MAX_HISTORY_TURNS:]) if history_list else "Chưa có lịch sử trò chuyện."
 
     try:
         result: ExtractionOutput = extraction_chain.invoke({
             "query": state.get("user_message", ""),
-            "current_time": CURRENT_TIME,
+            "current_time": CURRENT_TIME_STR,
             "chat_history": history_str
         })
-        print(f"👉 [DEBUG - RAW EXTRACTION RESULT]: {CURRENT_TIME}")
+        
         print (f"👉 [DEBUG - EXTRACTED RESULT]: {result}")
 
         if result and result.tasks:
@@ -73,9 +72,6 @@ def extract_intent_node(state: ChatState) -> dict:
                 if intent_str in valid_intents:
                     if task.search_filters:
                         raw_filters = task.search_filters.model_dump(exclude_unset=True, exclude_none=True)
-                        
-                        if raw_filters.pop("reset_search", False):
-                            global_reset = True
                             
                         global_clear_fields.update(raw_filters.pop("clear_fields", []))
                         array_actions = raw_filters.pop("array_actions", [])
@@ -91,7 +87,6 @@ def extract_intent_node(state: ChatState) -> dict:
                             vals = action.get("values", [])
                             
                             current_array = new_search_filters.get(field) or old_search_filters.get(field) or []
-                            if global_reset: current_array = new_search_filters.get(field) or [] 
                             
                             current_set = set([str(x).upper().replace(" ", "") for x in current_array])
                             target_vals = [str(x).upper().replace(" ", "") for x in vals]
@@ -114,12 +109,9 @@ def extract_intent_node(state: ChatState) -> dict:
             for field in global_clear_fields:
                 new_search_filters[field] = "CLEAR"
                 
-            if not global_reset:
-                for k, v in old_search_filters.items():
-                    if k not in new_search_filters and k not in global_clear_fields:
-                        new_search_filters[k] = v
-            else:
-                core_changed = True
+            for k, v in old_search_filters.items():
+                if k not in new_search_filters and k not in global_clear_fields:
+                    new_search_filters[k] = v
 
             CORE_FIELDS = ["origin", "destination", "departureDate", "returnDate", "roundTrip", "adults", "children", "infants", "travelClass"]
             core_changes_str = []

@@ -3,7 +3,7 @@ from app.ai_orchestrator.graph.state import ChatState
 from app.core.llm_setup import llm
 from langchain_core.prompts import ChatPromptTemplate
 from app.utils.promo_injector import check_and_inject_promos
-from app.core.constants import CURRENT_TIME, ContextTag
+from app.core.constants import CURRENT_TIME_STR, MAX_HISTORY_TURNS, ContextTag
 
 def final_response_node(state: ChatState):
     print("\n🔹🔹🔹 --- VÀO NODE TỔNG HỢP CÂU TRẢ LỜI ---")
@@ -18,9 +18,7 @@ def final_response_node(state: ChatState):
     
     history_dict = state.get("chat_history", {})
     history_list = history_dict.get("messages", []) if isinstance(history_dict, dict) else []
-    history_str = "\n".join(history_list[-10:]) if history_list else "Chưa có lịch sử."
-    
-    current_time_str = CURRENT_TIME
+    history_str = "\n".join(history_list[-MAX_HISTORY_TURNS:]) if history_list else "Chưa có lịch sử."
 
     system_instructions = []
 
@@ -41,13 +39,12 @@ def final_response_node(state: ChatState):
     if ContextTag.FLIGHT_FOUND in combined_context:
         promo_context = check_and_inject_promos(current_search_id)
         if promo_context:
-            combined_context += f"\n\n{ContextTag.PROMO_INFO}:\n{promo_context}"
+            combined_context += f"\n\n{promo_context}"
 
     known_info = {k: v for k, v in search_filters.items() if v and k != "current_search_id"}
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system", FINAL_NODE_SYSTEM_PROMPT),
-        ("human", "{question}")
+        ("system", FINAL_NODE_SYSTEM_PROMPT)
     ])
 
     formatted_messages = prompt.format_messages(
@@ -56,8 +53,12 @@ def final_response_node(state: ChatState):
         known_info=known_info,
         question=user_message,
         lang=lang,
-        current_time=current_time_str
+        current_time=CURRENT_TIME_STR
     )
+
+    print("\n--- PROMPT ĐƯỢC GỬI ĐẾN LLM ---")
+    for msg in formatted_messages:
+        print(f"{msg.type.upper()}: {msg.content}\n")
 
     response = llm.invoke(formatted_messages)
     bot_reply = response.content 
