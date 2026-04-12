@@ -52,6 +52,13 @@ def filter_sort_flights_node(state: ChatState) -> dict:
 
     node_msg = f"{ContextTag.FILTER_APPLIED}: Đã gửi lệnh điều chỉnh bộ lọc lên giao diện."
 
+    print("===== DEBUG ACTION =====")
+    print(f"Type: apply_filters")
+    print(f"Search ID: {current_search_id}")
+    print(f"Filters: {fe_filters}")
+    print(f"Sort: {sort_val}")
+    print("========================")
+
     return {
         "node_results": [node_msg],
         "action": {

@@ -17,6 +17,7 @@ def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]
     infants = int(search_filters.get("infants", 0))
     need_age_confirmation = search_filters.get("need_age_confirmation", False)
     roundTrip = search_filters.get("roundTrip", False)
+    preferred_airlines = search_filters.get("preferred_airlines", [])
 
     raw_errors = []
     state_updates = {}
@@ -49,6 +50,10 @@ def validate_flight_params(search_filters: dict) -> Tuple[bool, List[str], Dict]
 
     if roundTrip and not returnDate:
         raw_errors.append("Khách muốn bay khứ hồi nhưng chưa cung cấp ngày về.")
+    
+    for airline in preferred_airlines:
+        if airline not in SUPPORTED_AIRLINES_SET:
+            return False, [f"{ContextTag.INVALID_AIRLINE}:\n- '{airline}'"], {"preferred_airlines": "CLEAR"}
 
     if departureDate: 
         try:

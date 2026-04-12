@@ -137,13 +137,6 @@ def extract_intent_node(state: ChatState) -> dict:
                 node_result.append(f"{ContextTag.USER_UPDATE}: Đổi thông số cốt lõi ({', '.join(core_changes_str)}). Yêu cầu gọi API mới.")
             elif filter_changes_str:
                 node_result.append(f"{ContextTag.USER_UPDATE}: Đổi bộ lọc hiển thị ({', '.join(filter_changes_str)}).")
-                
-            if new_action_targets:
-                targets_info = []
-                if new_action_targets.get("compare_airlines"): targets_info.append(f"Hãng: {new_action_targets['compare_airlines']}")
-                if new_action_targets.get("compare_flights"): targets_info.append(f"Chuyến: {new_action_targets['compare_flights']}")
-                if targets_info:
-                    node_result.append(f"{ContextTag.USER_UPDATE}: Yêu cầu thao tác trên mục tiêu: {', '.join(targets_info)}.")
 
     except Exception as e:
         print(f"❌ [LỖI EXTRACT INTENT]: Không thể bóc tách dữ liệu: {e}")

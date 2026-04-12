@@ -8,15 +8,16 @@ import json
 from langchain_core.tools import tool
 
 @tool
-def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
+def fetch_airline_info(airline_codes: list[str], search_id: str, skip_example: bool = False) -> str:
     """Gọi tool này khi cần lấy thông tin chính sách, uy tín, dịch vụ của các Hãng bay để so sánh."""
     try:
-        # 1. Lấy context kiến thức từ Database
         db_info = airline_service.get_airlines_analysis_context(airline_codes)
         
+        if skip_example:
+            return f"[THÔNG TIN HÃNG BAY]:\n{db_info}"
+            
         example_text = "Không tìm thấy vé minh họa phù hợp cho các hãng này."
         
-        # 2. Lấy dữ liệu từ Redis nếu có search_id
         if search_id and search_id != "CLEAR":
             cached_data = redis_service.get_flight_offers(search_id)
             if cached_data:
@@ -37,7 +38,7 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
                     if example_flights:
                         example_text = format_flights_to_text(example_flights)
 
-        return f"\n{db_info}\n\n[VÉ MINH HỌA CỦA CÁC HÃNG BAY]:\n{example_text}"
+        return f"[THÔNG TIN HÃNG BAY]:\n{db_info}\n\n[VÉ MINH HỌA CỦA CÁC HÃNG BAY]:\n{example_text}"
     
     except Exception as e:
         return f"Lỗi khi lấy thông tin hãng bay: {str(e)}"
@@ -45,6 +46,7 @@ def fetch_airline_info(airline_codes: list[str], search_id: str) -> str:
 @tool
 def fetch_flight_details(flight_numbers: list[str], search_id: str) -> str:
     """Gọi tool này khi cần lấy thông tin chi tiết các hạng vé/tùy chọn của MỘT HOẶC NHIỀU MÃ CHUYẾN BAY (VD: VN135, VJ197)."""
+    print (f"🔧 [TOOL] fetch_flight_details được gọi với flight_numbers={flight_numbers} và search_id={search_id}")
     
     if not search_id or search_id == "CLEAR":
         return "Lỗi: Yêu cầu khách tìm kiếm chuyến bay trước."

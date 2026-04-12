@@ -1,17 +1,11 @@
-from langchain_core.tools import tool
-from app.ai_orchestrator.graph.prompts.analyze_prompt import ANALYZE_SYSTEM_PROMPT
 from app.ai_orchestrator.graph.state import ChatState
 from app.ai_orchestrator.graph.tools.flight_tools import fetch_airline_info, fetch_flight_details
 from app.utils.helpers import consume_task
 from app.core.constants import ContextTag
-from app.core.llm_setup import llm
-
-llm_with_tools = llm.bind_tools([fetch_airline_info, fetch_flight_details])
 
 def analyze_flights_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH (TOOL CALLING AGENT) ---")
+    print("\n🔹🔹🔹 --- VÀO TRẠM PHÂN TÍCH (PURE PYTHON ROUTER) ---")
     
-    user_message = state.get("user_message", "")
     action_targets = state.get("action_targets", {})
     current_search_id = state.get("current_search_id")
     tasks = state.get("tasks", [])
@@ -21,43 +15,40 @@ def analyze_flights_node(state: ChatState) -> dict:
     comp_flights = action_targets.get("compare_flights", [])
     
     if not current_search_id or current_search_id == "CLEAR":
-        return _build_error("Vui lòng tìm kiếm chuyến bay trước khi phân tích.", remaining_tasks)
-
-    if not comp_airlines and not comp_flights:
         return {
-            "node_results": ["[THÔNG BÁO]: Bạn chưa chọn chuyến bay hoặc hãng bay nào để phân tích. Vui lòng tick chọn ít nhất 1 chuyến hoặc 1 hãng."],
-            "action": {"type": "require_flight_selection", "payload": {"search_id": current_search_id}},
-            "tasks": [], 
+            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Vui lòng tìm kiếm chuyến bay trước khi phân tích."],
+            "tasks": remaining_tasks,
+            "action_targets": {}
         }
-    
-    ai_msg = llm_with_tools.invoke([
-        ("system", ANALYZE_SYSTEM_PROMPT),
-        ("human", user_message)
-    ])
 
     gathered_data = []
     
-    if not ai_msg.tool_calls:
-        print("⚠️ LLM không gọi tool, tự động fallback gọi tool bằng Python...")
-        if comp_airlines: 
-            gathered_data.append(fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id}))
-        if comp_flights: 
-            gathered_data.append(fetch_flight_details.invoke({"flight_ids": comp_flights, "search_id": current_search_id}))
+    if not comp_airlines and not comp_flights:
+        print("🛑 [HITL TRIGGERED]: Yêu cầu khách chọn chuyến bay trên UI.")
+        return {
+            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Dạ, để so sánh chi tiết, bạn vui lòng tick chọn các chuyến bay hoặc hãng bay cụ thể trên màn hình giúp mình nhé!"],
+            "action": {"type": "require_flight_selection", "payload": {"search_id": current_search_id}},
+            "tasks": [], 
+            "action_targets": {}
+        }
+
+    elif comp_airlines and not comp_flights:
+        print(f"⚙️ [ROUTER]: Luồng Hãng Bay (Airlines: {comp_airlines})")
+        res = fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id, "skip_example": False})
+        gathered_data.append(res)
+
+    elif comp_flights and not comp_airlines:
+        print(f"⚙️ [ROUTER]: Luồng Chuyến Bay (Flights: {comp_flights})")
+        res = fetch_flight_details.invoke({"flight_numbers": comp_flights, "search_id": current_search_id})
+        gathered_data.append(res)
+
     else:
-        for tool_call in ai_msg.tool_calls:
-            print(f"🧠 [AGENT GỌI TOOL]: {tool_call['name']} với args: {tool_call['args']}")
-            
-            args = tool_call["args"]
-            
-            args["search_id"] = current_search_id
-            
-            if tool_call["name"] == "fetch_airline_info":
-                res = fetch_airline_info.invoke(args)
-                gathered_data.append(res)
-                
-            elif tool_call["name"] == "fetch_flight_details":
-                res = fetch_flight_details.invoke(tool_call["args"])
-                gathered_data.append(res)
+        print(f"⚙️ [ROUTER]: Luồng Kết Hợp (Airlines: {comp_airlines}, Flights: {comp_flights})")
+        res_airline = fetch_airline_info.invoke({"airline_codes": comp_airlines, "search_id": current_search_id, "skip_example": True})
+        gathered_data.append(res_airline)
+        
+        res_flight = fetch_flight_details.invoke({"flight_numbers": comp_flights, "search_id": current_search_id})
+        gathered_data.append(res_flight)
 
     final_context = "\n\n".join(gathered_data) if gathered_data else "Không lấy được dữ liệu."
     
@@ -69,12 +60,5 @@ def analyze_flights_node(state: ChatState) -> dict:
     return {
         "node_results": [report],
         "tasks": remaining_tasks,
-        "action_targets": {}
-    }
-
-def _build_error(msg: str, tasks: list) -> dict:
-    return {
-        "node_results": [f"{ContextTag.SYS_ERROR}: {msg}"],
-        "tasks": tasks,
         "action_targets": {}
     }

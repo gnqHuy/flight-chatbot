@@ -59,7 +59,6 @@ def promo_retrieval_node(state: ChatState) -> dict:
         current_date_str = CURRENT_TIME_STR
         result_string = (
             f"{ContextTag.PROMO_INFO}\n"
-            f"--- KẾT QUẢ TRA CỨU KHUYẾN MÃI TƯƠNG ĐỒNG ---\n"
             f"- CÂU HỎI: '{query}'\n"
             f"- NGÀY HỆ THỐNG: {current_date_str}\n"
         )

@@ -34,8 +34,6 @@ def final_response_node(state: ChatState):
 
     combined_context = "\n\n".join(system_instructions)
 
-    print("combined_context  ", combined_context)
-
     if ContextTag.FLIGHT_FOUND in combined_context:
         promo_context = check_and_inject_promos(current_search_id)
         if promo_context:
@@ -44,7 +42,8 @@ def final_response_node(state: ChatState):
     known_info = {k: v for k, v in search_filters.items() if v and k != "current_search_id"}
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system", FINAL_NODE_SYSTEM_PROMPT)
+        ("system", FINAL_NODE_SYSTEM_PROMPT),
+        ("human", "{question}")
     ])
 
     formatted_messages = prompt.format_messages(

@@ -5,7 +5,7 @@ from app.core.enums import AnalysisCriteria, ChatIntent, SortPreference, TravelC
 class ArrayAction(BaseModel):
     field_name: Literal["preferred_airlines"] = Field(..., description="Tên mảng cần thao tác (chỉ hỗ trợ preferred_airlines).")
     action: Literal["ADD", "REMOVE"] = Field(..., description="Thêm (ADD) hoặc Xóa (REMOVE).")
-    values: List[str] = Field(..., description="Mã hãng bay. VD: ['VJ']")
+    values: List[str] = Field(..., description="Mã hãng bay. VD: ['VJ', 'VN']")
 
 class SearchFiltersParams(BaseModel):
     origin: Optional[str] = Field(None, description="Mã IATA điểm ĐI")
@@ -19,52 +19,37 @@ class SearchFiltersParams(BaseModel):
     adults: Optional[int] = Field(None, ge=1, description="Số lượng người lớn.")
     children: Optional[int] = Field(None, description="Số lượng trẻ em (2-11 tuổi).")
     infants: Optional[int] = Field(None, description="Số lượng em bé / trẻ sơ sinh (dưới 2 tuổi).")
-    need_age_confirmation: Optional[bool] = Field(None, description="CHỈ trả về True NẾU khách KHÔNG nói rõ số tuổi/tháng tuổi cụ thể. Nếu khách ĐÃ CUNG CẤP TUỔI rõ ràng (VD: '7 tuổi', '18 tháng'), TUYỆT ĐỐI set bằng False hoặc Null.")
+    need_age_confirmation: Optional[bool] = Field(None, description="True NẾU có trẻ em mà KHÔNG rõ tuổi cụ thể. False hoặc Null nếu đã rõ tuổi.")
     preferred_airlines: Optional[List[str]] = Field(None, description="Mã hãng bay khách CHỈ ĐỊNH lọc (VD: ['VN']).")
-    maxPrice: Optional[int] = Field(None, description="Mức giá tối đa (VNĐ) khách yêu cầu.")
-    nonStop: Optional[bool] = Field(None, description="True nếu chỉ tìm chuyến bay thẳng.")
+    maxPrice: Optional[int] = Field(None, description="Mức giá tối đa (VNĐ).")
+    nonStop: Optional[bool] = Field(None, description="True nếu tìm chuyến bay thẳng.")
     start_hour: Optional[int] = Field(None, description="Giờ bay sớm nhất (0-23).")
     end_hour: Optional[int] = Field(None, description="Giờ bay muộn nhất (0-23).")
     
     sort_preference: Optional[SortPreference] = Field(
-        None, 
-        description="Tiêu chí sắp xếp vé sau khi lọc: GIÁ (price), THỜI GIAN BAY (duration), GIỜ BAY (departure_time)."
+        None, description="Tiêu chí sắp xếp: price_asc, price_desc, departure_time..."
     )
-
-    clear_fields: Optional[List[str]] = Field(None, description="Tên các biến muốn HỦY BỎ. VD: Bỏ lọc giá -> ['maxPrice'].")
-    array_actions: Optional[List[ArrayAction]] = Field(None, description="Dùng để THÊM/BỚT hãng bay. VD: Bỏ VJ -> action: REMOVE, values: ['VJ']")
+    clear_fields: Optional[List[str]] = Field(None, description="Các biến muốn HỦY. VD: ['maxPrice']")
+    array_actions: Optional[List[ArrayAction]] = Field(None, description="THÊM/BỚT hãng bay.")
 
 class ActionTargetsParams(BaseModel):
     compare_flights: Optional[List[str]] = Field(
         default=None, 
-        description="Mã chuyến bay CỤ THỂ khách muốn hỏi/so sánh (VD: ['VN208']). TUYỆT ĐỐI không điền chữ chung chung vào đây."
+        description="MÃ CHUYẾN BAY (VD: VN123). ĐỂ NULL nếu khách không đọc mã số cụ thể. KHÔNG TỰ BỊA MÃ."
     )
     compare_airlines: Optional[List[str]] = Field(
-        default=None, 
-        description="Mã hãng bay khách muốn hỏi chính sách/so sánh (VD: ['VN', 'VJ'])."
+        default=None, description="Mã hãng bay cần so sánh (VD: ['VN', 'VJ'])."
     )
     analysis_criteria: Optional[List[AnalysisCriteria]] = Field(
-        default=None, 
-        description="Chủ đề khách muốn hỏi (hành lý, chỗ ngồi...)."
+        default=None, description="Chủ đề hỏi (hành lý, chỗ ngồi...)."
     )
 
 class Task(BaseModel):
     intent: ChatIntent = Field(..., description="Phân loại ý định.")
     
-    search_filters: Optional[SearchFiltersParams] = Field(
-        None, 
-        description="CHỨA ĐIỀU KIỆN TÌM KIẾM, LỌC & SẮP XẾP. VD: Giá tiền (maxPrice), ngày tháng, sắp xếp (sort_preference), hãng bay."
-    )
-    
-    action_targets: Optional[ActionTargetsParams] = Field(
-        None, 
-        description="CHỈ CHỨA ĐỐI TƯỢNG ĐỂ SO SÁNH (Mã chuyến bay, Mã hãng bay). TUYỆT ĐỐI KHÔNG điền giá tiền hay bộ lọc vào giỏ này."
-    )
-    
-    query_context: Optional[str] = Field(
-        None, 
-        description="Trích xuất NGUYÊN VĂN đoạn chat của khách hàng tương ứng với tác vụ này. BẮT BUỘC giữ nguyên từng chữ, từng dấu câu. TUYỆT ĐỐI KHÔNG tóm tắt, diễn đạt lại hay sửa lỗi chính tả."
-    )
+    search_filters: Optional[SearchFiltersParams] = Field(None, description="Điều kiện TÌM KIẾM, LỌC & SẮP XẾP.")
+    action_targets: Optional[ActionTargetsParams] = Field(None, description="Đối tượng để SO SÁNH (Mã chuyến, Mã hãng).")
+    query_context: Optional[str] = Field(None, description="Trích nguyên văn câu nói của khách hàng.")
 
 class ExtractionOutput(BaseModel):
     tasks: List[Task] = Field(..., description="Danh sách tác vụ bóc tách.")
