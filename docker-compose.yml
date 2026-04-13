@@ -6,7 +6,7 @@ services:
     container_name: flight_chatbot_db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: huy123456789
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: flight_chatbot
     ports:
       - "5432:5432"
