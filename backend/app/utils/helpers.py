@@ -1,31 +1,32 @@
+import json
+import os
 from typing import Optional
 
 from typing import Union, List
-# Giả sử bạn đã import TaskItem từ schemas của bạn
-# from app.schemas.chat_state import TaskItem 
+
+from typing import Union
 
 def consume_task(tasks: list, expected_intents: Union[str, list], next_task=None) -> list:
     """
-    Kiểm tra task đầu tiên trong danh sách.
-    Nếu đúng là nhiệm vụ của Node hiện tại (nằm trong expected_intents), thì "nuốt" nó (xóa đi).
-    Nếu không phải, giữ nguyên danh sách.
-    ĐẶC BIỆT: Nếu có next_task (Dùng cho Fallback), chèn nó vào vị trí ưu tiên cao nhất.
+    Tìm và "nuốt" (xóa) task ĐẦU TIÊN trong hàng đợi khớp với expected_intents (Bất kể vị trí nào).
+    Nếu không tìm thấy, giữ nguyên danh sách.
+    ĐẶC BIỆT: Nếu có next_task (Dùng cho Fallback), chèn nó vào vị trí ưu tiên cao nhất (index 0).
     """
-    remaining_tasks = []
-    
-    if tasks:
+    if not tasks:
+        remaining_tasks = []
+    else:
         if isinstance(expected_intents, str):
             expected_intents = [expected_intents]
             
-        current_task = tasks[0]
+        remaining_tasks = tasks.copy()
         
-        intent_val = current_task.intent.value if hasattr(current_task.intent, 'value') else str(current_task.intent)
-        
-        if intent_val in expected_intents:
-            remaining_tasks = tasks[1:]
-        else:
-            remaining_tasks = tasks.copy()
-
+        for i, task in enumerate(remaining_tasks):
+            intent_val = task.intent.value if hasattr(task.intent, 'value') else str(task.intent)
+            
+            if intent_val in expected_intents:
+                remaining_tasks.pop(i)
+                break
+            
     if next_task:
         remaining_tasks.insert(0, next_task)
         
@@ -85,3 +86,47 @@ def overwrite_dict(left: dict, right: dict) -> dict:
     if not right:
         return {}
     return right
+
+
+def load_test_cases(file_path: str):
+    if not os.path.exists(file_path):
+        return []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+    
+import json
+
+def evaluate_turn_with_llm(
+    judge_chain, 
+    user_query, 
+    exp_behavior, 
+    expected_tasks_json,
+    actual_tasks_json,
+    bot_action, 
+    bot_response
+) -> dict:
+    try:
+        safe_data = {
+            "user_query": str(user_query or "None"),
+            "expected_behavior": str(exp_behavior or "None"),
+            
+            "expected_tasks_json": expected_tasks_json, 
+            "actual_tasks_json": actual_tasks_json,     
+            
+            "bot_action": json.dumps(bot_action, ensure_ascii=False) if bot_action else "None",
+            "bot_response": "\n".join([str(x) for x in bot_response]) if isinstance(bot_response, list) else str(bot_response or "None")
+        }
+        result = judge_chain.invoke(safe_data)
+        return {"score": result.score, "reason": result.reason}
+    except Exception as e:
+        return {"score": 0, "reason": f"Lỗi chấm điểm lượt: {str(e)}"}
+
+def evaluate_scenario_with_llm(scenario_judge_chain, description, conversation_history) -> dict:
+    try:
+        result = scenario_judge_chain.invoke({
+            "description": description, 
+            "conversation_history": conversation_history
+        })
+        return {"scenario_score": result.scenario_score, "scenario_reason": result.scenario_reason}
+    except Exception as e:
+        return {"scenario_score": 0, "scenario_reason": f"Lỗi chấm điểm kịch bản: {str(e)}"}

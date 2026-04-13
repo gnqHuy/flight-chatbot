@@ -53,7 +53,6 @@ const FlightListContainer = ({
     fetchFlights();
   }, [searchId]);
 
-  // 🌟 MỚI: ENGINE LỌC & SẮP XẾP TẠI FRONTEND (Dùng useMemo để tối ưu hiệu năng)
   const displayedFlights = useMemo(() => {
     if (!allFlights || allFlights.length === 0) return [];
 
@@ -71,22 +70,31 @@ const FlightListContainer = ({
       return carrierCode === activeTab;
     });
 
-    // 2. Lọc theo Active Filters (Giá, Giờ, Bay thẳng)
+    // 2. Lọc theo Active Filters (Giá, Giờ, Bay thẳng, Hạng ghế)
     if (Object.keys(activeFilters).length > 0) {
       result = result.filter((f) => {
         let isMatch = true;
 
+        // 🌟 BỔ SUNG: Lọc Hạng ghế (travelClass)
+        if (isMatch && activeFilters.travelClass) {
+          if (f.cabin?.toUpperCase() !== activeFilters.travelClass.toUpperCase()) {
+            isMatch = false;
+          }
+        }
+
         // Lọc giá
-        if (activeFilters.maxPrice) {
+        if (isMatch && activeFilters.maxPrice) {
           if (Number(f.price || 0) > Number(activeFilters.maxPrice)) isMatch = false;
         }
 
         // Lọc bay thẳng
         if (isMatch && activeFilters.nonStop === true) {
           const segmentDetails = f.itineraries?.[0]?.segmentDetails || [];
-          if (segmentDetails.length > 1 || f.itineraries?.[0]?.stops < 2) isMatch = false;
+          // Chú ý: logic cũ của bạn stops < 2 hơi nguy hiểm, nên check đúng length
+          if (segmentDetails.length > 1) isMatch = false;
         }
 
+        // Lọc giờ bay
         if (
           isMatch &&
           (activeFilters.start_hour !== undefined || activeFilters.end_hour !== undefined)
@@ -116,7 +124,6 @@ const FlightListContainer = ({
         const priceA = Number(a.price || 0);
         const priceB = Number(b.price || 0);
 
-        // Amadeus thường để thời gian sâu bên trong, fallback an toàn
         const timeA =
           (a as any).departureTime ||
           a.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at ||
@@ -128,9 +135,9 @@ const FlightListContainer = ({
 
         switch (activeSort) {
           case 'price_desc':
-            return priceB - priceA;
+            return priceB - priceA; // Giá đắt nhất lên đầu
           case 'price_asc':
-            return priceA - priceB;
+            return priceA - priceB; // Giá rẻ nhất lên đầu
           case 'departure_time':
             return timeA.localeCompare(timeB);
           case 'arrival_time':

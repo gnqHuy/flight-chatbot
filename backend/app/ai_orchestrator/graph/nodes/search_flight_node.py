@@ -9,6 +9,7 @@ def search_flights_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM TỔNG THỂ (API SEARCH) ---")
     
     search_filters = state.get("search_filters", {})
+    current_search_id = state.get("current_search_id")
     current_tasks = state.get("tasks", [])
     remaining_tasks = consume_task(current_tasks, ["search_flight"])
     
@@ -22,6 +23,20 @@ def search_flights_node(state: ChatState) -> dict:
             "search_filters": state_updates if state_updates else {} 
         }
 
+    if current_search_id and current_search_id != "CLEAR":
+        cached_data = redis_service.get_flight_offers(current_search_id)
+        if cached_data:
+            return {
+                "node_results": [f"{ContextTag.FLIGHT_FOUND}: Đã tải lại danh sách vé từ bộ nhớ tạm."],
+                "action": {
+                    "type": "flight_list",
+                    "payload": {"search_id": current_search_id}
+                },
+                "tasks": remaining_tasks
+            }
+        else:
+            print(f"⚠️ [CACHE MISS]: Phiên {current_search_id} đã hết hạn. Chuẩn bị kéo API mới...")
+
     origin = search_filters.get("origin")
     destination = search_filters.get("destination")
     departureDate = search_filters.get("departureDate")
@@ -33,11 +48,12 @@ def search_flights_node(state: ChatState) -> dict:
             origin=origin,
             destination=destination,
             departureDate=departureDate,
-            roundTrip=search_filters.get("isRoundTrip", False),
+            roundTrip=search_filters.get("roundTrip", False),
             returnDate=search_filters.get("returnDate"),
             adults=search_filters.get("adults", 1),
             children=search_filters.get("children", 0),
             infants=search_filters.get("infants", 0),
+            travelClass=search_filters.get("travelClass"),
             includedAirlines=SUPPORTED_AIRLINES,
             max_offers=MAX_FLIGHTS_RETURNED
         )
@@ -47,7 +63,7 @@ def search_flights_node(state: ChatState) -> dict:
                 "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không tìm thấy chuyến bay nào của VN, VJ, QH cho hành trình này."], 
                 "action": None, 
                 "tasks": remaining_tasks,
-                "current_search_id": "NOT_FOUND"
+                "current_search_id": "CLEAR"
             }
         
         search_id = redis_service.save_flight_offers(flights)

@@ -24,7 +24,7 @@ def route_tasks(state: ChatState) -> str:
         ChatIntent.SEARCH_FLIGHT.value: "search_flights",
         ChatIntent.FILTER_SORT_FLIGHTS.value: "filter_sort_flights",
         ChatIntent.ANALYZE_FLIGHTS.value: "analyze_flights",
-        ChatIntent.GENERAL_QUESTION.value: "policy_retrieval_node",
+        ChatIntent.POLICY_QUESTION.value: "policy_retrieval_node",
         ChatIntent.PROMO_SEARCH.value: "promo_retrieval_node"
     }
 

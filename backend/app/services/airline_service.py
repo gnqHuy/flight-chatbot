@@ -23,7 +23,7 @@ class AirlineService:
             if not airlines:
                 return ""
                 
-            context = "🔍 [THÔNG TIN KIẾN THỨC CHUẨN VỀ CÁC HÃNG BAY ĐỂ PHÂN TÍCH]\n"
+            context = ""
             for al in airlines:
                 context += f"--- Hãng {al.name} ({al.code}) ---\n"
                 
@@ -42,11 +42,6 @@ class AirlineService:
                     context += f"Hành lý: {al.baggage_basic_info}\n"
                     
                 context += "\n"
-                
-            context += (
-                "⚠️ LƯU Ý CHO AI: Hãy CĂN CỨ VÀO THÔNG TIN TRÊN để so sánh và tư vấn khéo léo cho khách. "
-                "TUYỆT ĐỐI KHÔNG tự bịa thêm ưu/nhược điểm ngoài dữ liệu này."
-            )
             
             return context
 

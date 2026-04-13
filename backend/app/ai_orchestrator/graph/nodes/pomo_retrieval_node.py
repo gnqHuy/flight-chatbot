@@ -1,14 +1,13 @@
-import os
 from datetime import datetime
 from sqlmodel import Session, select, or_
-from langchain_openai import OpenAIEmbeddings
 
 from app.ai_orchestrator.graph.state import ChatState
 from app.database.database import engine
 from app.database.models.airline import Airline
 from app.database.models.flight_promotion import FlightPromotion
 from app.utils.helpers import consume_task
-from app.core.constants import ContextTag
+from app.core.constants import CURRENT_TIME, CURRENT_TIME_STR, ContextTag
+from app.ai_orchestrator.rag.vector_store import shared_embeddings
 
 def promo_retrieval_node(state: ChatState) -> dict:
     print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (HYBRID RAG + SQL) ---")
@@ -28,8 +27,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
     docs = []
     
     try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        query_vector = embeddings.embed_query(query)
+        query_vector = shared_embeddings.embed_query(query)
         
         with Session(engine) as session:
             stmt = select(FlightPromotion)
@@ -39,7 +37,7 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 if airline_obj:
                     stmt = stmt.where(FlightPromotion.airline_id == airline_obj.id)
             
-            today = datetime.now().date()
+            today = CURRENT_TIME.date()
             stmt = stmt.where(
                 or_(
                     FlightPromotion.booking_end_date == None,
@@ -58,10 +56,9 @@ def promo_retrieval_node(state: ChatState) -> dict:
                 "tasks": remaining_tasks 
             }
         
-        current_date_str = datetime.now().strftime("%d/%m/%Y")
+        current_date_str = CURRENT_TIME_STR
         result_string = (
             f"{ContextTag.PROMO_INFO}\n"
-            f"--- KẾT QUẢ TRA CỨU KHUYẾN MÃI TƯƠNG ĐỒNG ---\n"
             f"- CÂU HỎI: '{query}'\n"
             f"- NGÀY HỆ THỐNG: {current_date_str}\n"
         )

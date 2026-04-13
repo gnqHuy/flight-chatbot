@@ -44,3 +44,5 @@ pypdf
 beautifulsoup4
 playwright
 chromium
+pandas
+openpyxl

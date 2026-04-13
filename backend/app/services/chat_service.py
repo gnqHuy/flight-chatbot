@@ -11,7 +11,7 @@ class ChatService:
         self.conversation_repo = conversation_repo
         self.message_repo = message_repo
 
-    async def process_message(self, conversation_id: str | None, user_message: str, ui_context: dict | None = None):
+    async def process_message(self, conversation_id: uuid.UUID | None, user_message: str, ui_context: dict | None = None):
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
             self.conversation_repo.create(id=conversation_id, title="New Chat")
