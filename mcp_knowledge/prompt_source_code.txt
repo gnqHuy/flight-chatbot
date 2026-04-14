@@ -1,0 +1,1505 @@
+=== CẤU TRÚC THƯ MỤC DỰ ÁN ===
+[/]
+    constants.py
+    server.py
+[models/]
+    airline.py
+    crawler_staging.py
+    crawler_url.py
+    enums.py
+    flight_promotion.py
+    __init__.py
+[repositories/]
+    crawler_staging_repo.py
+    crawler_url_repo.py
+    flight_promotion_repo.py
+[schemas/]
+    promotion.py
+[services/]
+    [data_pipeline/]
+        [extractors/]
+            policy_extractor.py
+            promo_extractor.py
+            [crawlers/]
+                crawler_for_QH.py
+                crawler_for_VJ.py
+                crawler_for_VN.py
+        [ingest/]
+            policy_ingester.py
+            promo_ingester.py
+        [pineline/]
+            policy_pipeline.py
+            promo_pipeline.py
+        [post_processing/]
+            post_processing_policies.py
+            post_processing_promo.py
+    [rag/]
+        policy_retrieval.py
+        promo_retrieval.py
+        vector_store.py
+[utils/]
+    database.py
+
+
+============================================================
+=== CHI TIẾT NỘI DUNG SOURCE CODE ===
+============================================================
+
+============================================================
+FILE: app/constants.py
+============================================================
+from datetime import datetime
+
+SUPPORTED_AIRLINES   = ["VN", "VJ", "QH"]
+CURRENT_TIME         = datetime.now()
+CURRENT_TIME_STR     = CURRENT_TIME.strftime("%Y-%m-%d %H:%M")
+
+class ContextTag:
+    PROMO_INFO    = "[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]"
+    POLICY_INFO   = "[KIẾN THỨC NGHIỆP VỤ CHÍNH SÁCH]"
+    SYS_NOT_FOUND = "[KHÔNG TÌM THẤY DỮ LIỆU]"
+    SYS_ERROR     = "[TRỤC TRẶC HỆ THỐNG]"
+
+============================================================
+FILE: app/server.py
+============================================================
+"""
+mcp_knowledge/server.py
+MCP Knowledge Server — policy RAG + promo RAG + ETL pipeline triggers.
+Transport: SSE (FastMCP built-in), port 8002.
+"""
+import os, logging
+from collections import defaultdict
+from sqlmodel import Session, select, or_
+from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
+# FIX [1][2]: import đúng paths
+from constants import SUPPORTED_AIRLINES, CURRENT_TIME, CURRENT_TIME_STR, ContextTag
+from services.rag.vector_store import get_policy_vector_store, get_embeddings  # FIX [1]
+from utils.database import engine                                               
+from models.airline import Airline                                              
+from models.flight_promotion import FlightPromotion                            
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("mcp-knowledge")
+
+mcp = FastMCP("KnowledgeServer")
+
+
+# ── Tool 1: search_airline_policies ───────────────────────────────────────────
+@mcp.tool()
+def search_airline_policies(query: str, airline_codes: list[str] | None = None) -> str:
+    """Tra cứu chính sách, quy định của các hãng hàng không."""
+    logger.info(f"[policy] query='{query}' airlines={airline_codes}")
+    target_airlines = (
+        [c.upper() for c in airline_codes if c != "CLEAR"]
+        if airline_codes and "CLEAR" not in airline_codes
+        else []
+    )
+    try:
+        store = get_policy_vector_store()
+        docs  = []
+        if target_airlines:
+            for al in target_airlines:
+                docs.extend(store.similarity_search(query, k=3, filter={"airline": al}))
+        else:
+            for al in SUPPORTED_AIRLINES:
+                docs.extend(store.similarity_search(query, k=2, filter={"airline": al}))
+
+        if not docs:
+            return f"{ContextTag.SYS_NOT_FOUND}: Không tìm thấy thông tin chính sách."
+
+        grouped = defaultdict(list)
+        for doc in docs:
+            airline = doc.metadata.get("airline", "UNKNOWN").upper()
+            url     = doc.metadata.get("source_url", "Không có link")
+            content = " ".join(doc.page_content.replace("\n", " ").split()).strip()
+            if not any(i["content"] == content for i in grouped[airline]):
+                grouped[airline].append({"content": content, "url": url})
+
+        result = f"{ContextTag.POLICY_INFO}\n- CÂU HỎI: '{query}'\n- NỘI DUNG TRA CỨU:\n"
+        for airline, items in grouped.items():
+            result += f"\n▶ QUY ĐỊNH CỦA HÃNG {airline}:\n"
+            for i, item in enumerate(items, 1):
+                result += f"  {i}. {item['content']}\n     [Link]: {item['url']}\n"
+        return result.strip()
+    except Exception as e:
+        logger.exception("search_airline_policies error")
+        return f"{ContextTag.SYS_ERROR}: Lỗi hệ thống: {str(e)}"
+
+
+# ── Tool 2: get_active_promotions ─────────────────────────────────────────────
+@mcp.tool()
+def get_active_promotions(query: str, airline_code: str | None = None) -> str:
+    """Tìm kiếm các chương trình khuyến mãi vé máy bay."""
+    logger.info(f"[promo] query='{query}' airline={airline_code}")
+    try:
+        embeddings   = get_embeddings()          # FIX [1]
+        query_vector = embeddings.embed_query(query)
+
+        with Session(engine) as session:
+            stmt = select(FlightPromotion)
+            if airline_code:
+                airline_obj = session.exec(
+                    select(Airline).where(Airline.code == airline_code.upper())
+                ).first()
+                if airline_obj:
+                    stmt = stmt.where(FlightPromotion.airline_id == airline_obj.id)
+            stmt = stmt.where(
+                or_(FlightPromotion.booking_end_date == None,
+                    FlightPromotion.booking_end_date >= CURRENT_TIME.date())
+            ).order_by(
+                FlightPromotion.embedding.cosine_distance(query_vector)
+            ).limit(3)
+            docs = list(session.exec(stmt).all())
+
+        if not docs:
+            return f"{ContextTag.SYS_NOT_FOUND}: Không có khuyến mãi phù hợp."
+
+        result = f"{ContextTag.PROMO_INFO}\n- CÂU HỎI: '{query}'\n- NGÀY: {CURRENT_TIME_STR}\n"
+        for i, p in enumerate(docs, 1):
+            b_end = p.booking_end_date.strftime("%d/%m/%Y") if p.booking_end_date else "Không giới hạn"
+            result += f"\n▶ {i}. {p.promo_name}\n   - Mã: {p.promo_code}\n   - Hạn: {b_end}\n   - Chi tiết: {p.description}\n   - [Link]: {p.url}\n"
+        return result.strip()
+    except Exception as e:
+        logger.exception("get_active_promotions error")
+        return f"{ContextTag.SYS_ERROR}: Lỗi tra cứu khuyến mãi: {str(e)}"
+
+
+# ── Tool 3: run_policy_pipeline ───────────────────────────────────────────────
+@mcp.tool()
+def run_policy_pipeline() -> str:
+    """Chạy toàn bộ ETL pipeline cho chính sách: crawl → format → ingest vector DB."""
+    logger.info("[pipeline] Starting policy ETL...")
+    try:
+        from services.data_pipeline.pineline.policy_pipeline import PolicyETLPipeline
+        ok = PolicyETLPipeline().run_pipeline()
+        return "✅ Policy pipeline hoàn tất." if ok else "❌ Policy pipeline thất bại."
+    except Exception as e:
+        logger.exception("run_policy_pipeline error")
+        return f"❌ Lỗi: {str(e)}"
+
+
+# ── Tool 4: run_promo_pipeline ────────────────────────────────────────────────
+@mcp.tool()
+def run_promo_pipeline() -> str:
+    """Chạy toàn bộ ETL pipeline cho khuyến mãi: discover → crawl → extract → ingest."""
+    logger.info("[pipeline] Starting promo ETL...")
+    try:
+        from services.data_pipeline.pineline.promo_pipeline import PromotionETLPipeline
+        ok = PromotionETLPipeline().run_pipeline()
+        return "✅ Promo pipeline hoàn tất." if ok else "❌ Promo pipeline thất bại."
+    except Exception as e:
+        logger.exception("run_promo_pipeline error")
+        return f"❌ Lỗi: {str(e)}"
+
+
+# ── Tool 5: get_pipeline_status ───────────────────────────────────────────────
+@mcp.tool()
+def get_pipeline_status() -> str:
+    """Xem số lượng tasks theo status trong staging table."""
+    try:
+        from repositories.crawler_staging_repo import CrawlerStagingRepository
+        with Session(engine) as s:
+            counts = CrawlerStagingRepository(s).count_by_status()
+        return "\n".join(f"  {k}: {v}" for k, v in counts.items())
+    except Exception as e:
+        return f"❌ Lỗi: {str(e)}"
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8002"))
+    host = os.getenv("HOST", "0.0.0.0")
+    logger.info(f"🚀 Starting KnowledgeServer at http://{host}:{port}/sse")
+    # FIX [16]: thêm host parameter
+    mcp.run(transport="sse", host=host, port=port)
+
+============================================================
+FILE: app/models\airline.py
+============================================================
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, JSON, Text
+from typing import Optional, List
+
+class Airline(SQLModel, table=True):
+    __tablename__ = "airlines"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(index=True, unique=True, max_length=10)
+    name: str = Field(max_length=100)
+    website_url: str = Field(max_length=255)
+    logo_url: Optional[str] = Field(default=None, max_length=500)
+    hotline: Optional[str] = Field(default=None, max_length=50)
+    
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    pros: Optional[List[str]] = Field(default=[], sa_column=Column(JSON))
+    cons: Optional[List[str]] = Field(default=[], sa_column=Column(JSON))
+    baggage_basic_info: Optional[str] = Field(default=None, sa_column=Column(Text))
+
+    promotions: List["FlightPromotion"] = Relationship(back_populates="airline")
+    crawler_urls: List["CrawlerUrl"] = Relationship(back_populates="airline")
+
+============================================================
+FILE: app/models\crawler_staging.py
+============================================================
+from sqlmodel import Relationship, SQLModel, Field
+from sqlalchemy import Column, Text, JSON, Enum as SaEnum
+from typing import Optional
+from datetime import datetime, timezone
+from enums import StagingStatus
+
+class CrawlerStaging(SQLModel, table=True):
+    __tablename__ = "crawler_staging"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    url_id: int = Field(foreign_key="crawler_urls.id", index=True)
+    airline_id: int = Field(foreign_key="airlines.id")
+    
+    raw_text: Optional[str] = Field(default=None, sa_column=Column(Text))
+    formatted_data: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    
+    status: StagingStatus = Field(
+        default=StagingStatus.PENDING, 
+        sa_column=Column(SaEnum(StagingStatus), nullable=False, index=True)
+    )
+    
+    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    url_obj: Optional["CrawlerUrl"] = Relationship(back_populates="stagings")
+
+============================================================
+FILE: app/models\crawler_url.py
+============================================================
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, String, Enum as SaEnum
+from typing import Optional
+from datetime import datetime
+from enums import UrlType
+
+class CrawlerUrl(SQLModel, table=True):
+    __tablename__ = "crawler_urls"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    airline_id: int = Field(foreign_key="airlines.id", index=True)
+    
+    url_type: UrlType = Field(sa_column=Column(SaEnum(UrlType)))
+    category: Optional[str] = Field(default=None, max_length=100)
+    url: str = Field(sa_column=Column(String(1000)))
+    
+    is_active: bool = Field(default=True)
+    last_crawled_at: Optional[datetime] = Field(default=None)
+    
+    airline: Optional["Airline"] = Relationship(back_populates="crawler_urls"
+                                                )
+    stagings: list["CrawlerStaging"] = Relationship(back_populates="url_obj")
+
+============================================================
+FILE: app/models\enums.py
+============================================================
+from enum import Enum
+
+class UrlType(str, Enum):
+    POLICY_PAGE = "policy_page"
+    PROMO_LIST_PAGE = "promo_list_page"
+    PROMO_PAGE = "promo_page"
+
+class StagingStatus(str, Enum):
+    PENDING = "PENDING"
+    CRAWLED = "CRAWLED"
+    LLM_FORMATTED = "LLM_FORMATTED"
+    COMPLETED = "COMPLETED"
+    ERROR = "ERROR"
+
+============================================================
+FILE: app/models\flight_promotion.py
+============================================================
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, Text, Date
+from datetime import datetime, date, timezone
+from typing import Optional, List
+from pgvector.sqlalchemy import Vector
+from airline import Airline
+
+class FlightPromotion(SQLModel, table=True):
+    __tablename__ = "flight_promotions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    airline_id: int = Field(foreign_key="airlines.id", index=True)
+    
+    promo_code: Optional[str] = Field(default=None, max_length=50, index=True)
+    promo_name: str = Field(sa_column=Column(Text, nullable=False))
+    
+    booking_start_date: Optional[date] = Field(default=None, sa_column=Column(Date))
+    booking_end_date: Optional[date] = Field(default=None, sa_column=Column(Date, index=True))
+    
+    travel_start_date: Optional[date] = Field(default=None, sa_column=Column(Date))
+    travel_end_date: Optional[date] = Field(default=None, sa_column=Column(Date, index=True))
+    
+    description: str = Field(sa_column=Column(Text, nullable=False))
+    conditions: str = Field(sa_column=Column(Text, nullable=False))
+    url: str = Field(sa_column=Column(Text, nullable=False))
+
+    embedding: Optional[List[float]] = Field(
+        default=None, 
+        sa_column=Column(Vector(1536))
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    airline: Optional["Airline"] = Relationship(back_populates="promotions")
+
+============================================================
+FILE: app/models\__init__.py
+============================================================
+from .enums import StagingStatus, UrlType
+from .airline import Airline
+from .crawler_url import CrawlerUrl
+from .crawler_staging import CrawlerStaging
+from .flight_promotion import FlightPromotion
+
+============================================================
+FILE: app/repositories\crawler_staging_repo.py
+============================================================
+from sqlmodel import Session, select
+from sqlalchemy.orm import joinedload
+from typing import List, Optional
+from models.enums import UrlType, StagingStatus          # FIX
+from models.crawler_staging import CrawlerStaging
+from models.crawler_url import CrawlerUrl
+
+
+class CrawlerStagingRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def save_raw_content(self, url_id: int, airline_id: int, raw_text: str) -> CrawlerStaging:
+        existing = self.session.exec(
+            select(CrawlerStaging).where(CrawlerStaging.url_id == url_id)
+        ).first()
+        if existing:
+            existing.raw_text      = raw_text
+            existing.status        = StagingStatus.CRAWLED
+            existing.error_message = None
+            obj = existing
+        else:
+            obj = CrawlerStaging(
+                url_id=url_id, airline_id=airline_id,
+                raw_text=raw_text, status=StagingStatus.CRAWLED,
+            )
+        self.session.add(obj)
+        return obj
+
+    def get_pending_llm_tasks(self, url_type: UrlType, limit: int = 500) -> List[CrawlerStaging]:
+        return list(self.session.exec(
+            select(CrawlerStaging)
+            .join(CrawlerUrl, CrawlerStaging.url_id == CrawlerUrl.id)
+            .where(CrawlerStaging.status == StagingStatus.CRAWLED)
+            .where(CrawlerUrl.url_type == url_type)
+            .options(joinedload(CrawlerStaging.url_obj))
+            .limit(limit)
+        ).all())
+
+    def update_formatted_data(self, staging_id: int, json_data: dict):
+        obj = self.session.get(CrawlerStaging, staging_id)
+        if obj:
+            obj.formatted_data = json_data
+            obj.status         = StagingStatus.LLM_FORMATTED
+            self.session.add(obj)
+
+    def mark_as_error(self, staging_id: int, error_msg: str):
+        obj = self.session.get(CrawlerStaging, staging_id)
+        if obj:
+            obj.status        = StagingStatus.ERROR
+            obj.error_message = error_msg
+            self.session.add(obj)
+
+    def get_by_url_id(self, url_id: int) -> Optional[CrawlerStaging]:
+        return self.session.exec(
+            select(CrawlerStaging).where(CrawlerStaging.url_id == url_id)
+        ).first()
+
+    def count_by_status(self) -> dict:
+        from sqlmodel import func
+        return {
+            s.value: self.session.exec(
+                select(func.count(CrawlerStaging.id))
+                .where(CrawlerStaging.status == s)
+            ).one()
+            for s in StagingStatus
+        }
+
+============================================================
+FILE: app/repositories\crawler_url_repo.py
+============================================================
+from sqlmodel import Session, select
+from typing import List, Optional
+from models.crawler_url import CrawlerUrl
+from models.enums import UrlType
+
+
+class CrawlerUrlRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def get_active_urls(self, url_type: Optional[UrlType] = None) -> List[CrawlerUrl]:
+        q = select(CrawlerUrl).where(CrawlerUrl.is_active == True)
+        if url_type:
+            q = q.where(CrawlerUrl.url_type == url_type)
+        return list(self.session.exec(q).all())
+
+    def get_urls_by_airline(self, airline_id: int) -> List[CrawlerUrl]:
+        return list(self.session.exec(
+            select(CrawlerUrl).where(CrawlerUrl.airline_id == airline_id)
+        ).all())
+
+    def create(self, url_obj: CrawlerUrl) -> CrawlerUrl:
+        self.session.add(url_obj)
+        self.session.commit()
+        self.session.refresh(url_obj)
+        return url_obj
+
+    def get_by_id(self, url_id: int) -> Optional[CrawlerUrl]:
+        return self.session.get(CrawlerUrl, url_id)
+
+============================================================
+FILE: app/repositories\flight_promotion_repo.py
+============================================================
+from sqlmodel import Session, select
+from typing import List, Optional
+from datetime import date
+from models.flight_promotion import FlightPromotion   # FIX
+
+
+class FlightPromotionRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def get_active_promotions(self, target_airline_id: Optional[int] = None) -> List[FlightPromotion]:
+        today = date.today()
+        q = select(FlightPromotion).where(
+            (FlightPromotion.booking_end_date == None) |
+            (FlightPromotion.booking_end_date >= today)
+        )
+        if target_airline_id:
+            q = q.where(FlightPromotion.airline_id == target_airline_id)
+        return list(self.session.exec(q).all())
+
+============================================================
+FILE: app/schemas\promotion.py
+============================================================
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class Promotion(BaseModel):
+    promo_code: Optional[str] = Field(
+        description="Mã giảm giá (Ví dụ: THU5RR, FALL2024...). Nếu trong bài không đề cập mã cụ thể, trả về null."
+    )
+    promo_name: str = Field(
+        description="Tên chương trình khuyến mãi hoặc Tiêu đề tóm tắt."
+    )
+    booking_start_date: Optional[str] = Field(
+        description="Ngày bắt đầu mở bán/áp dụng (Định dạng YYYY-MM-DD). Nếu không rõ, trả về null."
+    )
+    booking_end_date: Optional[str] = Field(
+        description="Ngày kết thúc mở bán/hết hạn (Định dạng YYYY-MM-DD). RẤT QUAN TRỌNG. Nếu không rõ, trả về null."
+    )
+    travel_start_date: Optional[str] = Field(
+        description="Ngày bắt đầu thời gian bay áp dụng (Định dạng YYYY-MM-DD). Trả về null nếu không có."
+    )
+    travel_end_date: Optional[str] = Field(
+        description="Ngày kết thúc thời gian bay áp dụng (Định dạng YYYY-MM-DD). Trả về null nếu không có."
+    )
+    description: str = Field(
+        description="Mô tả ngắn gọn về mức giảm giá, chặng bay áp dụng (Khoảng 4-5 câu)."
+    )
+    conditions: str = Field(
+        description="Điều kiện áp dụng (hạng vé, ngoại trừ lễ tết, đối tượng áp dụng...). Tóm tắt dạng gạch đầu dòng."
+    )
+
+============================================================
+FILE: app/services\data_pipeline\extractors\policy_extractor.py
+============================================================
+import os, time, logging
+from sqlmodel import Session
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from repositories.crawler_staging_repo import CrawlerStagingRepository
+from models.enums import UrlType                                  
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = (
+    "Bạn là một chuyên gia Data Engineer. Nhiệm vụ: nhận văn bản thô cào từ website hàng không "
+    "và định dạng lại thành Markdown sạch để nạp vào hệ thống RAG.\n\n"
+    "QUY TẮC:\n"
+    "1. KHÔNG thêm, bớt hay bịa đặt thông tin (đặc biệt là giá tiền, số kg, kích thước).\n"
+    "2. Dùng Heading (##, ###) cho tiêu đề chính/phụ.\n"
+    "3. TUYỆT ĐỐI KHÔNG dùng bảng (|...|). Chuyển bảng thành bullet points đầy đủ ngữ cảnh.\n"
+    "4. In đậm (**) các từ khóa quan trọng, số tiền, trọng lượng.\n"
+    "5. Xóa nội dung rác (bản quyền, menu, footer).\n"
+    "Chỉ trả về Markdown, không giải thích."
+)
+
+class PolicyLLMFormatter:
+    def __init__(self, session: Session):
+        self.session      = session
+        self.staging_repo = CrawlerStagingRepository(session)
+        self.llm = ChatOpenAI( 
+            model="gpt-4o-mini", temperature=0,
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+        )
+        self.chain = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            ("user", "VĂN BẢN THÔ CẦN ĐỊNH DẠNG:\n{raw_text}"),
+        ]) | self.llm
+
+    def _format_text_with_llm(self, raw_text: str, max_retries: int = 3) -> str | None:
+        for attempt in range(max_retries):
+            try:
+                return self.chain.invoke({"raw_text": raw_text}).content
+            except Exception as e:
+                if "429" in str(e) or "RateLimitError" in str(e):
+                    logger.warning(f"Rate limit. Waiting 20s (attempt {attempt+1})")
+                    time.sleep(20)
+                else:
+                    logger.error(f"LLM error: {e}")
+                    return None
+        return None
+
+    def process(self):
+        logger.info("Starting Policy LLM formatting...")
+        tasks = self.staging_repo.get_pending_llm_tasks(url_type=UrlType.POLICY_PAGE)
+        if not tasks:
+            logger.info("No pending policy tasks")
+            return True
+        for i, task in enumerate(tasks, 1):
+            code = task.url_obj.airline.code if task.url_obj and task.url_obj.airline else "UNKNOWN"
+            url  = task.url_obj.url if task.url_obj else "UNKNOWN"
+            logger.info(f"[{i}/{len(tasks)}] [{code}] ID {task.id}: {url}")
+            md = self._format_text_with_llm(task.raw_text)
+            if md:
+                self.staging_repo.update_formatted_data(task.id, {
+                    "markdown_content": md,
+                    "metadata": {"airline": code, "source_url": url,
+                                 "category": task.url_obj.category if task.url_obj else ""},
+                })
+                self.session.commit()
+                logger.info("  ✅ Done")
+            else:
+                self.staging_repo.mark_as_error(task.id, "LLM returned empty")
+                self.session.commit()
+                logger.error("  ❌ Failed")
+            time.sleep(2)
+        return True
+
+============================================================
+FILE: app/services\data_pipeline\extractors\promo_extractor.py
+============================================================
+import time, logging
+from sqlmodel import Session
+from repositories.crawler_url_repo import CrawlerUrlRepository      # FIX
+from repositories.crawler_staging_repo import CrawlerStagingRepository
+from models.crawler_url import CrawlerUrl
+from models.enums import UrlType
+from services.data_pipeline.extractors.crawlers.crawler_for_VJ import get_vj_promo_urls, extract_vj_promo_text
+from services.data_pipeline.extractors.crawlers.crawler_for_VN import get_vn_promo_urls, extract_vn_promo_text
+from services.data_pipeline.extractors.crawlers.crawler_for_QH import get_qh_promo_urls, extract_qh_promo_text
+
+logger = logging.getLogger(__name__)
+
+URL_CRAWLERS     = {"VN": get_vn_promo_urls,     "VJ": get_vj_promo_urls,     "QH": get_qh_promo_urls}
+CONTENT_CRAWLERS = {"VN": extract_vn_promo_text, "VJ": extract_vj_promo_text, "QH": extract_qh_promo_text}
+
+class PromoExtractor:
+    def __init__(self, session: Session):
+        self.session      = session
+        self.url_repo     = CrawlerUrlRepository(session)
+        self.staging_repo = CrawlerStagingRepository(session)
+
+    def discover_promo_urls(self):
+        logger.info("Discovering promo URLs...")
+        for page in self.url_repo.get_active_urls(url_type=UrlType.PROMO_LIST_PAGE):
+            code = page.airline.code
+            discovered = URL_CRAWLERS.get(code, lambda u: [])(page.url)
+            existing = {u.url for u in self.url_repo.get_urls_by_airline(page.airline_id)}
+            added = 0
+            for link in discovered:
+                if link not in existing:
+                    self.session.add(CrawlerUrl(
+                        airline_id=page.airline_id, url_type=UrlType.PROMO_PAGE,
+                        category="promotion", url=link, is_active=True,
+                    ))
+                    added += 1
+            self.session.commit()
+            logger.info(f"  {code}: {len(discovered)} found, {added} new")
+
+    def extract_all(self):
+        self.discover_promo_urls()
+        logger.info("Starting promo content crawl...")
+        urls = self.url_repo.get_active_urls(url_type=UrlType.PROMO_PAGE)
+        for i, url_obj in enumerate(urls, 1):
+            existing = self.staging_repo.get_by_url_id(url_obj.id)
+            if existing and existing.status.value != "ERROR":
+                continue
+            code = url_obj.airline.code
+            logger.info(f"[{i}/{len(urls)}] [{code}] {url_obj.url}")
+            try:
+                text = CONTENT_CRAWLERS.get(code, lambda u: "")(url_obj.url)
+                if text and text.strip():
+                    self.staging_repo.save_raw_content(url_obj.id, url_obj.airline_id, text)
+                    url_obj.last_crawled_at = time.strftime("%Y-%m-%d %H:%M:%S")
+                    self.session.add(url_obj)
+                    self.session.commit()
+                else:
+                    logger.warning(f"  ⚠️ Empty: {url_obj.url}")
+            except Exception as e:
+                self.session.rollback()
+                logger.error(f"  ❌ Error: {e}")
+                if existing:
+                    self.staging_repo.mark_as_error(existing.id, str(e))
+                    self.session.commit()
+            time.sleep(2)
+        return True
+
+============================================================
+FILE: app/services\data_pipeline\extractors\crawlers\crawler_for_QH.py
+============================================================
+import re, time, logging
+import requests
+from bs4 import BeautifulSoup
+from requests.compat import urljoin
+from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
+
+# FIX: định nghĩa inline thay vì import từ app.core.constants
+AIRLINE_BASE_URLS = {"QH": "https://www.bambooairways.com"}
+MAX_RETRIES = 3
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
+
+def crawl_qh_policy(url: str) -> str | None:
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            main = soup.find(id="main-content")
+            if not main:
+                logger.warning(f"QH: no #main-content at {url}")
+                return None
+            portlets = main.find_all(class_=re.compile(r"portlet-content"))
+            if not portlets:
+                return None
+            blocks = []
+            for portlet in portlets:
+                for tag in portlet(["script","style","nav","footer","noscript","header","button"]):
+                    tag.decompose()
+                for hidden in portlet.find_all(style=re.compile(r"display:\s*none", re.I)):
+                    hidden.decompose()
+                for tr in portlet.find_all("tr"):
+                    for cell in tr.find_all(["td","th"]):
+                        cell.append(" | ")
+                    tr.append("\n")
+                for li in portlet.find_all("li"):
+                    li.insert(0, "- ")
+                t = portlet.get_text(separator="\n", strip=True)
+                if t:
+                    blocks.append(t)
+            raw = "\n\n".join(blocks)
+            clean = re.sub(r"\n{3,}", "\n\n", raw).strip()
+            return re.sub(r"\|\s+\|\s+\|", "|", clean)
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"QH network error: {e}. Retry {attempt+1}/{MAX_RETRIES}")
+            time.sleep(3)
+    return None
+
+
+def get_qh_promo_urls(url: str) -> list[str]:
+    base_url = AIRLINE_BASE_URLS["QH"]
+    promotions = set()
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for block in soup.find_all(attrs={"data-analytics-asset-title": "Ưu đãi"}):
+            for a in block.find_all("a", class_=re.compile(r"txtp11_link"), href=True):
+                href = a.get("href")
+                if href:
+                    promotions.add(urljoin(base_url, href))
+    except Exception as e:
+        logger.error(f"get_qh_promo_urls error: {e}")
+    return list(promotions)
+
+
+def extract_qh_promo_text(url: str) -> str:
+    logger.info(f"[QH] Crawling: {url}")
+    text_content = ""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.route("**/*", lambda route: route.abort()
+                   if route.request.resource_type in ["image","media","font"]
+                   else route.continue_())
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector("#content", timeout=20000)
+            time.sleep(2)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            for tag in soup(["script","style"]):
+                tag.decompose()
+            section = soup.find(id="content")
+            if section:
+                articles = section.find_all(class_=re.compile(r"journal-content-article"))
+                if articles:
+                    text_content = "\n\n".join(
+                        a.get_text(separator="\n", strip=True)
+                        for a in articles if a.get_text(strip=True)
+                    )
+        except Exception as e:
+            logger.error(f"QH promo crawl error: {e}")
+        finally:
+            browser.close()
+    return text_content
+
+============================================================
+FILE: app/services\data_pipeline\extractors\crawlers\crawler_for_VJ.py
+============================================================
+import re, time, logging
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
+MAX_RETRIES = 3
+
+
+def crawl_vj_policy(url: str) -> str | None:
+    for attempt in range(MAX_RETRIES):
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_selector("#root", timeout=15000)
+                page.wait_for_timeout(3000)
+                html = page.content()
+                browser.close()
+            soup = BeautifulSoup(html, "html.parser")
+            root = soup.find(id="root")
+            target = None
+            if root:
+                for c1 in root.find_all(recursive=False):
+                    c2 = c1.find(class_=re.compile(r"jss149"), recursive=False)
+                    if c2:
+                        xs12 = c2.find(class_=re.compile(r"MuiGrid-grid-xs-12"))
+                        target = xs12 or c2.find(class_=re.compile(r"MuiGrid-item")) or c2
+                        break
+            target = target or root or soup.find("body")
+            if not target or not target.get_text(strip=True):
+                continue
+            for tag in target(["script","style","nav","footer","noscript","header"]):
+                tag.decompose()
+            for img in target.find_all("img"):
+                src = img.get("src","").lower()
+                alt = img.get("alt","").strip()
+                if "greensuccess" in src:   img.replace_with(" [Bao gồm] ")
+                elif "redclose" in src:     img.replace_with(" [Không bao gồm] ")
+                elif alt:                   img.replace_with(f" [{alt}] ")
+                else:                       img.decompose()
+            for tr in target.find_all("tr"):
+                for cell in tr.find_all(["td","th"]): cell.append(" | ")
+                tr.append("\n")
+            for li in target.find_all("li"): li.insert(0, "- ")
+            raw = target.get_text(separator="\n", strip=True)
+            clean = re.sub(r"\n{3,}", "\n\n", raw).strip()
+            clean = re.sub(r"\|\s+\|\s+\|", "|", clean)
+            if clean: return clean
+        except Exception as e:
+            logger.warning(f"VJ error: {e}. Retry {attempt+1}/{MAX_RETRIES}")
+            time.sleep(3)
+    return None
+
+
+def get_vj_promo_urls(url: str) -> list[str]:
+    unique_urls = set()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        def handle_response(response):
+            if "/api/v1/post?slug=khuyen-mai-1697696806643" in response.url and response.status == 200:
+                try:
+                    for post in response.json().get("list", []):
+                        slug = post.get("slug")
+                        if slug: unique_urls.add(f"https://www.vietjetair.com/vi/news/{slug}")
+                except Exception: pass
+        page.on("response", handle_response)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=60000)
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f"get_vj_promo_urls error: {e}")
+        finally:
+            browser.close()
+    return list(unique_urls)
+
+
+def extract_vj_promo_text(url: str) -> str:
+    logger.info(f"[VJ] Crawling: {url}")
+    text_content = ""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.route("**/*", lambda route: route.abort()
+                   if route.request.resource_type in ["image","media","font"]
+                   else route.continue_())
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector("#root", timeout=20000)
+            time.sleep(3)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            root = soup.find(id="root")
+            if root:
+                target = root.select_one(".MuiGrid-root.MuiGrid-grid-xs-12")
+                if target: text_content = target.get_text(separator="\n", strip=True)
+        except Exception as e:
+            logger.error(f"VJ promo crawl error: {e}")
+        finally:
+            browser.close()
+    return text_content
+
+============================================================
+FILE: app/services\data_pipeline\extractors\crawlers\crawler_for_VN.py
+============================================================
+import re, time, json, logging
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
+
+# FIX: định nghĩa inline
+AIRLINE_BASE_URLS = {"VN": "https://www.vietnamairlines.com"}
+MAX_RETRIES = 3
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
+
+def crawl_vn_policy(url: str) -> str | None:
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for tag in soup.find_all(class_=re.compile(r"experiencefragment", re.I)):
+                tag.decompose()
+            content_divs = soup.find_all(class_="cmp-vna-rte")
+            if not content_divs: return None
+            blocks = []
+            for div in content_divs:
+                for inline in div.find_all(["a","span","strong","b","em","i"]): inline.unwrap()
+                for li in div.find_all("li"): li.insert(0, "- ")
+                for h in div.find_all(["h1","h2","h3","h4"]):
+                    h.insert(0, "\n[TIÊU ĐỀ] "); h.append("\n")
+                t = div.get_text(separator="\n", strip=True)
+                if t: blocks.append(t)
+            raw = "\n\n".join(blocks)
+            clean = re.sub(r"\n{2,}", "\n\n", raw).strip()
+            return re.sub(r"^\s+", "", clean, flags=re.MULTILINE)
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"VN network error: {e}. Retry {attempt+1}/{MAX_RETRIES}")
+            time.sleep(3)
+    return None
+
+
+def get_vn_promo_urls(url: str) -> list[str]:
+    base_url = AIRLINE_BASE_URLS["VN"]
+    unique_urls = set()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector(".cmp-promotion-list", timeout=15000)
+            time.sleep(2)
+            for link in page.locator("a.promotion-calendar-card__cta").all():
+                href = link.get_attribute("href")
+                if href and not href.startswith(("javascript","#")):
+                    unique_urls.add(urljoin(base_url, href))
+            for p_list in page.locator(".cmp-promotion-list").all():
+                data_promo = p_list.get_attribute("data-promotion")
+                if data_promo:
+                    try:
+                        for item in json.loads(data_promo).get("promotionList", []):
+                            cta = item.get("ctaDirect")
+                            if cta: unique_urls.add(urljoin(base_url, cta))
+                    except json.JSONDecodeError: continue
+        except Exception as e:
+            logger.error(f"get_vn_promo_urls error: {e}")
+        finally:
+            browser.close()
+    return list(unique_urls)
+
+
+def extract_vn_promo_text(url: str) -> str:
+    logger.info(f"[VN] Crawling: {url}")
+    text_content = ""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(url, wait_until="networkidle", timeout=60000)
+            time.sleep(2)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            asset = soup.find(class_=re.compile(r"Asset|Campaign"))
+            if asset: text_content = asset.get_text(separator="\n", strip=True)
+        except Exception as e:
+            logger.error(f"VN promo crawl error: {e}")
+        finally:
+            browser.close()
+    return text_content
+
+============================================================
+FILE: app/services\data_pipeline\ingest\policy_ingester.py
+============================================================
+import logging
+from sqlmodel import Session
+from utils.database import engine                                           # FIX
+from services.data_pipeline.extractors.policy_extractor import PolicyExtractor
+from services.data_pipeline.ingest.policy_ingester import PolicyDBIngester
+from services.data_pipeline.post_processing.post_processing_policies import PolicyLLMFormatter
+
+logger = logging.getLogger(__name__)
+
+class PolicyETLPipeline:
+    def run_pipeline(self):
+        logger.info("🚀 BẮT ĐẦU PIPELINE CHÍNH SÁCH")
+        try:
+            with Session(engine) as s:
+                PolicyExtractor(s).extract_all()    # FIX [17]: truyền session
+            with Session(engine) as s:
+                PolicyLLMFormatter(s).process()
+            with Session(engine) as s:
+                PolicyDBIngester(s).ingest_to_db()
+            logger.info("🎉 HOÀN TẤT PIPELINE CHÍNH SÁCH")
+            return True
+        except Exception as e:
+            logger.error(f"❌ PIPELINE THẤT BẠI: {e}")
+            return False
+
+============================================================
+FILE: app/services\data_pipeline\ingest\promo_ingester.py
+============================================================
+import logging
+from datetime import datetime
+from sqlmodel import Session, select
+from langchain_openai import OpenAIEmbeddings
+
+from app.core.config import OPENAI_API_KEY
+from app.database.models.crawler_staging import CrawlerStaging
+from app.database.models.crawler_url import CrawlerUrl, UrlType
+from app.database.models.flight_promotion import FlightPromotion
+from app.core.enums import StagingStatus
+
+logger = logging.getLogger(__name__)
+
+class PromoDBIngester:
+    def __init__(self, session: Session):
+        self.session = session
+        self.embedder = OpenAIEmbeddings(
+            model="text-embedding-3-small", 
+            api_key=OPENAI_API_KEY
+        )
+
+    def _parse_date(self, date_str):
+        if not date_str or date_str.lower() == "null":
+            return None
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    def ingest_to_db(self):
+        logger.info("🗄️ BƯỚC 3: BẮT ĐẦU NẠP DỮ LIỆU KHUYẾN MÃI VÀO DATABASE...")
+
+        statement = (
+            select(CrawlerStaging)
+            .join(CrawlerUrl, CrawlerStaging.url_id == CrawlerUrl.id)
+            .where(CrawlerStaging.status == StagingStatus.LLM_FORMATTED)
+            .where(CrawlerUrl.url_type == UrlType.PROMO_PAGE)
+        )
+        
+        ready_tasks = self.session.exec(statement).all()
+
+        if not ready_tasks:
+            logger.warning("⚠️ Không có dữ liệu Khuyến mãi nào ở trạng thái LLM_FORMATTED để nạp.")
+            return False
+
+        logger.info(f"🚀 Bắt đầu xử lý {len(ready_tasks)} bài viết khuyến mãi...")
+
+        promotions_to_process = []
+        texts_to_embed = []
+        tasks_to_update = []
+
+        for task in ready_tasks:
+            if not task.formatted_data:
+                continue
+
+            promo_data = task.formatted_data.copy()
+            metadata = promo_data.pop("metadata", {})
+            promo_data["airline_id"] = metadata.get("airline_id") 
+            promo_data["url"] = metadata.get("source_url", "UNKNOWN")
+
+            promo_name = promo_data.get('promo_name', '')
+            description = promo_data.get('description', '')
+            conditions = promo_data.get('conditions', '')
+
+            rag_text = f"Tên khuyến mãi: {promo_name}\nMô tả: {description}\nĐiều kiện áp dụng: {conditions}"
+            
+            texts_to_embed.append(rag_text)
+            promotions_to_process.append(promo_data)
+            tasks_to_update.append(task)
+
+        if not texts_to_embed:
+            logger.warning("⚠️ Không có dữ liệu hợp lệ để nạp.")
+            return False
+
+        logger.info("🧠 Đang gọi OpenAI API để tạo Vector Embeddings (Vui lòng đợi)...")
+        try:
+            embeddings_list = self.embedder.embed_documents(texts_to_embed)
+            logger.info("   ✅ Đã lấy xong Vector Embeddings!")
+        except Exception as e:
+            logger.error(f"❌ Lỗi khi gọi OpenAI Embeddings: {e}")
+            return False
+
+        logger.info("🗄️ Đang lưu dữ liệu vào bảng FlightPromotion...")
+        try:
+            for idx, promo in enumerate(promotions_to_process):
+                db_promo = FlightPromotion(
+                    airline_id=promo.get("airline_id"),
+                    promo_code=promo.get("promo_code"),
+                    promo_name=promo.get("promo_name"),
+                    booking_start_date=self._parse_date(promo.get("booking_start_date")),
+                    booking_end_date=self._parse_date(promo.get("booking_end_date")),
+                    travel_start_date=self._parse_date(promo.get("travel_start_date")),
+                    travel_end_date=self._parse_date(promo.get("travel_end_date")),
+                    description=promo.get("description"),
+                    conditions=promo.get("conditions"),
+                    url=promo.get("url"),
+                    embedding=embeddings_list[idx] 
+                )
+                self.session.add(db_promo)
+                
+                tasks_to_update[idx].status = StagingStatus.COMPLETED
+                self.session.add(tasks_to_update[idx])
+
+            self.session.commit()
+            logger.info("🎉 THÀNH CÔNG! Đã lưu toàn bộ khuyến mãi vào bảng 'flight_promotions' và cập nhật Staging.")
+            return True
+            
+        except Exception as e:
+            self.session.rollback()
+            logger.error(f"❌ Lỗi khi nạp DB Khuyến mãi: {e}")
+            return False
+
+============================================================
+FILE: app/services\data_pipeline\pineline\policy_pipeline.py
+============================================================
+import logging
+from sqlmodel import Session
+from utils.database import engine
+from services.data_pipeline.extractors.policy_extractor import PolicyExtractor
+from services.data_pipeline.ingest.policy_ingester import PolicyDBIngester
+from services.data_pipeline.post_processing.post_processing_policies import PolicyLLMFormatter
+
+logger = logging.getLogger(__name__)
+
+class PolicyETLPipeline:
+    def run_pipeline(self):
+        logger.info("🚀 BẮT ĐẦU PIPELINE CHÍNH SÁCH")
+        try:
+            with Session(engine) as s:
+                PolicyExtractor(s).extract_all()    # FIX [17]: truyền session
+            with Session(engine) as s:
+                PolicyLLMFormatter(s).process()
+            with Session(engine) as s:
+                PolicyDBIngester(s).ingest_to_db()
+            logger.info("🎉 HOÀN TẤT PIPELINE CHÍNH SÁCH")
+            return True
+        except Exception as e:
+            logger.error(f"❌ PIPELINE THẤT BẠI: {e}")
+            return False
+
+============================================================
+FILE: app/services\data_pipeline\pineline\promo_pipeline.py
+============================================================
+import logging
+from sqlmodel import Session
+from utils.database import engine                                           # FIX
+from services.data_pipeline.extractors.promo_extractor import PromoExtractor
+from services.data_pipeline.ingest.promo_ingester import PromoDBIngester
+from services.data_pipeline.post_processing.post_processing_promo import PromoLLMExtractor  # FIX [19]
+
+logger = logging.getLogger(__name__)
+
+class PromotionETLPipeline:
+    def run_pipeline(self):
+        logger.info("🚀 BẮT ĐẦU PIPELINE KHUYẾN MÃI")
+        try:
+            with Session(engine) as s:
+                PromoExtractor(s).extract_all()     # FIX [17]: truyền session
+            with Session(engine) as s:
+                PromoLLMExtractor(s).process()
+            with Session(engine) as s:
+                PromoDBIngester(s).ingest_to_db()
+            logger.info("🎉 HOÀN TẤT PIPELINE KHUYẾN MÃI")
+            return True
+        except Exception as e:
+            logger.error(f"❌ PIPELINE THẤT BẠI: {e}")
+            return False
+
+============================================================
+FILE: app/services\data_pipeline\post_processing\post_processing_policies.py
+============================================================
+import os, time, logging
+from sqlmodel import Session
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI                          # FIX: tạo llm local
+from repositories.crawler_staging_repo import CrawlerStagingRepository  # FIX
+from models.enums import UrlType                                  # FIX
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = (
+    "Bạn là một chuyên gia Data Engineer. Nhiệm vụ: nhận văn bản thô cào từ website hàng không "
+    "và định dạng lại thành Markdown sạch để nạp vào hệ thống RAG.\n\n"
+    "QUY TẮC:\n"
+    "1. KHÔNG thêm, bớt hay bịa đặt thông tin (đặc biệt là giá tiền, số kg, kích thước).\n"
+    "2. Dùng Heading (##, ###) cho tiêu đề chính/phụ.\n"
+    "3. TUYỆT ĐỐI KHÔNG dùng bảng (|...|). Chuyển bảng thành bullet points đầy đủ ngữ cảnh.\n"
+    "4. In đậm (**) các từ khóa quan trọng, số tiền, trọng lượng.\n"
+    "5. Xóa nội dung rác (bản quyền, menu, footer).\n"
+    "Chỉ trả về Markdown, không giải thích."
+)
+
+class PolicyLLMFormatter:
+    def __init__(self, session: Session):
+        self.session      = session
+        self.staging_repo = CrawlerStagingRepository(session)
+        self.llm = ChatOpenAI(                                   # FIX: tạo local thay vì import
+            model="gpt-4o-mini", temperature=0,
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+        )
+        self.chain = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            ("user", "VĂN BẢN THÔ CẦN ĐỊNH DẠNG:\n{raw_text}"),
+        ]) | self.llm
+
+    def _format_text_with_llm(self, raw_text: str, max_retries: int = 3) -> str | None:
+        for attempt in range(max_retries):
+            try:
+                return self.chain.invoke({"raw_text": raw_text}).content
+            except Exception as e:
+                if "429" in str(e) or "RateLimitError" in str(e):
+                    logger.warning(f"Rate limit. Waiting 20s (attempt {attempt+1})")
+                    time.sleep(20)
+                else:
+                    logger.error(f"LLM error: {e}")
+                    return None
+        return None
+
+    def process(self):
+        logger.info("Starting Policy LLM formatting...")
+        tasks = self.staging_repo.get_pending_llm_tasks(url_type=UrlType.POLICY_PAGE)
+        if not tasks:
+            logger.info("No pending policy tasks")
+            return True
+        for i, task in enumerate(tasks, 1):
+            code = task.url_obj.airline.code if task.url_obj and task.url_obj.airline else "UNKNOWN"
+            url  = task.url_obj.url if task.url_obj else "UNKNOWN"
+            logger.info(f"[{i}/{len(tasks)}] [{code}] ID {task.id}: {url}")
+            md = self._format_text_with_llm(task.raw_text)
+            if md:
+                self.staging_repo.update_formatted_data(task.id, {
+                    "markdown_content": md,
+                    "metadata": {"airline": code, "source_url": url,
+                                 "category": task.url_obj.category if task.url_obj else ""},
+                })
+                self.session.commit()
+                logger.info("  ✅ Done")
+            else:
+                self.staging_repo.mark_as_error(task.id, "LLM returned empty")
+                self.session.commit()
+                logger.error("  ❌ Failed")
+            time.sleep(2)
+        return True
+
+============================================================
+FILE: app/services\data_pipeline\post_processing\post_processing_promo.py
+============================================================
+import os, time, json, logging
+from sqlmodel import Session
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from repositories.crawler_staging_repo import CrawlerStagingRepository
+from models.enums import UrlType
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = (
+    "Bạn là chuyên gia phân tích dữ liệu. Nhận văn bản thô của một trang khuyến mãi hàng không, "
+    "trích xuất thông tin và trả về ĐÚNG định dạng JSON sau (không có backtick, không giải thích):\n"
+    '{"promo_code":"string hoặc null","promo_name":"string",'
+    '"booking_start_date":"YYYY-MM-DD hoặc null","booking_end_date":"YYYY-MM-DD hoặc null",'
+    '"travel_start_date":"YYYY-MM-DD hoặc null","travel_end_date":"YYYY-MM-DD hoặc null",'
+    '"description":"string","conditions":"string"}'
+)
+
+class PromoLLMExtractor:
+    def __init__(self, session: Session):
+        self.session      = session
+        self.staging_repo = CrawlerStagingRepository(session)
+        self.llm = ChatOpenAI(
+            model="gpt-4o-mini", temperature=0,
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+        )
+        self.chain = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            ("user", "VĂN BẢN THÔ:\n{raw_text}"),
+        ]) | self.llm
+
+    def _extract(self, raw_text: str, max_retries: int = 3) -> dict | None:
+        for attempt in range(max_retries):
+            try:
+                content = self.chain.invoke({"raw_text": raw_text}).content
+                return json.loads(content.replace("```json","").replace("```","").strip())
+            except json.JSONDecodeError:
+                logger.warning(f"JSON parse failed attempt {attempt+1}")
+            except Exception as e:
+                if "429" in str(e) or "RateLimitError" in str(e):
+                    logger.warning("Rate limit, waiting 20s")
+                    time.sleep(20)
+                else:
+                    logger.error(f"LLM error: {e}")
+                    return None
+        return None
+
+    def process(self):
+        logger.info("Starting Promo LLM extraction...")
+        tasks = self.staging_repo.get_pending_llm_tasks(url_type=UrlType.PROMO_PAGE)
+        if not tasks:
+            logger.info("No pending promo tasks")
+            return True
+        for i, task in enumerate(tasks, 1):
+            code = task.url_obj.airline.code if task.url_obj and task.url_obj.airline else "UNKNOWN"
+            url  = task.url_obj.url if task.url_obj else "UNKNOWN"
+            logger.info(f"[{i}/{len(tasks)}] [{code}] ID {task.id}: {url}")
+            data = self._extract(task.raw_text)
+            if data:
+                data["metadata"] = {"airline_id": task.airline_id, "source_url": url}
+                self.staging_repo.update_formatted_data(task.id, data)
+                self.session.commit()
+                logger.info("  ✅ Done")
+            else:
+                self.staging_repo.mark_as_error(task.id, "LLM extraction failed")
+                self.session.commit()
+                logger.error("  ❌ Failed")
+            time.sleep(2)
+        return True
+
+============================================================
+FILE: app/services\rag\policy_retrieval.py
+============================================================
+import logging
+from collections import defaultdict
+from services.rag.vector_store import get_policy_vector_store
+
+logger = logging.getLogger(__name__)
+SUPPORTED_AIRLINES = ["VN", "VJ", "QH"]
+
+
+def retrieve_policy(query: str, target_airlines: list[str] | None = None) -> str:
+    store = get_policy_vector_store()
+    docs  = []
+    for al in (target_airlines or SUPPORTED_AIRLINES):
+        k = 3 if target_airlines else 2
+        docs.extend(store.similarity_search(query, k=k, filter={"airline": al.upper()}))
+
+    if not docs: return ""
+
+    grouped = defaultdict(list)
+    for doc in docs:
+        airline = doc.metadata.get("airline","UNKNOWN").upper()
+        url     = doc.metadata.get("source_url","Không có link")
+        content = " ".join(doc.page_content.replace("\n"," ").split()).strip()
+        if not any(i["content"] == content for i in grouped[airline]):
+            grouped[airline].append({"content": content, "url": url})
+
+    result = f"[KIẾN THỨC NGHIỆP VỤ CHÍNH SÁCH]\n- CÂU HỎI: '{query}'\n- NỘI DUNG:\n"
+    for airline, items in grouped.items():
+        result += f"\n▶ QUY ĐỊNH HÃNG {airline}:\n"
+        for i, item in enumerate(items, 1):
+            result += f"  {i}. {item['content']}\n     [Link]: {item['url']}\n"
+    return result.strip()
+
+============================================================
+FILE: app/services\rag\promo_retrieval.py
+============================================================
+import os, json, logging
+from datetime import datetime
+from sqlmodel import Session, select, or_, and_
+from models.airline import Airline
+from models.flight_promotion import FlightPromotion
+from services.rag.vector_store import get_embeddings
+from utils.database import engine
+
+logger = logging.getLogger(__name__)
+PROMO_TAG = "[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]"
+
+
+def retrieve_promo(query: str, target_airline_code: str | None = None) -> str:
+    embeddings   = get_embeddings()
+    query_vector = embeddings.embed_query(query)
+    today        = datetime.now().date()
+
+    with Session(engine) as session:
+        stmt = select(FlightPromotion)
+        if target_airline_code:
+            airline = session.exec(
+                select(Airline).where(Airline.code == target_airline_code.upper())
+            ).first()
+            if airline:
+                stmt = stmt.where(FlightPromotion.airline_id == airline.id)
+        stmt = stmt.where(
+            or_(FlightPromotion.booking_end_date == None,
+                FlightPromotion.booking_end_date >= today)
+        ).order_by(FlightPromotion.embedding.cosine_distance(query_vector)).limit(3)
+        docs = list(session.exec(stmt).all())
+
+    if not docs: return ""
+
+    result = f"{PROMO_TAG}\n- CÂU HỎI: '{query}'\n- NGÀY: {today.strftime('%Y-%m-%d')}\n"
+    for idx, p in enumerate(docs, 1):
+        b_end = p.booking_end_date.strftime("%d/%m/%Y") if p.booking_end_date else "Không giới hạn"
+        result += f"\n▶ {idx}. {p.promo_name}\n"
+        result += f"   - Mã: {p.promo_code or 'Tự động áp dụng'}\n"
+        result += f"   - Hạn: {b_end}\n"
+        result += f"   - Chi tiết: {p.description}\n"
+        result += f"   - Điều kiện: {p.conditions}\n"
+        result += f"   - [Link]: {p.url}\n"
+    return result.strip()
+
+
+def inject_promos(search_id: str, redis_host: str = "localhost", redis_port: int = 6379) -> str:
+    import redis as redis_lib
+    r = redis_lib.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
+    raw = r.get(search_id)
+    if not raw: return ""
+
+    flights = json.loads(raw)
+    if not flights: return ""
+
+    found_codes = {str(a).upper() for f in flights[:5] for a in f.get("airlines", [])}
+    if not found_codes: return ""
+
+    with Session(engine) as session:
+        airlines = session.exec(
+            select(Airline).where(Airline.code.in_(list(found_codes)))
+        ).all()
+        promo_msgs = []
+        for airline in airlines:
+            promos = session.exec(
+                select(FlightPromotion)
+                .where(FlightPromotion.airline_id == airline.id)    # FIX [18]: tách .where()
+                .where(or_(FlightPromotion.booking_end_date == None,
+                           FlightPromotion.booking_end_date >= datetime.now().date()))
+                .limit(2)
+            ).all()
+            for p in promos:
+                code_str = f" (Mã: {p.promo_code})" if p.promo_code else " (Áp dụng trực tiếp)"
+                promo_msgs.append(f"  + Hãng {airline.code}: {p.promo_name}{code_str}. ĐK: {p.conditions}")
+
+    if not promo_msgs: return ""
+    return (
+        "[THÔNG TIN GỢI Ý KHÁCH HÀNG VỀ KHUYẾN MÃI]\n"
+        "Các hãng bay trong danh sách ĐANG CÓ KHUYẾN MÃI:\n"
+        + "\n".join(promo_msgs)
+        + "\n\n[YÊU CẦU CHO AI]: Khéo léo lồng ghép 1-2 khuyến mãi phù hợp vào câu trả lời."
+    )
+
+============================================================
+FILE: app/services\rag\vector_store.py
+============================================================
+import os
+import logging
+from langchain_postgres.vectorstores import PGVector
+from langchain_openai import OpenAIEmbeddings
+
+logger = logging.getLogger(__name__)
+
+DATABASE_URL  = os.getenv("DATABASE_URL", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+COLLECTION_NAME = "flight_policies"
+
+_policy_store: PGVector | None = None
+_embeddings: OpenAIEmbeddings | None = None
+
+
+def get_embeddings() -> OpenAIEmbeddings:
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            api_key=OPENAI_API_KEY,
+        )
+    return _embeddings
+
+
+def get_policy_vector_store() -> PGVector:
+    global _policy_store
+    if _policy_store is None:
+        _policy_store = PGVector(
+            embeddings=get_embeddings(),
+            collection_name=COLLECTION_NAME,
+            connection=DATABASE_URL,
+            use_jsonb=True,
+        )
+        logger.info(f"PGVector store '{COLLECTION_NAME}' initialized")
+    return _policy_store
+
+============================================================
+FILE: app/utils\database.py
+============================================================
+import os
+from sqlmodel import create_engine, SQLModel, Session
+
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"options": "-csearch_path=public"},
+    echo=False,
+    pool_pre_ping=True,
+)
+
+def init_db():
+    """Tạo bảng nếu chưa có (chỉ gọi lúc startup)."""
+    SQLModel.metadata.create_all(engine)
+
+def get_session() -> Session:
+    return Session(engine)
+

@@ -6,13 +6,15 @@ services:
     container_name: flight_chatbot_db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: huy123456789
       POSTGRES_DB: flight_chatbot
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    networks:
+      - ota_network
 
   redis:
     image: redis:7-alpine
@@ -22,7 +24,30 @@ services:
     volumes:
       - redisdata:/data
     restart: unless-stopped
+    networks:
+      - ota_network
+
+  knowledge_mcp:
+    build:
+      context: ./mcp_knowledge
+      dockerfile: Dockerfile
+    container_name: flight_knowledge_mcp
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@postgres:5432/flight_chatbot
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - ota_network
 
 volumes:
   pgdata:
   redisdata:
+
+networks:
+  ota_network:
+    driver: bridge

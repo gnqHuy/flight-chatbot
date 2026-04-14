@@ -42,7 +42,7 @@ class ChatService:
         if ui_context and ui_context.get("active_search_id"):
             inputs["current_search_id"] = ui_context["active_search_id"]
         
-        final_state = await run_in_threadpool(flight_graph.invoke, inputs, config=graph_config)
+        final_state = await flight_graph.ainvoke(inputs, config=graph_config)
 
         return self._format_and_save_response(conversation_id, final_state)
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-from app.core.i18n_service import i18n
 from app.core.constants import SUPPORTED_AIRLINES
 
 from datetime import datetime
@@ -96,7 +95,7 @@ def format_duffel_flight_display(raw_offer: dict, lang: str = "vi") -> dict | No
                 "flightNumber": f"{first_seg.get('marketing_carrier', {}).get('iata_code')}{first_seg.get('marketing_carrier_flight_number')}",
                 "departure": {
                     "iata": first_seg.get("origin", {}).get("iata_code"),
-                    "city": first_seg.get("origin", {}).get("city_name"), # Giả sử i18n sẽ xử lý ngoài nếu cần
+                    "city": first_seg.get("origin", {}).get("city_name"),
                     "at": first_seg["departing_at"],
                     "terminal": first_seg.get("origin_terminal", "N/A")
                 },

@@ -1,16 +1,12 @@
-from datetime import datetime
-from sqlmodel import Session, select, or_
-
 from app.ai_orchestrator.graph.state import ChatState
-from app.database.database import engine
-from app.database.models.airline import Airline
-from app.database.models.flight_promotion import FlightPromotion
 from app.utils.helpers import consume_task
-from app.core.constants import CURRENT_TIME, CURRENT_TIME_STR, ContextTag
-from app.ai_orchestrator.rag.vector_store import shared_embeddings
+from app.core.constants import ContextTag
 
-def promo_retrieval_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (HYBRID RAG + SQL) ---")
+# Import MCP Client Manager (Singleton instance)
+from app.ai_orchestrator.graph.tools.mcp_client import knowledge_mcp
+
+async def promo_retrieval_node(state: ChatState) -> dict:
+    print("\n🔹🔹🔹 --- VÀO TRẠM TÌM KIẾM KHUYẾN MÃI (QUA MCP) ---")
     
     search_filters = state.get("search_filters", {})
     action_targets = state.get("action_targets", {})
@@ -21,66 +17,38 @@ def promo_retrieval_node(state: ChatState) -> dict:
     
     query = user_message 
     
+    # Lấy hãng bay ưu tiên (ưu tiên action_targets trước, sau đó đến search_filters)
     target_airline_list = action_targets.get("compare_airlines") or search_filters.get("preferred_airlines") or []
-    target_airline_code = target_airline_list[0].upper() if target_airline_list else None
-
-    docs = []
     
+    # Lọc bỏ giá trị "CLEAR" (nếu có) trước khi gửi sang MCP Promo
+    valid_airlines = [al.upper() for al in target_airline_list if al.upper() != "CLEAR"]
+    target_airline_code = valid_airlines[0] if valid_airlines else None
+
+    if not query:
+        return {
+            "node_results": [f"{ContextTag.SYS_ERROR}: Không xác định được nhu cầu tìm khuyến mãi."],
+            "tasks": remaining_tasks
+        }
+
     try:
-        query_vector = shared_embeddings.embed_query(query)
-        
-        with Session(engine) as session:
-            stmt = select(FlightPromotion)
-            
-            if target_airline_code:
-                airline_obj = session.exec(select(Airline).where(Airline.code == target_airline_code)).first()
-                if airline_obj:
-                    stmt = stmt.where(FlightPromotion.airline_id == airline_obj.id)
-            
-            today = CURRENT_TIME.date()
-            stmt = stmt.where(
-                or_(
-                    FlightPromotion.booking_end_date == None,
-                    FlightPromotion.booking_end_date >= today
-                )
-            )
-            
-            stmt = stmt.order_by(FlightPromotion.embedding.cosine_distance(query_vector)).limit(3)
-            
-            docs = session.exec(stmt).all()
-            
-        if not docs:
-            airline_msg = f" của hãng {target_airline_code}" if target_airline_code else ""
-            return {
-                "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Hiện tại không có chương trình khuyến mãi nào phù hợp{airline_msg}."],
-                "tasks": remaining_tasks 
+        # Gọi sang Knowledge Server qua MCP
+        result_text = await knowledge_mcp.call_tool(
+            tool_name="get_active_promotions",
+            arguments={
+                "query": query,
+                "airline_code": target_airline_code
             }
-        
-        current_date_str = CURRENT_TIME_STR
-        result_string = (
-            f"{ContextTag.PROMO_INFO}\n"
-            f"- CÂU HỎI: '{query}'\n"
-            f"- NGÀY HỆ THỐNG: {current_date_str}\n"
         )
         
-        for idx, promo in enumerate(docs, 1):
-            b_end = promo.booking_end_date.strftime("%d/%m/%Y") if promo.booking_end_date else "Không giới hạn"
-            
-            result_string += f"\n▶ {idx}. {promo.promo_name}\n"
-            result_string += f"   - Mã code: {promo.promo_code or 'Tự động áp dụng'}\n"
-            result_string += f"   - Hạn đặt: {b_end}\n"
-            result_string += f"   - Nội dung: {promo.description}\n"
-            result_string += f"   - Điều kiện: {promo.conditions}\n"
-            result_string += f"   - [Link chi tiết]: {promo.url}\n"
-                
+        print(f"👉 [MCP PROMO SUCCESS]: Đã lấy được dữ liệu khuyến mãi.")
         return {
-            "node_results": [result_string.strip()], 
+            "node_results": [result_text], 
             "tasks": remaining_tasks 
         }
     
     except Exception as e:
-        print(f"ERROR - Promo Hybrid RAG Node: {e}")
+        print(f"❌ ERROR - Promo MCP Node: {e}")
         return {
-            "node_results": [f"{ContextTag.SYS_ERROR}: Hệ thống tra cứu khuyến mãi đang gặp sự cố kết nối."],
+            "node_results": [f"{ContextTag.SYS_ERROR}: Hệ thống mất kết nối tới Knowledge Server khi tra cứu khuyến mãi. Chi tiết: {str(e)}"],
             "tasks": remaining_tasks
         }

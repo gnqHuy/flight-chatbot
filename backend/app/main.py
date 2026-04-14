@@ -1,12 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-from app.ai_orchestrator.graph.flight_graph import flight_graph
-from app.ai_orchestrator.graph.state import ChatState
 
 from app.api.api import api_router
-from app.database import models
+from app.database.checkpointer import async_pool, checkpointer
 from app.database.database import init_db
 
 app = FastAPI()
@@ -24,7 +20,13 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
+    
+    await async_pool.open()
+    
+    await checkpointer.setup()
+    
+    print("✅ Đã khởi tạo toàn bộ Database và LangGraph Checkpointer!")
 
 app.include_router(api_router, prefix="/api/v1")
