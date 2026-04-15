@@ -3,8 +3,8 @@ from app.core.config import DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"options": "-csearch_path=public"},
-    echo=False
+    echo=False,
+    pool_pre_ping=True,
 )
 
 def init_db():
