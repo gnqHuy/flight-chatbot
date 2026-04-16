@@ -1,8 +1,6 @@
 from app.ai_orchestrator.graph.state import ChatState
 from app.utils.helpers import consume_task
 from app.core.constants import ContextTag
-
-# Import MCP Client Manager (Singleton instance)
 from app.ai_orchestrator.graph.tools.mcp_client import knowledge_mcp
 
 async def promo_retrieval_node(state: ChatState) -> dict:
@@ -17,10 +15,8 @@ async def promo_retrieval_node(state: ChatState) -> dict:
     
     query = user_message 
     
-    # Lấy hãng bay ưu tiên (ưu tiên action_targets trước, sau đó đến search_filters)
     target_airline_list = action_targets.get("compare_airlines") or search_filters.get("preferred_airlines") or []
     
-    # Lọc bỏ giá trị "CLEAR" (nếu có) trước khi gửi sang MCP Promo
     valid_airlines = [al.upper() for al in target_airline_list if al.upper() != "CLEAR"]
     target_airline_code = valid_airlines[0] if valid_airlines else None
 
@@ -31,7 +27,6 @@ async def promo_retrieval_node(state: ChatState) -> dict:
         }
 
     try:
-        # Gọi sang Knowledge Server qua MCP
         result_text = await knowledge_mcp.call_tool(
             tool_name="get_active_promotions",
             arguments={

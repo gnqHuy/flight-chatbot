@@ -1,6 +1,5 @@
-version: "3.8"
-
 services:
+  # ── Infrastructure ─────────────────────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg15
     container_name: flight_chatbot_db
@@ -15,6 +14,11 @@ services:
     restart: unless-stopped
     networks:
       - ota_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -26,21 +30,51 @@ services:
     restart: unless-stopped
     networks:
       - ota_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── MCP Knowledge Server ───────────────────────────────────────────────────
   knowledge_mcp:
     build:
       context: ./mcp_knowledge
       dockerfile: Dockerfile
-    container_name: flight_knowledge_mcp
+    container_name: flight_mcp_knowledge
     ports:
       - "5001:5001"
     env_file:
-      - .env
+      - ./mcp_knowledge/.env
     environment:
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@postgres:5432/flight_chatbot
+      DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
-      - postgres
-    restart: unless-stopped
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: on-failure
+    networks:
+      - ota_network
+
+  # ── MCP Flight Server ──────────────────────────────────────────────────────
+  mcp_flight:
+    build:
+      context: ./mcp-flight
+      dockerfile: Dockerfile
+    container_name: flight_mcp_flight
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./mcp-flight/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: on-failure
     networks:
       - ota_network
 

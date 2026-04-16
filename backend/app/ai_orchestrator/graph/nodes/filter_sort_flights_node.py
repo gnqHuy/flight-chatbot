@@ -1,18 +1,22 @@
-import asyncio
+"""
+app/ai_orchestrator/graph/nodes/filter_sort_flights_node.py
+Thin async wrapper — filter/sort xử lý server-side trong mcp-flight.
+"""
 from app.ai_orchestrator.graph.state import ChatState
+from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp
 from app.utils.helpers import consume_task
 from app.schemas.chat_state import Task
 from app.core.enums import ChatIntent
 from app.core.constants import ContextTag
-from app.services.redis_service import redis_service
+
 
 async def filter_sort_flights_node(state: ChatState) -> dict:
-    print("\n🔹🔹🔹 --- VÀO TRẠM LỌC & SẮP XẾP ---")
+    print("\n🔹🔹🔹 --- VÀO TRẠM LỌC & SẮP XẾP (MCP FLIGHT) ---")
 
-    search_filters    = state.get("search_filters", {})
+    sf                = state.get("search_filters", {})
     current_search_id = state.get("current_search_id")
     tasks             = state.get("tasks", [])
-    print(f"👉 [DEBUG] filters: {search_filters}, search_id: {current_search_id}")
+    remaining         = consume_task(tasks, "filter_sort_flights")
 
     if not current_search_id or current_search_id == "CLEAR":
         return {
@@ -23,38 +27,53 @@ async def filter_sort_flights_node(state: ChatState) -> dict:
             ),
         }
 
-    loop = asyncio.get_running_loop()
-    cached_data = await loop.run_in_executor(
-        None, redis_service.get_flight_offers, current_search_id
-    )
-    if not cached_data:
-        print(f"❌ Phiên {current_search_id} hết hạn trên Redis")
-        return {
-            "node_results": [f"{ContextTag.SYS_NOT_FOUND}: Phiên tìm kiếm đã hết hạn. Hệ thống sẽ tự động tìm lại."],
-            "current_search_id": "CLEAR",
-            "tasks": consume_task(
-                tasks, "filter_sort_flights",
-                next_task=Task(intent=ChatIntent.SEARCH_FLIGHT),
-            ),
-        }
-
-    fe_filter_keys = ["maxPrice", "start_hour", "end_hour", "nonStop", "preferred_airlines", "travelClass"]
-    fe_filters = {k: search_filters[k] for k in fe_filter_keys if k in search_filters}
-
-    sort_pref = search_filters.get("sort_preference")
+    sort_pref = sf.get("sort_preference")
     sort_val  = (
         sort_pref.value if hasattr(sort_pref, "value")
-        else str(sort_pref) if sort_pref
-        else None
+        else str(sort_pref) if sort_pref else None
     )
 
-    print(f"Type: apply_filters | ID: {current_search_id} | Filters: {fe_filters} | Sort: {sort_val}")
+    try:
+        result_text = await flight_mcp.call_tool("get_filtered_flights", {
+            "search_id":          current_search_id,
+            "maxPrice":           sf.get("maxPrice"),
+            "preferred_airlines": sf.get("preferred_airlines"),
+            "nonStop":            sf.get("nonStop"),
+            "travelClass":        sf.get("travelClass"),
+            "start_hour":         sf.get("start_hour"),
+            "end_hour":           sf.get("end_hour"),
+            "sort_preference":    sort_val,
+        })
+    except Exception as e:
+        print(f"❌ [filter MCP error]: {e}")
+        return {
+            "node_results": [f"{ContextTag.SYS_ERROR}: Lỗi kết nối Flight Server khi lọc vé."],
+            "tasks":        remaining,
+        }
+
+    filtered_id = _extract_value(result_text, "filtered_id")
+
+    action = None
+    if filtered_id and filtered_id != "NONE":
+        action = {
+            "type":    "apply_filters",
+            "payload": {
+                "search_id":   current_search_id,
+                "filtered_id": filtered_id,
+            },
+        }
 
     return {
-        "node_results": [f"{ContextTag.FILTER_APPLIED}: Đã gửi lệnh điều chỉnh bộ lọc lên giao diện."],
-        "action": {
-            "type": "apply_filters",
-            "payload": {"search_id": current_search_id, "filters": fe_filters, "sort": sort_val},
-        },
-        "tasks": consume_task(tasks, "filter_sort_flights"),
+        "node_results": [result_text],
+        "action":       action,
+        "tasks":        remaining,
     }
+
+
+def _extract_value(text: str, key: str) -> str | None:
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(f"{key}="):
+            val = line.split("=", 1)[1].strip()
+            return None if val in ("None", "NONE", "") else val
+    return None

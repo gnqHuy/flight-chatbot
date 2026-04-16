@@ -29,7 +29,7 @@ async def extract_intent_node(state: ChatState) -> dict:
     history_str  = "\n".join(history_list[-MAX_HISTORY_TURNS:]) if history_list else "Chưa có lịch sử trò chuyện."
 
     try:
-        result: ExtractionOutput = await extraction_chain.ainvoke({  # FIX: ainvoke
+        result: ExtractionOutput = await extraction_chain.ainvoke({
             "query":        state.get("user_message", ""),
             "current_time": CURRENT_TIME_STR,
             "chat_history": history_str,
