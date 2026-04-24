@@ -1,67 +1,83 @@
+"""
+app/ai_orchestrator/graph/flight_graph.py
+Build và init ReAct agent graph.
+Chỉ chứa graph assembly — logic nằm ở các modules riêng.
+"""
+import functools
 from langgraph.graph import StateGraph, START, END
-from app.ai_orchestrator.graph.state import ChatState
-from app.core.enums import ChatIntent
+from langgraph.prebuilt import ToolNode
 
-from app.ai_orchestrator.graph.nodes.extract_intent_node import extract_intent_node
-from app.ai_orchestrator.graph.nodes.search_flight_node import search_flights_node
-from app.ai_orchestrator.graph.nodes.analyze_flights_node import analyze_flights_node
-from app.ai_orchestrator.graph.nodes.filter_sort_flights_node import filter_sort_flights_node
-from app.ai_orchestrator.graph.nodes.policy_retrieval_node import policy_retrieval_node
-from app.ai_orchestrator.graph.nodes.final_response_node import final_response_node
-from app.ai_orchestrator.graph.nodes.pomo_retrieval_node import promo_retrieval_node
-from app.database.checkpointer import get_checkpointer
+from app.ai_orchestrator.graph.state import FlightAgentState
+from app.ai_orchestrator.graph.nodes import agent_node, post_process_node
+from app.ai_orchestrator.graph.tools.flight_tool import (
+    search_flights, filter_flights, analyze_flights
+)
+from app.ai_orchestrator.graph.tools.knowledge_tool import search_policies, get_promotions
 
-def route_tasks(state: ChatState) -> str:
-    tasks = state.get("tasks", [])
-    if not tasks:
-        return "final_response"
-    intent_val = tasks[0].intent.value if hasattr(tasks[0].intent, "value") else str(tasks[0].intent)
-    return {
-        ChatIntent.SEARCH_FLIGHT.value:       "search_flights",
-        ChatIntent.FILTER_SORT_FLIGHTS.value: "filter_sort_flights",
-        ChatIntent.ANALYZE_FLIGHTS.value:     "analyze_flights",
-        ChatIntent.POLICY_QUESTION.value:     "policy_retrieval_node",
-        ChatIntent.PROMO_SEARCH.value:        "promo_retrieval_node",
-    }.get(intent_val, "final_response")
-
-
-def _build_graph_skeleton():
-    graph = StateGraph(ChatState)
-    graph.add_node("extract_intent",       extract_intent_node)
-    graph.add_node("search_flights",       search_flights_node)
-    graph.add_node("filter_sort_flights",  filter_sort_flights_node)
-    graph.add_node("analyze_flights",      analyze_flights_node)
-    graph.add_node("policy_retrieval_node", policy_retrieval_node)
-    graph.add_node("final_response",       final_response_node)
-    graph.add_node("promo_retrieval_node", promo_retrieval_node)
-
-    graph.add_edge(START, "extract_intent")
-
-    routing_map = {
-        "search_flights":        "search_flights",
-        "filter_sort_flights":   "filter_sort_flights",
-        "analyze_flights":       "analyze_flights",
-        "policy_retrieval_node": "policy_retrieval_node",
-        "promo_retrieval_node":  "promo_retrieval_node",
-        "final_response":        "final_response",
-    }
-    graph.add_conditional_edges("extract_intent",        route_tasks, routing_map)
-    graph.add_conditional_edges("search_flights",        route_tasks, routing_map)
-    graph.add_conditional_edges("filter_sort_flights",   route_tasks, routing_map)
-    graph.add_conditional_edges("analyze_flights",       route_tasks, routing_map)
-    graph.add_conditional_edges("policy_retrieval_node", route_tasks, routing_map)
-    graph.add_conditional_edges("promo_retrieval_node",  route_tasks, routing_map)
-    graph.add_edge("final_response", END)
-    return graph
-
+TOOLS = [search_flights, filter_flights, analyze_flights, search_policies, get_promotions]
 
 flight_graph = None
 
 
+def _should_continue(state: FlightAgentState) -> str:
+    """Nếu LLM ra tool_calls → chạy tools. Không thì post_process."""
+    last = state["messages"][-1]
+    if hasattr(last, "tool_calls") and last.tool_calls:
+        return "tools"
+    return "post_process"
+
+
+async def build_graph_for_llm(llm, checkpointer):
+    """Build graph với LLM bất kỳ — dùng cho multi-model test."""
+    from app.ai_orchestrator.graph.tools.flight_tool import (
+        search_flights, filter_flights, analyze_flights
+    )
+    from app.ai_orchestrator.graph.tools.knowledge_tool import search_policies, get_promotions
+
+    tools          = [search_flights, filter_flights, analyze_flights, search_policies, get_promotions]
+    llm_with_tools = llm.bind_tools(tools)
+    tool_node      = ToolNode(tools)
+
+    graph = StateGraph(FlightAgentState)
+    graph.add_node("agent",        functools.partial(agent_node, llm_with_tools=llm_with_tools))
+    graph.add_node("tools",        tool_node)
+    graph.add_node("post_process", post_process_node)
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges("agent", _should_continue,
+                                {"tools": "tools", "post_process": "post_process"})
+    graph.add_edge("tools", "agent")
+    graph.add_edge("post_process", END)
+    return graph.compile(checkpointer=checkpointer)
+
+
 async def init_flight_graph():
-    """Gọi trong on_startup SAU KHI checkpointer pool đã open."""
+    """Gọi trong on_startup sau khi checkpointer pool đã open."""
     global flight_graph
-    checkpointer = get_checkpointer()
-    flight_graph = _build_graph_skeleton().compile(checkpointer=checkpointer)
-    print("[Graph] flight_graph compiled with AsyncPostgresSaver")
+
+    from app.core.llm_setup import llm
+    from app.database.checkpointer import get_checkpointer
+
+    checkpointer   = get_checkpointer()
+    llm_with_tools = llm.bind_tools(TOOLS)
+    tool_node      = ToolNode(TOOLS)
+
+    graph = StateGraph(FlightAgentState)
+
+    graph.add_node(
+        "agent",
+        functools.partial(agent_node, llm_with_tools=llm_with_tools),
+    )
+    graph.add_node("tools",        tool_node)
+    graph.add_node("post_process", post_process_node)
+
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges(
+        "agent", _should_continue,
+        {"tools": "tools", "post_process": "post_process"},
+    )
+    graph.add_edge("tools", "agent")
+    graph.add_edge("post_process", END)
+
+    flight_graph = graph.compile(checkpointer=checkpointer)
+    print("[Graph] ReAct flight_graph compiled")
     return flight_graph

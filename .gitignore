@@ -58,4 +58,7 @@ tmp/
 .prettierrc
 
 data/
-scripts/
+data_set/
+dum_data/
+result/
+test_script/

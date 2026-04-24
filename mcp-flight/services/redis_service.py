@@ -28,11 +28,13 @@ def get_client() -> redis.Redis:
 TTL = int(os.getenv("REDIS_TTL", 3600))
 
 
-def save_flights(flights: list[dict], prefix: str = "search") -> str:
-    search_id = f"{prefix}_{uuid.uuid4().hex[:8]}"
-    get_client().setex(search_id, TTL, json.dumps(flights, ensure_ascii=False))
-    logger.info(f"[Redis] Saved {len(flights)} flights → {search_id}")
-    return search_id
+def save_flights(flights: list[dict], prefix: str = "search",
+                 override_key: str | None = None) -> str:
+    """Lưu danh sách vé. Nếu override_key thì dùng key đó thay vì tạo mới."""
+    key = override_key or f"{prefix}_{uuid.uuid4().hex[:8]}"
+    get_client().setex(key, TTL, json.dumps(flights, ensure_ascii=False))
+    logger.info(f"[Redis] Saved {len(flights)} flights → {key}")
+    return key
 
 
 def load_flights(search_id: str) -> list[dict] | None:
@@ -44,3 +46,13 @@ def load_flights(search_id: str) -> list[dict] | None:
 
 def exists(search_id: str) -> bool:
     return bool(get_client().exists(search_id))
+
+
+def save_raw(key: str, value: str, ttl: int | None = None) -> None:
+    """Lưu string thô vào Redis — dùng cho meta params."""
+    get_client().setex(key, ttl or TTL, value)
+
+
+def load_raw(key: str) -> str | None:
+    """Đọc string thô từ Redis."""
+    return get_client().get(key)

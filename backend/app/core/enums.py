@@ -12,14 +12,6 @@ class ComponentType(str, Enum):
     REQUIRE_FLIGHT_SELECTION = "require_flight_selection"
     APPLY_FILTERS = "apply_filters"
 
-class ChatIntent(str, Enum):
-    SEARCH_FLIGHT = "search_flight"
-    ANALYZE_FLIGHTS = "analyze_flights"
-    FILTER_SORT_FLIGHTS = "filter_sort_flights"
-    POLICY_QUESTION = "policy_question"
-    PROMO_SEARCH = "promo_search"
-    OUT_OF_SCOPE = "out_of_scope"
-
 class TravelClass(str, Enum):
     ECONOMY = "ECONOMY"
     BUSINESS = "BUSINESS"
