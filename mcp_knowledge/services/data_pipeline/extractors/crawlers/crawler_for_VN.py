@@ -6,7 +6,6 @@ from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
-# FIX: định nghĩa inline
 AIRLINE_BASE_URLS = {"VN": "https://www.vietnamairlines.com"}
 MAX_RETRIES = 3
 HEADERS = {

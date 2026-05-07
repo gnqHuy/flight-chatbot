@@ -8,14 +8,21 @@ from collections import defaultdict
 from sqlmodel import Session, select, or_
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
-
+from constants import get_current_time, get_current_time_str
 load_dotenv(override=True)
 
-from constants import SUPPORTED_AIRLINES, CURRENT_TIME, CURRENT_TIME_STR, ContextTag
+from constants import SUPPORTED_AIRLINES, ContextTag
 from services.rag.vector_store import get_policy_vector_store, get_embeddings
 from utils.database import engine                                               
 from models.airline import Airline                                              
-from models.flight_promotion import FlightPromotion                            
+from models.flight_promotion import FlightPromotion                         
+from services.data_pipeline.pineline.policy_pipeline import PolicyETLPipeline
+from services.data_pipeline.pineline.promo_pipeline import PromotionETLPipeline
+from sqlmodel import select
+from models.pipeline_run import PipelineRun
+from repositories.crawler_staging_repo import CrawlerStagingRepository
+import threading
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,9 +84,12 @@ def get_active_promotions(query: str, airline_code: str | None = None) -> str:
     """Tìm kiếm các chương trình khuyến mãi vé máy bay."""
     logger.info(f"[promo] query='{query}' airline={airline_code}")
     try:
-        embeddings   = get_embeddings()          # FIX [1]
+        today        = get_current_time().date()
+        today_str    = get_current_time_str()
+ 
+        embeddings   = get_embeddings()
         query_vector = embeddings.embed_query(query)
-
+ 
         with Session(engine) as session:
             stmt = select(FlightPromotion)
             if airline_code:
@@ -88,22 +98,33 @@ def get_active_promotions(query: str, airline_code: str | None = None) -> str:
                 ).first()
                 if airline_obj:
                     stmt = stmt.where(FlightPromotion.airline_id == airline_obj.id)
+ 
             stmt = stmt.where(
-                or_(FlightPromotion.booking_end_date == None,
-                    FlightPromotion.booking_end_date >= CURRENT_TIME.date())
+                or_(
+                    FlightPromotion.booking_end_date == None,
+                    FlightPromotion.booking_end_date >= today,
+                )
             ).order_by(
                 FlightPromotion.embedding.cosine_distance(query_vector)
             ).limit(3)
             docs = list(session.exec(stmt).all())
-
+ 
         if not docs:
             return f"{ContextTag.SYS_NOT_FOUND}: Không có khuyến mãi phù hợp."
-
-        result = f"{ContextTag.PROMO_INFO}\n- CÂU HỎI: '{query}'\n- NGÀY: {CURRENT_TIME_STR}\n"
+ 
+        result = f"{ContextTag.PROMO_INFO}\n- CÂU HỎI: '{query}'\n- NGÀY: {today_str}\n"
         for i, p in enumerate(docs, 1):
             b_end = p.booking_end_date.strftime("%d/%m/%Y") if p.booking_end_date else "Không giới hạn"
-            result += f"\n▶ {i}. {p.promo_name}\n   - Mã: {p.promo_code}\n   - Hạn: {b_end}\n   - Chi tiết: {p.description}\n   - [Link]: {p.url}\n"
+            result += (
+                f"\n▶ {i}. {p.promo_name}\n"
+                f"   - Mã: {p.promo_code or 'Tự động áp dụng'}\n"
+                f"   - Hạn: {b_end}\n"
+                f"   - Chi tiết: {p.description}\n"
+                f"   - Điều kiện: {p.conditions}\n"
+                f"   - [Link]: {p.url}\n"
+            )
         return result.strip()
+    
     except Exception as e:
         logger.exception("get_active_promotions error")
         return f"{ContextTag.SYS_ERROR}: Lỗi tra cứu khuyến mãi: {str(e)}"
@@ -113,11 +134,12 @@ def get_active_promotions(query: str, airline_code: str | None = None) -> str:
 @mcp.tool()
 def run_policy_pipeline() -> str:
     """Chạy toàn bộ ETL pipeline cho chính sách: crawl → format → ingest vector DB."""
-    logger.info("[pipeline] Starting policy ETL...")
+    logger.info("[pipeline] Starting policy ETL in background...")
     try:
-        from services.data_pipeline.pineline.policy_pipeline import PolicyETLPipeline
-        ok = PolicyETLPipeline().run_pipeline()
-        return "✅ Policy pipeline hoàn tất." if ok else "❌ Policy pipeline thất bại."
+        def _run():
+            PolicyETLPipeline().run_pipeline()
+        threading.Thread(target=_run, daemon=True).start()
+        return "✅ Policy pipeline đã được kích hoạt chạy nền. Dùng get_pipeline_status() để theo dõi."
     except Exception as e:
         logger.exception("run_policy_pipeline error")
         return f"❌ Lỗi: {str(e)}"
@@ -127,11 +149,12 @@ def run_policy_pipeline() -> str:
 @mcp.tool()
 def run_promo_pipeline() -> str:
     """Chạy toàn bộ ETL pipeline cho khuyến mãi: discover → crawl → extract → ingest."""
-    logger.info("[pipeline] Starting promo ETL...")
+    logger.info("[pipeline] Starting promo ETL in background...")
     try:
-        from services.data_pipeline.pineline.promo_pipeline import PromotionETLPipeline
-        ok = PromotionETLPipeline().run_pipeline()
-        return "✅ Promo pipeline hoàn tất." if ok else "❌ Promo pipeline thất bại."
+        def _run():
+            PromotionETLPipeline().run_pipeline()
+        threading.Thread(target=_run, daemon=True).start()
+        return "✅ Promo pipeline đã được kích hoạt chạy nền. Dùng get_pipeline_status() để theo dõi."
     except Exception as e:
         logger.exception("run_promo_pipeline error")
         return f"❌ Lỗi: {str(e)}"
@@ -140,12 +163,46 @@ def run_promo_pipeline() -> str:
 # ── Tool 5: get_pipeline_status ───────────────────────────────────────────────
 @mcp.tool()
 def get_pipeline_status() -> str:
-    """Xem số lượng tasks theo status trong staging table."""
+    """Xem trạng thái các lần chạy pipeline gần nhất."""
     try:
-        from repositories.crawler_staging_repo import CrawlerStagingRepository
+
+
         with Session(engine) as s:
+            # 5 lần chạy gần nhất
+            runs = s.exec(
+                select(PipelineRun)
+                .order_by(PipelineRun.started_at.desc())
+                .limit(5)
+            ).all()
+
+            # Staging counts
             counts = CrawlerStagingRepository(s).count_by_status()
-        return "\n".join(f"  {k}: {v}" for k, v in counts.items())
+
+        lines = ["=== PIPELINE RUNS (5 gần nhất) ==="]
+        if not runs:
+            lines.append("  Chưa có lần chạy nào.")
+        else:
+            for r in runs:
+                duration = ""
+                if r.finished_at:
+                    secs = int((r.finished_at - r.started_at).total_seconds())
+                    duration = f" | {secs}s"
+                lines.append(
+                    f"  [{r.pipeline_type.upper()}] {r.status.upper()}"
+                    f" | started={r.started_at.strftime('%Y-%m-%d %H:%M')}{duration}"
+                    f" | discovered={r.urls_discovered}"
+                    f" | crawled={r.urls_crawled}"
+                    f" | ingested={r.urls_ingested}"
+                )
+                if r.status == "failed" and r.error_message:
+                    lines.append(f"    ❌ {r.error_message[:100]}")
+
+        lines.append("\n=== STAGING STATUS ===")
+        for k, v in counts.items():
+            lines.append(f"  {k}: {v}")
+
+        return "\n".join(lines)
+
     except Exception as e:
         return f"❌ Lỗi: {str(e)}"
 
@@ -155,5 +212,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8002"))
     host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"🚀 Starting KnowledgeServer at http://{host}:{port}/sse")
-    # FIX [16]: thêm host parameter
     mcp.run(transport="sse")

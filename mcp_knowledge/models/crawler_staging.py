@@ -11,6 +11,9 @@ class CrawlerStaging(SQLModel, table=True):
     
     url_id: int = Field(foreign_key="crawler_urls.id", index=True)
     airline_id: int = Field(foreign_key="airlines.id")
+
+    pipeline_run_id: Optional[str] = Field(default=None, index=True)
+    content_hash:   Optional[str]  = Field(default=None, max_length=32) 
     
     raw_text: Optional[str] = Field(default=None, sa_column=Column(Text))
     formatted_data: Optional[dict] = Field(default=None, sa_column=Column(JSON))

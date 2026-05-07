@@ -6,7 +6,6 @@ from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
-# FIX: định nghĩa inline thay vì import từ app.core.constants
 AIRLINE_BASE_URLS = {"QH": "https://www.bambooairways.com"}
 MAX_RETRIES = 3
 HEADERS = {

@@ -5,6 +5,8 @@ from models.airline import Airline
 from models.flight_promotion import FlightPromotion
 from services.rag.vector_store import get_embeddings
 from utils.database import engine
+import redis as redis_lib
+
 
 logger = logging.getLogger(__name__)
 PROMO_TAG = "[THÔNG TIN KHUYẾN MÃI TỪ HỆ THỐNG]"
@@ -44,7 +46,6 @@ def retrieve_promo(query: str, target_airline_code: str | None = None) -> str:
 
 
 def inject_promos(search_id: str, redis_host: str = "localhost", redis_port: int = 6379) -> str:
-    import redis as redis_lib
     r = redis_lib.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
     raw = r.get(search_id)
     if not raw: return ""
@@ -63,7 +64,7 @@ def inject_promos(search_id: str, redis_host: str = "localhost", redis_port: int
         for airline in airlines:
             promos = session.exec(
                 select(FlightPromotion)
-                .where(FlightPromotion.airline_id == airline.id)    # FIX [18]: tách .where()
+                .where(FlightPromotion.airline_id == airline.id)
                 .where(or_(FlightPromotion.booking_end_date == None,
                            FlightPromotion.booking_end_date >= datetime.now().date()))
                 .limit(2)

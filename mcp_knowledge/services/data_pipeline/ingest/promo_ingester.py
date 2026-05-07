@@ -3,109 +3,138 @@ from datetime import datetime
 from sqlmodel import Session, select
 from langchain_openai import OpenAIEmbeddings
 
-from app.core.config import OPENAI_API_KEY
-from app.database.models.crawler_staging import CrawlerStaging
-from app.database.models.crawler_url import CrawlerUrl, UrlType
-from app.database.models.flight_promotion import FlightPromotion
-from app.core.enums import StagingStatus
+from constants import OPENAI_API_KEY
+from models.crawler_staging import CrawlerStaging
+from models.crawler_url import CrawlerUrl, UrlType
+from models.flight_promotion import FlightPromotion
+from models.enums import StagingStatus
 
 logger = logging.getLogger(__name__)
 
+
 class PromoDBIngester:
     def __init__(self, session: Session):
-        self.session = session
+        self.session  = session
         self.embedder = OpenAIEmbeddings(
-            model="text-embedding-3-small", 
-            api_key=OPENAI_API_KEY
+            model="text-embedding-3-small",
+            api_key=OPENAI_API_KEY,
         )
 
     def _parse_date(self, date_str):
-        if not date_str or date_str.lower() == "null":
+        if not date_str or str(date_str).lower() in ("null", "none", ""):
             return None
         try:
             return datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
+        except (ValueError, TypeError):
             return None
 
-    def ingest_to_db(self):
-        logger.info("🗄️ BƯỚC 3: BẮT ĐẦU NẠP DỮ LIỆU KHUYẾN MÃI VÀO DATABASE...")
+    def ingest_to_db(self, run_id: str = None) -> int:
+        """
+        Nạp promo vào DB với upsert theo (airline_id, url).
+        Nếu có run_id → chỉ xử lý tasks của lần chạy đó.
+        Trả về số records ingested.
+        """
+        logger.info("🗄️ BƯỚC 3: NẠP DỮ LIỆU KHUYẾN MÃI VÀO DATABASE...")
 
-        statement = (
+        stmt = (
             select(CrawlerStaging)
             .join(CrawlerUrl, CrawlerStaging.url_id == CrawlerUrl.id)
             .where(CrawlerStaging.status == StagingStatus.LLM_FORMATTED)
             .where(CrawlerUrl.url_type == UrlType.PROMO_PAGE)
         )
-        
-        ready_tasks = self.session.exec(statement).all()
+        if run_id:
+            stmt = stmt.where(CrawlerStaging.pipeline_run_id == run_id)
 
+        ready_tasks = self.session.exec(stmt).all()
         if not ready_tasks:
-            logger.warning("⚠️ Không có dữ liệu Khuyến mãi nào ở trạng thái LLM_FORMATTED để nạp.")
-            return False
+            logger.warning("⚠️ Không có Promo nào ở trạng thái LLM_FORMATTED")
+            return 0
 
-        logger.info(f"🚀 Bắt đầu xử lý {len(ready_tasks)} bài viết khuyến mãi...")
+        logger.info(f"🚀 Xử lý {len(ready_tasks)} promos...")
 
-        promotions_to_process = []
         texts_to_embed = []
-        tasks_to_update = []
+        tasks_meta     = []
 
         for task in ready_tasks:
             if not task.formatted_data:
                 continue
-
             promo_data = task.formatted_data.copy()
-            metadata = promo_data.pop("metadata", {})
-            promo_data["airline_id"] = metadata.get("airline_id") 
-            promo_data["url"] = metadata.get("source_url", "UNKNOWN")
+            metadata   = promo_data.pop("metadata", {})
+            promo_data["airline_id"] = metadata.get("airline_id")
+            promo_data["url"]        = metadata.get("source_url", "UNKNOWN")
 
-            promo_name = promo_data.get('promo_name', '')
-            description = promo_data.get('description', '')
-            conditions = promo_data.get('conditions', '')
-
-            rag_text = f"Tên khuyến mãi: {promo_name}\nMô tả: {description}\nĐiều kiện áp dụng: {conditions}"
-            
+            rag_text = (
+                f"Tên khuyến mãi: {promo_data.get('promo_name', '')}\n"
+                f"Mô tả: {promo_data.get('description', '')}\n"
+                f"Điều kiện: {promo_data.get('conditions', '')}"
+            )
             texts_to_embed.append(rag_text)
-            promotions_to_process.append(promo_data)
-            tasks_to_update.append(task)
+            tasks_meta.append((task, promo_data))
 
         if not texts_to_embed:
-            logger.warning("⚠️ Không có dữ liệu hợp lệ để nạp.")
-            return False
+            logger.warning("⚠️ Không có text để embed")
+            return 0
 
-        logger.info("🧠 Đang gọi OpenAI API để tạo Vector Embeddings (Vui lòng đợi)...")
         try:
-            embeddings_list = self.embedder.embed_documents(texts_to_embed)
-            logger.info("   ✅ Đã lấy xong Vector Embeddings!")
+            embeddings = self.embedder.embed_documents(texts_to_embed)
         except Exception as e:
-            logger.error(f"❌ Lỗi khi gọi OpenAI Embeddings: {e}")
-            return False
+            logger.error(f"❌ Embedding failed: {e}")
+            return 0
 
-        logger.info("🗄️ Đang lưu dữ liệu vào bảng FlightPromotion...")
-        try:
-            for idx, promo in enumerate(promotions_to_process):
-                db_promo = FlightPromotion(
-                    airline_id=promo.get("airline_id"),
-                    promo_code=promo.get("promo_code"),
-                    promo_name=promo.get("promo_name"),
-                    booking_start_date=self._parse_date(promo.get("booking_start_date")),
-                    booking_end_date=self._parse_date(promo.get("booking_end_date")),
-                    travel_start_date=self._parse_date(promo.get("travel_start_date")),
-                    travel_end_date=self._parse_date(promo.get("travel_end_date")),
-                    description=promo.get("description"),
-                    conditions=promo.get("conditions"),
-                    url=promo.get("url"),
-                    embedding=embeddings_list[idx] 
-                )
-                self.session.add(db_promo)
-                
-                tasks_to_update[idx].status = StagingStatus.COMPLETED
-                self.session.add(tasks_to_update[idx])
+        success = error = 0
+        for (task, promo_data), embedding in zip(tasks_meta, embeddings):
+            try:
+                self._upsert(promo_data, embedding)
+                task.status = StagingStatus.COMPLETED
+                self.session.add(task)
+                self.session.commit()
+                success += 1
+            except Exception as e:
+                self.session.rollback()
+                logger.error(f"❌ Upsert failed {promo_data.get('url')}: {e}")
+                task.status        = StagingStatus.ERROR
+                task.error_message = str(e)
+                self.session.add(task)
+                self.session.commit()
+                error += 1
 
-            self.session.commit()
-            logger.info("🎉 THÀNH CÔNG! Đã lưu toàn bộ khuyến mãi vào bảng 'flight_promotions' và cập nhật Staging.")
-            return True
-            
-        except Exception as e:
-            self.session.rollback()
-            logger.error(f"❌ Lỗi khi nạp DB Khuyến mãi: {e}")
-            return False
+        logger.info(f"✅ Done: {success} upserted, {error} errors")
+        return success
+
+    def _upsert(self, promo_data: dict, embedding: list[float]):
+        """INSERT nếu chưa có, UPDATE nếu đã có (theo url)."""
+        url        = promo_data.get("url", "UNKNOWN")
+        airline_id = promo_data.get("airline_id")
+
+        existing = self.session.exec(
+            select(FlightPromotion).where(FlightPromotion.url == url)
+        ).first()
+
+        if existing:
+            existing.promo_name          = promo_data.get("promo_name", existing.promo_name)
+            existing.promo_code          = promo_data.get("promo_code")
+            existing.booking_start_date  = self._parse_date(promo_data.get("booking_start_date"))
+            existing.booking_end_date    = self._parse_date(promo_data.get("booking_end_date"))
+            existing.travel_start_date   = self._parse_date(promo_data.get("travel_start_date"))
+            existing.travel_end_date     = self._parse_date(promo_data.get("travel_end_date"))
+            existing.description         = promo_data.get("description", existing.description)
+            existing.conditions          = promo_data.get("conditions", existing.conditions)
+            existing.embedding           = embedding
+            existing.updated_at          = datetime.now()
+            self.session.add(existing)
+            logger.debug(f"  ↺ Updated: {existing.promo_name}")
+        else:
+            self.session.add(FlightPromotion(
+                airline_id=airline_id,
+                url=url,
+                promo_name         = promo_data.get("promo_name", ""),
+                promo_code         = promo_data.get("promo_code"),
+                booking_start_date = self._parse_date(promo_data.get("booking_start_date")),
+                booking_end_date   = self._parse_date(promo_data.get("booking_end_date")),
+                travel_start_date  = self._parse_date(promo_data.get("travel_start_date")),
+                travel_end_date    = self._parse_date(promo_data.get("travel_end_date")),
+                description        = promo_data.get("description", ""),
+                conditions         = promo_data.get("conditions", ""),
+                embedding          = embedding,
+            ))
+            logger.debug(f"  + Inserted: {promo_data.get('promo_name')}")

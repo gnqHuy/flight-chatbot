@@ -30,5 +30,6 @@ class FlightPromotion(SQLModel, table=True):
         sa_column=Column(Vector(1536))
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at:         Optional[datetime] = Field(default=None)
 
     airline: Optional["Airline"] = Relationship(back_populates="promotions")

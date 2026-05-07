@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from typing import List, Optional
 from datetime import date
-from models.flight_promotion import FlightPromotion   # FIX
+from models.flight_promotion import FlightPromotion
 
 
 class FlightPromotionRepository:
