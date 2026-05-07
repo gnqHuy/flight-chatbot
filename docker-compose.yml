@@ -50,6 +50,8 @@ services:
       DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+    volumes:
+      - ./mcp_knowledge:/app
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -71,6 +73,8 @@ services:
       DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+    volumes:
+      - ./mcp-flight:/app
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
