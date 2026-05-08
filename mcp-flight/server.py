@@ -12,8 +12,15 @@ import os
 import sys
 import json
 import logging
-from mcp.server.fastmcp import FastMCP
+import uvicorn
+
 from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 load_dotenv(override=True)
 sys.path.insert(0, os.path.dirname(__file__))
@@ -25,18 +32,30 @@ from services.airline_service import get_airlines_info
 from utils.validators         import validate_search_params, validate_filter_params
 from utils.flight_analysis    import build_analysis_context
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Logging — DEBUG=true để xem chi tiết, mặc định INFO
+# ─────────────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stderr,
+    force=True,
 )
+logging.getLogger("sse_starlette.sse").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 logger = logging.getLogger("mcp-flight")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Constants
+# ─────────────────────────────────────────────────────────────────────────────
 mcp = FastMCP("FlightServer")
 
-_META_TTL = 7200  # Lưu meta 2 giờ — dài hơn TTL data (1h) để còn recover
+_META_TTL = 7200
 
-# Core params dùng để so sánh cache hit — đổi bất kỳ field nào → search mới
 _CORE_PARAM_KEYS = [
     "origin", "destination", "departureDate",
     "roundTrip", "returnDate",
@@ -46,72 +65,68 @@ _CORE_PARAM_KEYS = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HELPER: Normalize param value để so sánh
+# Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _normalize(val) -> str:
-    """
-    Chuẩn hoá giá trị param để so sánh cache hit.
-    None / "" / False đều về chuỗi "" để tránh false miss.
-    """
     if val is None or val == "" or val is False:
         return ""
     if val is True:
         return "TRUE"
     s = str(val).strip().upper()
-    if s == "TRUE":
-        return "TRUE"
-    if s == "FALSE":
-        return ""
+    if s in ("TRUE", "FALSE"):
+        return s if s == "TRUE" else ""
     return s
 
 
 def _same_core_params(params: dict, meta: dict) -> bool:
-    """
-    So sánh Core Params hiện tại với meta đã lưu.
-    Trả True chỉ khi tất cả Core Params giống nhau → có thể dùng cache.
-    """
+    logger.debug("[cache_check] So sánh Core Params:")
+    all_same = True
     for key in _CORE_PARAM_KEYS:
-        if _normalize(params.get(key)) != _normalize(meta.get(key)):
-            logger.debug(
-                f"[cache_check] Param '{key}' thay đổi: "
-                f"'{meta.get(key)}' → '{params.get(key)}'"
-            )
-            return False
-    return True
+        p_val = _normalize(params.get(key))
+        m_val = _normalize(meta.get(key))
+        if p_val != m_val:
+            logger.debug(f"  [DIFF] {key}: '{meta.get(key)}' → '{params.get(key)}'")
+            all_same = False
+        else:
+            logger.debug(f"  [SAME] {key}: '{params.get(key)}'")
+    return all_same
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER: Cache recovery
-# ─────────────────────────────────────────────────────────────────────────────
 
 async def _recover_cache(search_id: str) -> list | None:
-    """
-    Thử recover cache từ meta params đã lưu khi search lần đầu.
-    Trả về danh sách vé mới nếu thành công, None nếu không có meta.
-    """
+    logger.info(f"[recover] Bắt đầu recover cho search_id={search_id}")
+
     meta_raw = load_raw(f"{search_id}:meta")
     if not meta_raw:
-        logger.warning(f"[recover] Không có meta cho {search_id}")
+        logger.warning(f"[recover] FAIL — không có meta key '{search_id}:meta' trong Redis")
         return None
 
     try:
         meta = json.loads(meta_raw)
-    except Exception:
+    except Exception as e:
+        logger.error(f"[recover] FAIL — parse meta lỗi: {e}")
         return None
 
     logger.info(
-        f"[recover] Tìm lại từ meta: "
-        f"{meta.get('origin')}→{meta.get('destination')} {meta.get('departureDate')}"
+        f"[recover] Meta OK — "
+        f"{meta.get('origin')}→{meta.get('destination')} "
+        f"{meta.get('departureDate')} "
+        f"adults={meta.get('adults')} children={meta.get('children')} infants={meta.get('infants')}"
     )
 
     try:
+        logger.info("[recover] Gọi Duffel API để lấy lại vé...")
         flights = await search_flights_async(meta, max_offers=200)
         if flights:
-            # Lưu lại với cùng search_id để các keys cũ vẫn dùng được
             save_flights(flights, prefix="search", override_key=search_id)
             save_raw(f"{search_id}:meta", meta_raw, ttl=_META_TTL)
+            logger.info(
+                f"[recover] OK — {len(flights)} vé, "
+                f"data TTL reset 3600s, meta TTL reset {_META_TTL}s"
+            )
             return flights
+        else:
+            logger.warning("[recover] Duffel trả về 0 vé")
     except Exception as e:
         logger.error(f"[recover] Duffel error: {e}")
 
@@ -119,7 +134,7 @@ async def _recover_cache(search_id: str) -> list | None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TOOL 1: search_flights
+# Tool 1: search_flights
 # ─────────────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
@@ -138,17 +153,14 @@ async def search_flights(
 ) -> str:
     """
     Tìm chuyến bay từ Duffel API.
-
-    Cache logic (MCP tự quyết, không phụ thuộc backend):
-      - Nếu current_search_id được truyền vào VÀ còn hạn VÀ Core Params
-        giống hệt meta đã lưu → trả lại cache, KHÔNG gọi Duffel.
-      - Nếu Core Params thay đổi (dù id còn hạn) → gọi Duffel mới.
-      - Nếu không có current_search_id → gọi Duffel bình thường.
-
+    Cache logic: MCP tự quyết dùng cache hay gọi Duffel mới dựa trên Core Params.
     Backend chỉ cần luôn truyền current_search_id hiện tại vào args.
-    MCP tự quyết dùng cache hay gọi mới.
     """
-    logger.info(f"[search_flights] {origin}→{destination} {departureDate}")
+    logger.info(
+        f"[search_flights] CALL {origin}→{destination} {departureDate} "
+        f"adults={adults} children={children} infants={infants} "
+        f"current_search_id={current_search_id}"
+    )
 
     params = {
         "origin":             origin,
@@ -163,20 +175,21 @@ async def search_flights(
         "preferred_airlines": preferred_airlines or [],
     }
 
-    # ── Validate trước (V1–V7) ────────────────────────────────────────────────
+    # ── Validate (V1–V7) ──────────────────────────────────────────────────────
     is_valid, errors, _ = validate_search_params(params)
     if not is_valid:
+        logger.warning(f"[search_flights] Validation FAIL: {errors}")
         return "[THÔNG TIN ĐẶT VÉ CẦN KHÁCH KIỂM TRA LẠI]:\n" + "\n".join(
             f"- {e}" for e in errors
         )
 
-    # ── Cache hit: so sánh Core Params với meta đã lưu ───────────────────────
-    # Đây là bước quan trọng — MCP tự quyết, không tin tưởng hoàn toàn vào
-    # backend để tránh: (1) gọi Duffel lặp với cùng params, (2) trả sai data
-    # khi backend truyền id nhưng params đã đổi.
+    # ── Cache check ───────────────────────────────────────────────────────────
     if current_search_id and current_search_id != "CLEAR":
-        meta_raw = load_raw(f"{current_search_id}:meta")
-        if meta_raw and exists(current_search_id):
+        meta_raw   = load_raw(f"{current_search_id}:meta")
+        data_alive = exists(current_search_id)
+        logger.debug(f"  meta_exists={meta_raw is not None} | data_exists={data_alive}")
+
+        if meta_raw and data_alive:
             try:
                 meta = json.loads(meta_raw)
                 if _same_core_params(params, meta):
@@ -184,46 +197,51 @@ async def search_flights(
                     if flights:
                         save_flights(flights, prefix="search", override_key=current_search_id)
                         save_raw(f"{current_search_id}:meta", meta_raw, ttl=_META_TTL)
-                        logger.info(f"[search_flights] Cache hit + TTL refreshed: {current_search_id}")
                         cheapest = min(flights, key=lambda f: f.get("price", 9e9))
                         non_stop = sum(
                             1 for f in flights
-                            if all(
-                                it.get("stops", 1) == 0
-                                for it in (f.get("itineraries") or [])
-                            )
+                            if all(it.get("stops", 1) == 0 for it in (f.get("itineraries") or []))
+                        )
+                        logger.info(
+                            f"[search_flights] CACHE HIT — {len(flights)} vé, "
+                            f"rẻ nhất {cheapest.get('price')} {cheapest.get('currency')}. TTL reset."
                         )
                         return (
                             f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]\n"
                             f"search_id={current_search_id}\n"
                             f"total={len(flights)}\n"
                             f"non_stop={non_stop}\n"
-                            f"cheapest_price={cheapest.get('price', 0):.0f} "
-                            f"{cheapest.get('currency', 'VND')}\n"
+                            f"cheapest_price={cheapest.get('price', 0):.0f} {cheapest.get('currency', 'VND')}\n"
                             f"cheapest_airlines={', '.join(cheapest.get('airlines') or [])}\n"
                             f"Hành trình: {origin}→{destination} ngày {departureDate}"
                             + (f" | Khứ hồi về {returnDate}" if roundTrip and returnDate else "")
                         )
+                    else:
+                        logger.warning("[search_flights] Params giống nhưng data corrupt — gọi Duffel mới")
                 else:
-                    logger.info(
-                        f"[search_flights] Core params thay đổi → tìm mới "
-                        f"(bỏ cache {current_search_id})"
-                    )
+                    logger.info(f"[search_flights] CACHE MISS — params thay đổi, bỏ id={current_search_id}")
             except Exception as e:
-                logger.warning(f"[search_flights] Lỗi parse meta: {e} → gọi Duffel")
-        # Nếu meta không có hoặc id hết hạn → gọi Duffel bình thường
+                logger.warning(f"[search_flights] Lỗi parse meta: {e} — gọi Duffel")
+        else:
+            logger.info(
+                f"[search_flights] Cache hết hạn hoặc không có meta cho id={current_search_id}"
+            )
+    else:
+        logger.info("[search_flights] Không có current_search_id — gọi Duffel mới")
 
     # ── Gọi Duffel ────────────────────────────────────────────────────────────
+    logger.info(f"[search_flights] Gọi Duffel API: {origin}→{destination} {departureDate}")
     try:
         flights = await search_flights_async(params, max_offers=200)
     except Exception as e:
-        logger.error(f"[search_flights] Duffel error: {e}")
+        logger.error(f"[search_flights] Duffel FAIL: {e}")
         return (
             f"[TRỤC TRẶC HỆ THỐNG]: Không thể kết nối với hãng hàng không. "
             f"Chi tiết: {str(e)}"
         )
 
     if not flights:
+        logger.warning(f"[search_flights] Duffel trả về 0 vé")
         return (
             f"[KHÔNG TÌM THẤY CHUYẾN BAY]: Không có chuyến bay VN/VJ/QH nào cho "
             f"{origin}→{destination} ngày {departureDate}."
@@ -231,15 +249,17 @@ async def search_flights(
 
     # ── Lưu Redis + meta ──────────────────────────────────────────────────────
     search_id = save_flights(flights, prefix="search")
-
-    # Meta lưu Core Params để: (1) compare cache hit lần sau, (2) recover khi hết hạn
     save_raw(f"{search_id}:meta", json.dumps(params), ttl=_META_TTL)
 
-    # Thống kê
     cheapest = min(flights, key=lambda f: f.get("price", 9e9))
     non_stop = sum(
         1 for f in flights
         if all(it.get("stops", 1) == 0 for it in (f.get("itineraries") or []))
+    )
+    logger.info(
+        f"[search_flights] OK — {len(flights)} vé, non_stop={non_stop}, "
+        f"rẻ nhất {cheapest.get('price')} {cheapest.get('currency')} "
+        f"({', '.join(cheapest.get('airlines') or [])}). Lưu → {search_id}"
     )
 
     return (
@@ -255,7 +275,7 @@ async def search_flights(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TOOL 2: get_filtered_flights
+# Tool 2: get_filtered_flights
 # ─────────────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
@@ -273,19 +293,24 @@ async def get_filtered_flights(
     Lọc và sắp xếp vé server-side.
     Tự động recover cache nếu hết hạn (dùng meta params đã lưu).
     """
-    logger.info(f"[get_filtered_flights] search_id={search_id}")
+    logger.info(
+        f"[filter_flights] CALL search_id={search_id} | "
+        f"maxPrice={maxPrice} airlines={preferred_airlines} nonStop={nonStop} "
+        f"hours={start_hour}-{end_hour} sort={sort_preference}"
+    )
 
-    # ── Load cache (tự recover nếu hết hạn) ──────────────────────────────────
     flights = load_flights(search_id)
     if not flights:
-        logger.info(f"[get_filtered_flights] Cache hết hạn, thử recover...")
+        logger.info(f"[filter_flights] Cache MISS — thử recover...")
         flights = await _recover_cache(search_id)
         if not flights:
+            logger.warning("[filter_flights] Recover FAIL")
             return (
                 "[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
                 "khôi phục tự động. Vui lòng tìm vé lại nhé."
             )
-        logger.info(f"[get_filtered_flights] Recover thành công: {len(flights)} vé")
+    else:
+        logger.info(f"[filter_flights] Cache HIT — {len(flights)} vé")
 
     filters = {
         k: v for k, v in {
@@ -299,16 +324,17 @@ async def get_filtered_flights(
         }.items() if v is not None
     }
 
-    # ── Validate filter params ────────────────────────────────────────────────
     is_valid, errors = validate_filter_params(filters)
     if not is_valid:
+        logger.warning(f"[filter_flights] Filter params invalid: {errors}")
         return "[BỘ LỌC KHÔNG HỢP LỆ]:\n" + "\n".join(f"- {e}" for e in errors)
 
-    # ── Filter + Sort ─────────────────────────────────────────────────────────
     original_count = len(flights)
     filtered       = filter_and_sort(flights, filters)
     summary        = build_filter_summary(original_count, filtered, filters)
     filtered_id    = save_flights(filtered, prefix="filtered") if filtered else None
+
+    logger.info(f"[filter_flights] OK — {original_count} → {len(filtered)} vé. filtered_id={filtered_id}")
 
     return (
         f"[BỘ LỌC ĐƯỢC ÁP DỤNG]\n"
@@ -320,7 +346,7 @@ async def get_filtered_flights(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TOOL 3: analyze_flights
+# Tool 3: analyze_flights
 # ─────────────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
@@ -332,29 +358,30 @@ async def analyze_flights(
     """
     Build structured analysis context cho LLM.
     Tự động recover cache nếu hết hạn.
-    target_airline_codes: ["VN","VJ"] — so sánh theo hãng.
-    target_flight_numbers: ["VN123","VJ456"] — so sánh vé cụ thể.
     """
     logger.info(
-        f"[analyze_flights] search_id={search_id} airlines={target_airline_codes}"
+        f"[analyze_flights] CALL search_id={search_id} | "
+        f"airlines={target_airline_codes} flights={target_flight_numbers}"
     )
 
-    # ── Load cache (tự recover nếu hết hạn) ──────────────────────────────────
     flights = load_flights(search_id)
     if not flights:
-        logger.info(f"[analyze_flights] Cache hết hạn, thử recover...")
+        logger.info("[analyze_flights] Cache MISS — thử recover...")
         flights = await _recover_cache(search_id)
         if not flights:
+            logger.warning("[analyze_flights] Recover FAIL")
             return (
                 "[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
                 "khôi phục tự động. Vui lòng tìm vé lại nhé."
             )
-        logger.info(f"[analyze_flights] Recover thành công: {len(flights)} vé")
+    else:
+        logger.info(f"[analyze_flights] Cache HIT — {len(flights)} vé")
 
     airline_db_info = ""
     if target_airline_codes:
         clean = [c.upper() for c in target_airline_codes if c and c != "CLEAR"]
         if clean:
+            logger.debug(f"[analyze_flights] Lấy DB info cho hãng: {clean}")
             airline_db_info = get_airlines_info(clean)
 
     context = build_analysis_context(
@@ -367,23 +394,18 @@ async def analyze_flights(
         ),
     )
 
+    logger.info(f"[analyze_flights] OK — context {len(context)} chars")
     return f"[DỮ LIỆU SO SÁNH CHUYẾN BAY/HÃNG BAY]\n{context}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8001"))
     host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"Starting mcp-flight server at http://{host}:{port}/sse")
-
-    import uvicorn
-    from mcp.server.sse import SseServerTransport
-    from starlette.applications import Starlette
-    from starlette.routing import Route, Mount
-    from starlette.requests import Request
-    from starlette.responses import JSONResponse
 
     sse = SseServerTransport("/messages")
 
