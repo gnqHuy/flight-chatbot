@@ -54,8 +54,11 @@ class ChatService:
             pass
 
         if ui_context and ui_context.get("active_search_id"):
+            await _fg.flight_graph.aupdate_state(
+                config,
+                {"current_search_id": ui_context["active_search_id"]}
+            )
             current_state["current_search_id"] = ui_context["active_search_id"]
-            await _fg.flight_graph.aupdate_state(config, current_state)
 
         inputs = {
             "messages": [

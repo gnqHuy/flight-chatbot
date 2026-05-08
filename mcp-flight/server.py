@@ -36,6 +36,50 @@ mcp = FastMCP("FlightServer")
 
 _META_TTL = 7200  # Lưu meta 2 giờ — dài hơn TTL data (1h) để còn recover
 
+# Core params dùng để so sánh cache hit — đổi bất kỳ field nào → search mới
+_CORE_PARAM_KEYS = [
+    "origin", "destination", "departureDate",
+    "roundTrip", "returnDate",
+    "adults", "children", "infants",
+    "travelClass",
+]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPER: Normalize param value để so sánh
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _normalize(val) -> str:
+    """
+    Chuẩn hoá giá trị param để so sánh cache hit.
+    None / "" / False đều về chuỗi "" để tránh false miss.
+    """
+    if val is None or val == "" or val is False:
+        return ""
+    if val is True:
+        return "TRUE"
+    s = str(val).strip().upper()
+    if s == "TRUE":
+        return "TRUE"
+    if s == "FALSE":
+        return ""
+    return s
+
+
+def _same_core_params(params: dict, meta: dict) -> bool:
+    """
+    So sánh Core Params hiện tại với meta đã lưu.
+    Trả True chỉ khi tất cả Core Params giống nhau → có thể dùng cache.
+    """
+    for key in _CORE_PARAM_KEYS:
+        if _normalize(params.get(key)) != _normalize(meta.get(key)):
+            logger.debug(
+                f"[cache_check] Param '{key}' thay đổi: "
+                f"'{meta.get(key)}' → '{params.get(key)}'"
+            )
+            return False
+    return True
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPER: Cache recovery
@@ -56,13 +100,17 @@ async def _recover_cache(search_id: str) -> list | None:
     except Exception:
         return None
 
-    logger.info(f"[recover] Tìm lại từ meta: {meta.get('origin')}→{meta.get('destination')} {meta.get('departureDate')}")
+    logger.info(
+        f"[recover] Tìm lại từ meta: "
+        f"{meta.get('origin')}→{meta.get('destination')} {meta.get('departureDate')}"
+    )
 
     try:
         flights = await search_flights_async(meta, max_offers=200)
         if flights:
             # Lưu lại với cùng search_id để các keys cũ vẫn dùng được
             save_flights(flights, prefix="search", override_key=search_id)
+            save_raw(f"{search_id}:meta", meta_raw, ttl=_META_TTL)
             return flights
     except Exception as e:
         logger.error(f"[recover] Duffel error: {e}")
@@ -90,43 +138,90 @@ async def search_flights(
 ) -> str:
     """
     Tìm chuyến bay từ Duffel API.
-    Lưu meta params để recover cache sau này.
-    Trả về search_id cho filter và analyze dùng.
+
+    Cache logic (MCP tự quyết, không phụ thuộc backend):
+      - Nếu current_search_id được truyền vào VÀ còn hạn VÀ Core Params
+        giống hệt meta đã lưu → trả lại cache, KHÔNG gọi Duffel.
+      - Nếu Core Params thay đổi (dù id còn hạn) → gọi Duffel mới.
+      - Nếu không có current_search_id → gọi Duffel bình thường.
+
+    Backend chỉ cần luôn truyền current_search_id hiện tại vào args.
+    MCP tự quyết dùng cache hay gọi mới.
     """
     logger.info(f"[search_flights] {origin}→{destination} {departureDate}")
 
     params = {
-        "origin": origin, "destination": destination,
-        "departureDate": departureDate, "roundTrip": roundTrip,
-        "returnDate": returnDate, "adults": adults,
-        "children": children, "infants": infants,
-        "travelClass": travelClass,
+        "origin":             origin,
+        "destination":        destination,
+        "departureDate":      departureDate,
+        "roundTrip":          roundTrip,
+        "returnDate":         returnDate,
+        "adults":             adults,
+        "children":           children,
+        "infants":            infants,
+        "travelClass":        travelClass,
         "preferred_airlines": preferred_airlines or [],
     }
 
-    # ── Validate ──────────────────────────────────────────────────────────────
+    # ── Validate trước (V1–V7) ────────────────────────────────────────────────
     is_valid, errors, _ = validate_search_params(params)
     if not is_valid:
-        return "[THÔNG TIN ĐẶT VÉ CẦN KHÁCH KIỂM TRA LẠI]:\n" + "\n".join(f"- {e}" for e in errors)
+        return "[THÔNG TIN ĐẶT VÉ CẦN KHÁCH KIỂM TRA LẠI]:\n" + "\n".join(
+            f"- {e}" for e in errors
+        )
 
-    # ── Cache hit ─────────────────────────────────────────────────────────────
-    if current_search_id and current_search_id != "CLEAR" and exists(current_search_id):
-        flights = load_flights(current_search_id)
-        if flights:
-            logger.info(f"[search_flights] Cache hit: {current_search_id}")
-            return (
-                f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]: Tải lại từ cache.\n"
-                f"search_id={current_search_id}\n"
-                f"total={len(flights)}\n"
-                f"Hành trình: {origin}→{destination} ngày {departureDate}"
-            )
+    # ── Cache hit: so sánh Core Params với meta đã lưu ───────────────────────
+    # Đây là bước quan trọng — MCP tự quyết, không tin tưởng hoàn toàn vào
+    # backend để tránh: (1) gọi Duffel lặp với cùng params, (2) trả sai data
+    # khi backend truyền id nhưng params đã đổi.
+    if current_search_id and current_search_id != "CLEAR":
+        meta_raw = load_raw(f"{current_search_id}:meta")
+        if meta_raw and exists(current_search_id):
+            try:
+                meta = json.loads(meta_raw)
+                if _same_core_params(params, meta):
+                    flights = load_flights(current_search_id)
+                    if flights:
+                        save_flights(flights, prefix="search", override_key=current_search_id)
+                        save_raw(f"{current_search_id}:meta", meta_raw, ttl=_META_TTL)
+                        logger.info(f"[search_flights] Cache hit + TTL refreshed: {current_search_id}")
+                        cheapest = min(flights, key=lambda f: f.get("price", 9e9))
+                        non_stop = sum(
+                            1 for f in flights
+                            if all(
+                                it.get("stops", 1) == 0
+                                for it in (f.get("itineraries") or [])
+                            )
+                        )
+                        return (
+                            f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]\n"
+                            f"search_id={current_search_id}\n"
+                            f"total={len(flights)}\n"
+                            f"non_stop={non_stop}\n"
+                            f"cheapest_price={cheapest.get('price', 0):.0f} "
+                            f"{cheapest.get('currency', 'VND')}\n"
+                            f"cheapest_airlines={', '.join(cheapest.get('airlines') or [])}\n"
+                            f"Hành trình: {origin}→{destination} ngày {departureDate}"
+                            + (f" | Khứ hồi về {returnDate}" if roundTrip and returnDate else "")
+                        )
+                else:
+                    logger.info(
+                        f"[search_flights] Core params thay đổi → tìm mới "
+                        f"(bỏ cache {current_search_id})"
+                    )
+            except Exception as e:
+                logger.warning(f"[search_flights] Lỗi parse meta: {e} → gọi Duffel")
+        # Nếu meta không có hoặc id hết hạn → gọi Duffel bình thường
 
     # ── Gọi Duffel ────────────────────────────────────────────────────────────
     try:
         flights = await search_flights_async(params, max_offers=200)
     except Exception as e:
         logger.error(f"[search_flights] Duffel error: {e}")
-        return f"[TRỤC TRẶC HỆ THỐNG]: Không thể kết nối với hãng hàng không. Chi tiết: {str(e)}"
+        return (
+            f"[TRỤC TRẶC HỆ THỐNG]: Không thể kết nối với hãng hàng không. "
+            f"Chi tiết: {str(e)}"
+        )
 
     if not flights:
         return (
@@ -137,7 +232,7 @@ async def search_flights(
     # ── Lưu Redis + meta ──────────────────────────────────────────────────────
     search_id = save_flights(flights, prefix="search")
 
-    # Lưu meta để recover cache sau này khi hết hạn
+    # Meta lưu Core Params để: (1) compare cache hit lần sau, (2) recover khi hết hạn
     save_raw(f"{search_id}:meta", json.dumps(params), ttl=_META_TTL)
 
     # Thống kê
@@ -187,22 +282,24 @@ async def get_filtered_flights(
         flights = await _recover_cache(search_id)
         if not flights:
             return (
-                f"[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
-                f"khôi phục tự động. Vui lòng tìm vé lại nhé."
+                "[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
+                "khôi phục tự động. Vui lòng tìm vé lại nhé."
             )
         logger.info(f"[get_filtered_flights] Recover thành công: {len(flights)} vé")
 
-    filters = {k: v for k, v in {
-        "maxPrice":           maxPrice,
-        "preferred_airlines": preferred_airlines,
-        "nonStop":            nonStop,
-        "travelClass":        travelClass,
-        "start_hour":         start_hour,
-        "end_hour":           end_hour,
-        "sort_preference":    sort_preference,
-    }.items() if v is not None}
+    filters = {
+        k: v for k, v in {
+            "maxPrice":           maxPrice,
+            "preferred_airlines": preferred_airlines,
+            "nonStop":            nonStop,
+            "travelClass":        travelClass,
+            "start_hour":         start_hour,
+            "end_hour":           end_hour,
+            "sort_preference":    sort_preference,
+        }.items() if v is not None
+    }
 
-    # ── Validate ──────────────────────────────────────────────────────────────
+    # ── Validate filter params ────────────────────────────────────────────────
     is_valid, errors = validate_filter_params(filters)
     if not is_valid:
         return "[BỘ LỌC KHÔNG HỢP LỆ]:\n" + "\n".join(f"- {e}" for e in errors)
@@ -211,8 +308,7 @@ async def get_filtered_flights(
     original_count = len(flights)
     filtered       = filter_and_sort(flights, filters)
     summary        = build_filter_summary(original_count, filtered, filters)
-
-    filtered_id = save_flights(filtered, prefix="filtered") if filtered else None
+    filtered_id    = save_flights(filtered, prefix="filtered") if filtered else None
 
     return (
         f"[BỘ LỌC ĐƯỢC ÁP DỤNG]\n"
@@ -239,7 +335,9 @@ async def analyze_flights(
     target_airline_codes: ["VN","VJ"] — so sánh theo hãng.
     target_flight_numbers: ["VN123","VJ456"] — so sánh vé cụ thể.
     """
-    logger.info(f"[analyze_flights] search_id={search_id} airlines={target_airline_codes}")
+    logger.info(
+        f"[analyze_flights] search_id={search_id} airlines={target_airline_codes}"
+    )
 
     # ── Load cache (tự recover nếu hết hạn) ──────────────────────────────────
     flights = load_flights(search_id)
@@ -248,8 +346,8 @@ async def analyze_flights(
         flights = await _recover_cache(search_id)
         if not flights:
             return (
-                f"[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
-                f"khôi phục tự động. Vui lòng tìm vé lại nhé."
+                "[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể "
+                "khôi phục tự động. Vui lòng tìm vé lại nhé."
             )
         logger.info(f"[analyze_flights] Recover thành công: {len(flights)} vé")
 
@@ -263,7 +361,10 @@ async def analyze_flights(
         flights=flights,
         airline_db_info=airline_db_info,
         target_flights=target_flight_numbers,
-        target_airlines=[c.upper() for c in target_airline_codes if c] if target_airline_codes else None,
+        target_airlines=(
+            [c.upper() for c in target_airline_codes if c]
+            if target_airline_codes else None
+        ),
     )
 
     return f"[DỮ LIỆU SO SÁNH CHUYẾN BAY/HÃNG BAY]\n{context}"
@@ -287,7 +388,9 @@ if __name__ == "__main__":
     sse = SseServerTransport("/messages")
 
     async def handle_sse(request: Request):
-        async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
             await mcp._mcp_server.run(
                 streams[0], streams[1],
                 mcp._mcp_server.create_initialization_options()

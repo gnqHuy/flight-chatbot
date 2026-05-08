@@ -25,6 +25,7 @@ async def search_flights(
     returnDate: str | None = None,
     travelClass: str | None = None,
     preferred_airlines: list[str] | None = None,
+    current_search_id: str | None = None,
 ) -> str:
     """
     Tìm vé máy bay mới từ Duffel API.
@@ -51,7 +52,7 @@ async def search_flights(
         "returnDate":         returnDate,
         "travelClass":        travelClass,
         "preferred_airlines": preferred_airlines or [],
-        "current_search_id":  None,
+        "current_search_id":  current_search_id,
     })
 
 
