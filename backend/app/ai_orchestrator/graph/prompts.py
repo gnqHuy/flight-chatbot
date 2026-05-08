@@ -47,7 +47,6 @@ def build_system_prompt(state: dict, test_date: str | None = None) -> str:
     has_cache = bool(search_id and search_id != "CLEAR")
     cache_str = f"CÓ — ID: {search_id}" if has_cache else "KHÔNG CÓ"
 
-    # vì MCP Flight tự quyết dùng cache hay gọi Duffel mới dựa trên Core Params
     cache_instruction = (
         f"""Cache đang CÓ (ID: {search_id}).
 LUÔN truyền current_search_id="{search_id}" vào args của search_flights.
@@ -84,12 +83,17 @@ KHÔNG dùng tên đầy đủ trong args tool.
 {cache_instruction}
 
 ━━━ VALIDATION GATE — CHỈ ÁP DỤNG CHO V8 ━━━
-V8 — "em bé / trẻ em / con nít" CHƯA RÕ TUỔI:
+V8 — "em bé / trẻ em / bé / con nít / đứa nhỏ" CHƯA RÕ TUỔI:
   → KHÔNG gọi bất kỳ tool nào.
-  → Hỏi ngay: "Bé nhà mình bao nhiêu tuổi ạ?"
-  → Sau khi có tuổi: dưới 2 tuổi = infants, 2-11 tuổi = children.
-  → KHÔNG hỏi lại nếu khách đã nói rõ tuổi (ví dụ "bé 5 tuổi" → children=1).
-
+  → Hỏi ngay: "Bé nhà mình bao nhiêu tuổi ạ? (dưới 2 tuổi = em bé, 2-11 tuổi = trẻ em)"
+  → KHÔNG nói "Mình sẽ tìm vé" hay bất kỳ câu hứa hẹn nào trước khi biết tuổi.
+ 
+Khi khách trả lời tuổi — map NGAY và gọi search_flights NGAY, không hỏi lại:
+  "18 tháng" / "1 tuổi" / "dưới 2 tuổi" → infants=1, children=0
+  "2 tuổi" / "5 tuổi" / "10 tuổi"       → children=1, infants=0
+  "bé 3 tháng"                            → infants=1, children=0
+  Sau khi map → gọi search_flights ngay. KHÔNG hỏi lại nếu tuổi đã rõ.
+ 
 Tất cả validation khác (V1–V7: thiếu điểm đi, ngày sai, quá số người...):
   → Cứ gọi search_flights với params hiện có.
   → MCP Flight sẽ validate và trả thông báo lỗi.
@@ -174,6 +178,9 @@ Sau khi tool trả về kết quả, tổng hợp thành 1 câu trả lời hoà
   KHÔNG tự nhớ và lặp lại từ turn trước nếu tool result không xác nhận lại.
 - Nếu tool trả về rỗng/lỗi → nói thật, không bịa.
 - TUYỆT ĐỐI KHÔNG để lộ tag hệ thống ([DỮ LIỆU...], JSON thô) trong câu trả lời.
+- TUYỆT ĐỐI KHÔNG tự suy luận hoặc đặt mặc định origin.
+  Nếu user không nói rõ điểm đi → gọi search_flights với origin="" (rỗng)
+  để MCP Flight trả lỗi V1 → Bot hỏi lại.
 - KHÔNG mời đặt vé.
 
 ━━━ ĐỊNH DẠNG ━━━

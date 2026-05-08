@@ -4,6 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.api import api_router
 from app.database.checkpointer import async_pool, checkpointer
 from app.database.database import init_db
+from app.database.checkpointer import async_pool
+from app.ai_orchestrator.graph.flight_graph import init_flight_graph
+from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp, knowledge_mcp
+
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    force=True,
+)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 app = FastAPI()
 
@@ -22,28 +35,28 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
-    # 1. Init DB schema (sync)
     init_db()
     print("✅ DB schema OK")
 
-    # 2. Mở async pool cho LangGraph checkpointer
     await async_pool.open()
     await checkpointer.setup()
     print("✅ Checkpointer OK")
 
-    # 3. Compile ReAct agent graph — PHẢI sau khi checkpointer ready
-    from app.ai_orchestrator.graph.flight_graph import init_flight_graph
     await init_flight_graph()
     print("✅ Flight graph OK")
 
-    # 4. Kết nối MCP servers (non-blocking — chỉ kiểm tra, không block startup)
     try:
-        from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp, knowledge_mcp
+        await flight_mcp.connect()
+        await knowledge_mcp.connect()
         print("✅ MCP clients ready")
     except Exception as e:
         print(f"⚠️  MCP clients warning: {e} (sẽ retry khi gọi tool)")
 
     print("🚀 Server sẵn sàng nhận request!")
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    await async_pool.close()
+    print("[OK] Connection pool closed")
 
 app.include_router(api_router, prefix="/api/v1")

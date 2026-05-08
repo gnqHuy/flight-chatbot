@@ -1,17 +1,11 @@
 """
 app/ai_orchestrator/graph/tools/flight_tool.py
-3 tools riêng biệt: search_flights, filter_flights, analyze_flights.
-Normalize được xử lý ở system prompt — tool chỉ gọi MCP.
 """
 import logging
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TOOL 1: search_flights
-# ─────────────────────────────────────────────────────────────────────────────
 
 @tool
 async def search_flights(
@@ -29,19 +23,17 @@ async def search_flights(
 ) -> str:
     """
     Tìm vé máy bay mới từ Duffel API.
-    Gọi khi: khách cung cấp hành trình mới HOẶC đổi Core Param
-    (điểm đi, điểm đến, ngày bay, số hành khách, hạng ghế).
-    KHÔNG gọi nếu chỉ thay đổi bộ lọc (hãng, giá, giờ bay).
-
-    Trả về search_id để dùng cho filter_flights và analyze_flights.
-    origin/destination: mã IATA 3 chữ (HAN, SGN, DAD, PQC, CXR...).
-    preferred_airlines: IATA code hãng bay (VN, VJ, QH).
+    Gọi khi: khách cung cấp hành trình mới HOẶC đổi Core Param.
+    current_search_id: luôn truyền search_id hiện tại để MCP kiểm tra cache.
     """
     from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp
 
-    logger.info(f"[search_flights] {origin}→{destination} {departureDate}")
+    logger.info(
+        f"[search_flights tool] {origin}→{destination} {departureDate} | "
+        f"current_search_id={current_search_id}"
+    )
 
-    return await flight_mcp.call_tool("search_flights", {
+    args = {
         "origin":             origin,
         "destination":        destination,
         "departureDate":      departureDate,
@@ -53,12 +45,13 @@ async def search_flights(
         "travelClass":        travelClass,
         "preferred_airlines": preferred_airlines or [],
         "current_search_id":  current_search_id,
-    })
+    }
+    logger.debug(f"[search_flights tool] args gửi MCP: {args}")
 
+    result = await flight_mcp.call_tool("search_flights", args)
+    logger.debug(f"[search_flights tool] MCP trả về: {result[:200]}...")
+    return result
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TOOL 2: filter_flights
-# ─────────────────────────────────────────────────────────────────────────────
 
 @tool
 async def filter_flights(
@@ -74,18 +67,16 @@ async def filter_flights(
     """
     Lọc và sắp xếp vé từ kết quả tìm kiếm đang có.
     Gọi khi: khách thay đổi Soft Param trên danh sách hiện tại.
-    Nếu cache hết hạn, MCP server tự động tìm lại — không cần lo.
-
-    Bỏ lọc một tiêu chí: truyền None cho param đó.
-    Loại hãng X: preferred_airlines = [các hãng còn lại, KHÔNG có X].
-    sort_preference: "price_asc" | "price_desc" | "departure_time" | "arrival_time"
-    preferred_airlines: IATA code (VN, VJ, QH).
     """
     from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp
 
-    logger.info(f"[filter_flights] search_id={current_search_id}")
+    logger.info(
+        f"[filter_flights tool] search_id={current_search_id} | "
+        f"maxPrice={maxPrice} airlines={preferred_airlines} nonStop={nonStop} "
+        f"hours={start_hour}-{end_hour} sort={sort_preference}"
+    )
 
-    return await flight_mcp.call_tool("get_filtered_flights", {
+    args = {
         "search_id":          current_search_id,
         "maxPrice":           maxPrice,
         "preferred_airlines": preferred_airlines,
@@ -94,12 +85,12 @@ async def filter_flights(
         "start_hour":         start_hour,
         "end_hour":           end_hour,
         "sort_preference":    sort_preference,
-    })
+    }
 
+    result = await flight_mcp.call_tool("get_filtered_flights", args)
+    logger.debug(f"[filter_flights tool] MCP trả về: {result[:200]}...")
+    return result
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TOOL 3: analyze_flights
-# ─────────────────────────────────────────────────────────────────────────────
 
 @tool
 async def analyze_flights(
@@ -109,25 +100,27 @@ async def analyze_flights(
 ) -> str:
     """
     So sánh và phân tích vé hoặc hãng bay từ kết quả tìm kiếm.
-    Gọi khi: khách muốn so sánh vé/hãng cụ thể.
-    Nếu cache hết hạn, MCP server tự động tìm lại — không cần lo.
-
-    compare_airlines: IATA code ["VN","VJ","QH"] — so sánh theo hãng.
-    compare_flights: mã chuyến ["VN123","VJ456"] — so sánh vé cụ thể.
-    Phải truyền ít nhất 1 trong 2.
     """
     from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp
 
     if not compare_airlines and not compare_flights:
+        logger.warning("[analyze_flights tool] Thiếu target — không có airline và flight number")
         return (
             "[YÊU CẦU CHỌN]: Bạn muốn so sánh hãng nào hoặc chuyến nào? "
             "Cho mình biết mã hãng (VN/VJ/QH) hoặc tick chọn trên màn hình."
         )
 
-    logger.info(f"[analyze_flights] search_id={current_search_id} airlines={compare_airlines}")
+    logger.info(
+        f"[analyze_flights tool] search_id={current_search_id} | "
+        f"airlines={compare_airlines} flights={compare_flights}"
+    )
 
-    return await flight_mcp.call_tool("analyze_flights", {
+    args = {
         "search_id":             current_search_id,
         "target_airline_codes":  compare_airlines,
         "target_flight_numbers": compare_flights,
-    })
+    }
+
+    result = await flight_mcp.call_tool("analyze_flights", args)
+    logger.debug(f"[analyze_flights tool] MCP trả về: {result[:200]}...")
+    return result

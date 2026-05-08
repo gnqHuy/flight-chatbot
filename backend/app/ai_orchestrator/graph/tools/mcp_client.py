@@ -7,7 +7,6 @@ import os
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
-
 class MCPClient:
     def __init__(self, server_url: str, name: str = "mcp"):
         self.server_url = server_url
@@ -23,8 +22,6 @@ class MCPClient:
                     c.text for c in result.content if hasattr(c, "text")
                 )
 
-
-# Singletons — import vào các nodes
 knowledge_mcp = MCPClient(
     server_url=os.getenv("KNOWLEDGE_MCP_URL", "http://127.0.0.1:5001/sse"),
     name="knowledge",
