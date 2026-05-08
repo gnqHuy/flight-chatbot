@@ -1,4 +1,3 @@
-from datetime import datetime
 
 SUPPORTED_AIRLINES     = ["VN", "VJ", "QH"]
 SUPPORTED_AIRLINES_SET = set(SUPPORTED_AIRLINES)
@@ -34,10 +33,6 @@ class ValidationTag:
     LIMIT_EXCEEDED  = "[VƯỢT QUÁ SỐ KHÁCH]"
     INVALID_PAX     = "[SỐ KHÁCH KHÔNG HỢP LỆ]"
     INVALID_DATE    = "[NGÀY BAY KHÔNG HỢP LỆ]"
-
-CURRENT_TIME     = datetime.now()
-# CURRENT_TIME_STR = CURRENT_TIME.strftime("%Y-%m-%d %H:%M")
-CURRENT_TIME_STR = "2026-05-15"
 
 MAX_HISTORY_TURNS    = 6
 MAX_FLIGHTS_RETURNED = 200

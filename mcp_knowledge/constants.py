@@ -2,8 +2,6 @@ import os
 from datetime import datetime
 
 SUPPORTED_AIRLINES = ["VN", "VJ", "QH"]
-CURRENT_TIME       = datetime.now()
-CURRENT_TIME_STR   = CURRENT_TIME.strftime("%Y-%m-%d %H:%M")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DATABASE_URL   = os.getenv("DATABASE_URL", "")

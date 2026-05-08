@@ -2,8 +2,8 @@
 app/ai_orchestrator/graph/prompts.py
 """
 import json
-from datetime import datetime
 
+from app.core.time_utils import get_current_datetime_str
 
 def build_system_prompt(state: dict, test_date: str | None = None) -> str:
     sf        = state.get("search_filters") or {}
@@ -12,7 +12,7 @@ def build_system_prompt(state: dict, test_date: str | None = None) -> str:
     if test_date:
         current_time = test_date
     else:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        current_time = get_current_datetime_str()
 
     origin      = sf.get("origin")
     destination = sf.get("destination")
