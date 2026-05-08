@@ -42,3 +42,9 @@ class ConversationRepository:
             .limit(limit)
         )
         return self.session.exec(stmt).all()
+    
+    def delete(self, conversation_id: UUID) -> None:
+        convo = self.get_by_id(conversation_id)
+        if convo:
+            self.session.delete(convo)
+            self.session.commit()

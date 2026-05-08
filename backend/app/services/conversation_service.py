@@ -28,9 +28,9 @@ class ConversationService:
         
         return self.message_repo.get_by_conversation_id(conversation_id)
 
-    # def delete_conversation(self, conversation_id: UUID):
-    #     conversation = self.conversation_repo.get_by_id(conversation_id)
-    #     if not conversation:
-    #         raise HTTPException(status_code=404, detail="Conversation not found")
+    def delete_conversation(self, conversation_id: UUID):
+        conversation = self.conversation_repo.get_by_id(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
         
-    #     return self.conversation_repo.delete(conversation_id)
+        return self.conversation_repo.delete(conversation_id)

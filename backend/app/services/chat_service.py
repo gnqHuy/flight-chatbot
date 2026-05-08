@@ -1,11 +1,11 @@
+# app/services/chat_service.py
 """
 app/services/chat_service.py
 """
 import uuid
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 
 import app.ai_orchestrator.graph.flight_graph as _fg
-from app.ai_orchestrator.graph.prompts import build_system_prompt
 from app.core.enums import ChatRole
 from app.repositories.message_repo import MessageRepository
 from app.repositories.conversation_repo import ConversationRepository
@@ -23,7 +23,7 @@ class ChatService:
 
     async def process_message(
         self,
-        conversation_id: uuid.UUID | None,
+        conversation_id: uuid.UUID | str | None,
         user_message: str,
         ui_context: dict | None = None,
     ):
@@ -31,6 +31,7 @@ class ChatService:
             conversation_id = str(uuid.uuid4())
             self.conversation_repo.create(id=conversation_id, title="New Chat")
         else:
+            conversation_id = str(conversation_id)
             if not self.conversation_repo.get_by_id(conversation_id):
                 self.conversation_repo.create(
                     id=conversation_id, title="New Chat (Auto-created)"
@@ -42,7 +43,7 @@ class ChatService:
             content=user_message,
         )
 
-        config = {"configurable": {"thread_id": str(conversation_id)}}
+        config = {"configurable": {"thread_id": conversation_id}}
 
         current_state = {}
         try:
@@ -54,11 +55,10 @@ class ChatService:
 
         if ui_context and ui_context.get("active_search_id"):
             current_state["current_search_id"] = ui_context["active_search_id"]
+            await _fg.flight_graph.aupdate_state(config, current_state)
 
-        system_prompt = build_system_prompt(current_state)
         inputs = {
             "messages": [
-                SystemMessage(content=system_prompt),
                 HumanMessage(content=user_message),
             ]
         }
@@ -72,7 +72,8 @@ class ChatService:
         selected_flight_ids: list[str],
     ):
         """Khách tick chọn chuyến bay trên UI → tiếp tục analyze."""
-        config = {"configurable": {"thread_id": str(conversation_id)}}
+        conversation_id = str(conversation_id)
+        config = {"configurable": {"thread_id": conversation_id}}
 
         current_state = {}
         try:
@@ -82,7 +83,6 @@ class ChatService:
         except Exception:
             pass
 
-        system_prompt = build_system_prompt(current_state)
         flight_ids_str = ", ".join(selected_flight_ids)
         user_msg = (
             f"Tôi đã chọn các chuyến bay: {flight_ids_str}. "
@@ -91,7 +91,6 @@ class ChatService:
 
         inputs = {
             "messages": [
-                SystemMessage(content=system_prompt),
                 HumanMessage(content=user_msg),
             ]
         }
