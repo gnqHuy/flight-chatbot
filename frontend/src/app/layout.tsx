@@ -28,8 +28,8 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
-          <div className="flex h-screen w-full overflow-hidden bg-white">
-            <div className="h-full flex-shrink-0">
+          <div className="flex h-screen w-full bg-gray-100 overflow-hidden">
+            <div className="flex shrink-0">
               <ChatSidebar />
             </div>
 
