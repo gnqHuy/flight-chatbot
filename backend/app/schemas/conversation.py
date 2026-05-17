@@ -11,3 +11,4 @@ class ConversationRead(SQLModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    is_active: bool

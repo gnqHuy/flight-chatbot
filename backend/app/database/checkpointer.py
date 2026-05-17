@@ -1,12 +1,12 @@
 import os
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-# ĐỔI SANG DÙNG POOL ASYNC
 from psycopg_pool import AsyncConnectionPool 
 from dotenv import load_dotenv
+from app.core.config import CHECKPOINT_DATABASE_URL
 
 load_dotenv()
 
-db_uri = os.getenv("DATABASE_URL")
+db_uri = CHECKPOINT_DATABASE_URL
 if not db_uri:
     raise ValueError("Chưa cấu hình DATABASE_URL trong file .env")
 
@@ -19,8 +19,7 @@ async_pool = AsyncConnectionPool(
     kwargs={"autocommit": True},
     open=False 
 )
-
-checkpointer = AsyncPostgresSaver(async_pool)
+checkpointer = None
 
 def get_checkpointer():
     """Hàm này chỉ trả về object, không làm block hệ thống nữa"""

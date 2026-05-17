@@ -5,7 +5,7 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharac
 from langchain_openai import OpenAIEmbeddings
 from langchain_postgres.vectorstores import PGVector
 
-from constants import OPENAI_API_KEY, DATABASE_URL
+from constants import OPENAI_API_KEY, KNOWLEDGE_DATABASE_URL
 from models.crawler_staging import CrawlerStaging
 from models.crawler_url import CrawlerUrl, UrlType
 from models.enums import StagingStatus
@@ -35,8 +35,8 @@ class PolicyDBIngester:
     def ingest_to_db(self, run_id: str = None) -> int:
         logger.info("🗄️ BƯỚC 3: NẠP DỮ LIỆU CHÍNH SÁCH VÀO VECTOR DB...")
 
-        if not DATABASE_URL:
-            logger.error("❌ DATABASE_URL chưa cấu hình")
+        if not KNOWLEDGE_DATABASE_URL:
+            logger.error("❌ KNOWLEDGE_DATABASE_URL chưa cấu hình")
             return 0
 
         stmt = (
@@ -90,7 +90,7 @@ class PolicyDBIngester:
             vector_store = PGVector(
                 embeddings=self.embeddings,
                 collection_name=self.collection_name,
-                connection=DATABASE_URL,
+                connection=KNOWLEDGE_DATABASE_URL,
                 use_jsonb=True,
             )
             vector_store.add_documents(all_splits)

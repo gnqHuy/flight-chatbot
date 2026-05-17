@@ -37,6 +37,7 @@ class ConversationRepository:
         stmt = (
             select(Conversation)
             .where(Conversation.user_id == user_id)
+            .where(Conversation.is_active == True)
             .order_by(Conversation.updated_at.desc())
             .offset(offset)
             .limit(limit)
@@ -46,5 +47,6 @@ class ConversationRepository:
     def delete(self, conversation_id: UUID) -> None:
         convo = self.get_by_id(conversation_id)
         if convo:
-            self.session.delete(convo)
+            convo.is_active = False
+            self.session.add(convo)
             self.session.commit()

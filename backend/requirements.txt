@@ -9,11 +9,11 @@ langchain-core>=0.2.0
 langchain-openai>=0.1.0
 langchain_google_genai
 langchain-anthropic
-langchain-postgres>=0.0.6
-langchain-text-splitters>=0.2.0
+langgraph-checkpoint-postgres
 langgraph>=0.2.0
 openai>=1.0.0
 google-genai
+
 # ── MCP ───────────────────────────────────────────────────────────────────
 mcp>=1.0.0
 
@@ -22,10 +22,6 @@ sqlmodel>=0.0.21
 psycopg2-binary>=2.9.0      # SQLAlchemy sync engine
 psycopg[binary]>=3.1.0      # AsyncPostgresSaver (LangGraph checkpointer)
 psycopg-pool>=3.2.0         # AsyncConnectionPool
-pgvector>=0.2.0
-
-# ── Redis ─────────────────────────────────────────────────────────────────
-redis>=5.0.0
 
 # ── Auth ──────────────────────────────────────────────────────────────────
 python-jose[cryptography]>=3.3.0

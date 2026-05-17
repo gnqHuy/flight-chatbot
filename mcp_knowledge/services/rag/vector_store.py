@@ -5,7 +5,7 @@ from langchain_openai import OpenAIEmbeddings
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL  = os.getenv("DATABASE_URL", "")
+KNOWLEDGE_DATABASE_URL  = os.getenv("KNOWLEDGE_DATABASE_URL", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 COLLECTION_NAME = "flight_policies"
 
@@ -29,7 +29,7 @@ def get_policy_vector_store() -> PGVector:
         _policy_store = PGVector(
             embeddings=get_embeddings(),
             collection_name=COLLECTION_NAME,
-            connection=DATABASE_URL,
+            connection=KNOWLEDGE_DATABASE_URL,
             use_jsonb=True,
         )
         logger.info(f"PGVector store '{COLLECTION_NAME}' initialized")

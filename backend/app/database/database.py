@@ -1,8 +1,9 @@
 from sqlmodel import SQLModel, create_engine, Session
-from app.core.config import DATABASE_URL
+from app.core.config import BACKEND_DATABASE_URL
+from app.database.models import *
 
 engine = create_engine(
-    DATABASE_URL,
+    BACKEND_DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
 )

@@ -50,14 +50,13 @@ async def build_graph_for_llm(llm, checkpointer):
     return graph.compile(checkpointer=checkpointer)
 
 
-async def init_flight_graph():
+async def init_flight_graph(checkpointer):
     """Gọi trong on_startup sau khi checkpointer pool đã open."""
     global flight_graph
 
     from app.core.llm_setup import llm
     from app.database.checkpointer import get_checkpointer
 
-    checkpointer   = get_checkpointer()
     llm_with_tools = llm.bind_tools(TOOLS)
     tool_node      = ToolNode(TOOLS)
 

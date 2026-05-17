@@ -4,6 +4,8 @@ Validate search params trước khi gọi Duffel API.
 """
 from datetime import datetime
 
+from utils.time_utils import get_current_time
+
 SUPPORTED_AIRLINES = {"VN", "VJ", "QH"}
 
 
@@ -72,7 +74,7 @@ def validate_search_params(params: dict) -> tuple[bool, list[str], dict]:
     if departure_date:
         try:
             dep_dt = datetime.strptime(departure_date, "%Y-%m-%d")
-            today  = datetime.now()
+            today  = get_current_time()
             if dep_dt.date() < today.date():
                 errors.append("Ngày đi đã qua.")
                 updates["departureDate"] = "CLEAR"

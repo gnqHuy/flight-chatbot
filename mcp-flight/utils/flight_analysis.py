@@ -91,19 +91,15 @@ def format_flights_to_text(flights: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+# mcp-flight/utils/flight_analysis.py (Chỉ sửa phần build_analysis_context)
+
 def build_analysis_context(
     flights: list[dict],
-    airline_db_info: str = "",
     target_flights: list[str] | None = None,
     target_airlines: list[str] | None = None,
 ) -> str:
     """
-    Build structured analysis context cho LLM — thay thế antipattern cũ
-    (dump raw data và để LLM tự phân tích).
-
-    - Nếu target_flights: lọc các vé theo mã chuyến, format chi tiết.
-    - Nếu target_airlines: lọc theo hãng, format chi tiết + thêm DB info.
-    - Nếu cả hai: làm cả hai.
+    Build structured analysis context cho LLM (Chỉ thuần thông tin vé).
     """
     sections: list[str] = []
 
@@ -114,7 +110,6 @@ def build_analysis_context(
             if any(al.upper() in (target_airlines or []) for al in (f.get("airlines") or []))
         ]
         if airline_flights:
-            # Lấy 1 vé rẻ nhất mỗi hãng làm ví dụ
             seen: set[str] = set()
             examples: list[dict] = []
             for f in sorted(airline_flights, key=lambda x: x.get("price", 999999)):
@@ -126,8 +121,6 @@ def build_analysis_context(
                 "[VÉ MINH HỌA CỦA CÁC HÃNG]\n" + format_flights_to_text(examples)
             )
 
-        if airline_db_info:
-            sections.append("[THÔNG TIN HÃNG BAY TỪ HỆ THỐNG]\n" + airline_db_info)
 
     # Lọc theo flight numbers
     if target_flights:

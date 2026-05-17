@@ -1,21 +1,40 @@
 services:
-  # ── Infrastructure ─────────────────────────────────────────────────────────
-  postgres:
+  backend_db:
     image: pgvector/pgvector:pg15
-    container_name: flight_chatbot_db
+    container_name: flight_backend_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: huy123456789
-      POSTGRES_DB: flight_chatbot
+      POSTGRES_DB: backend_db
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - backend_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - ota_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d backend_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  knowledge_db:
+    image: pgvector/pgvector:pg15
+    container_name: flight_knowledge_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: huy123456789
+      POSTGRES_DB: knowledge_db
+    ports:
+      - "55433:5432"
+    volumes:
+      - knowledge_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - ota_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowledge_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,14 +66,14 @@ services:
     env_file:
       - ./mcp_knowledge/.env
     environment:
-      DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
+      KNOWLEDGE_DATABASE_URL: "postgresql://postgres:huy123456789@knowledge_db:5432/knowledge_db"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       APP_DATE: "${APP_DATE:-}"
     volumes:
       - ./mcp_knowledge:/app
     depends_on:
-      postgres: { condition: service_healthy }
+      knowledge_db: { condition: service_healthy }
       redis: { condition: service_healthy }
     restart: on-failure
     networks:
@@ -71,21 +90,46 @@ services:
     env_file:
       - ./mcp-flight/.env
     environment:
-      DATABASE_URL: "postgresql://postgres:huy123456789@postgres:5432/flight_chatbot"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       APP_DATE: "${APP_DATE:-}"
     volumes:
       - ./mcp-flight:/app
     depends_on:
-      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     restart: on-failure
     networks:
       - ota_network
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flight_backend_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      BACKEND_DATABASE_URL: "postgresql+psycopg2://postgres:huy123456789@backend_db:5432/backend_db"
+      FLIGHT_MCP_URL: "http://mcp_flight:8001/sse"
+      KNOWLEDGE_MCP_URL: "http://knowledge_mcp:5001/sse"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend_db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      knowledge_mcp: { condition: service_started }
+      mcp_flight: { condition: service_started }
+    restart: on-failure
+    networks:
+      - ota_network
+
 volumes:
-  pgdata:
+  backend_pgdata:
+  knowledge_pgdata:
   redisdata:
 
 networks:
