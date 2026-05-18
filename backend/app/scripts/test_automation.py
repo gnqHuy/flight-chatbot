@@ -4,7 +4,7 @@ app/scripts/test_automation.py
 Chạy test với 1 candidate model tại 1 thời điểm.
 Đổi model: thay CANDIDATE_ID ở đầu file.
 
-Chạy: python -m app.scripts.test_automation
+Chạy: docker exec -it flight_backend_api python -m app.scripts.test_automation
 """
 import asyncio
 import json
@@ -12,10 +12,8 @@ import os
 import sys
 import uuid
 import time
+import traceback
 from datetime import datetime
-
-from dotenv import load_dotenv
-load_dotenv()
 
 from langchain_core.messages import HumanMessage
 
@@ -47,8 +45,6 @@ CANDIDATE = next(c for c in CANDIDATES if c["id"] == CANDIDATE_ID)
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
-    import asyncio as _asyncio
-
     config = {
         "configurable": {
             "thread_id": thread_id,
@@ -81,9 +77,9 @@ async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
             if "503" in str(e) or "UNAVAILABLE" in str(e):
                 wait = 10 * (attempt + 1)
                 print(f"    {C.YELLOW}⚠ 503 UNAVAILABLE, retry sau {wait}s... (lần {attempt+1}/3){C.RESET}")
-                await _asyncio.sleep(wait)
+                await asyncio.sleep(wait)
                 continue
-            raise  # lỗi khác thì raise luôn
+            raise
 
     raise RuntimeError("Gemini 503 sau 3 lần retry")
 
@@ -104,25 +100,32 @@ async def main(input_file: str, output_file: str):
     if not os.path.exists(input_file):
         print(f"{C.RED}❌ Không tìm thấy: {input_file}{C.RESET}")
         return
+        
     with open(input_file, encoding="utf-8") as f:
         test_cases = json.load(f)
     print(f"📂 {len(test_cases)} test cases\n")
 
     # ── Init ──────────────────────────────────────────────────────────────────
-    from app.database.checkpointer import async_pool, checkpointer
+    from app.database.checkpointer import async_pool, AsyncPostgresSaver
+    from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp, knowledge_mcp
+    
     await async_pool.open()
+    checkpointer = AsyncPostgresSaver(async_pool)
     await checkpointer.setup()
+
+    print("🔗 Đang kết nối tới MCP Servers...")
+    await flight_mcp.connect()
+    await knowledge_mcp.connect()
+    print("✅ MCP Connected!")
 
     from app.core.llm_setup import llm_openai, llm_gemini, llm_claude, llm_as_judge
     candidate_llms = {"openai": llm_openai, "gemini": llm_gemini, "claude": llm_claude}
     llm = candidate_llms[CANDIDATE_ID]
 
-    # Project LangSmith được set trong .env (LANGSMITH_PROJECT)
-    # Uncomment đúng project trước khi chạy
-
     print(f"⚙  Compile graph cho {CANDIDATE['label']}...")
     from app.ai_orchestrator.graph.flight_graph import build_graph_for_llm
-    graph = await build_graph_for_llm(llm, checkpointer)
+    
+    graph = build_graph_for_llm(llm, checkpointer)
     print(f"✅ Graph ready\n")
 
     judge_chains = build_judge_chains()
@@ -218,7 +221,6 @@ async def main(input_file: str, output_file: str):
                 })
 
             except Exception as e:
-                import traceback
                 print(f"    {C.RED}✗ Exception: {e}{C.RESET}")
                 traceback.print_exc()
                 stats["tech_fail"] += 1
@@ -304,13 +306,14 @@ async def main(input_file: str, output_file: str):
         json.dump(report, f, ensure_ascii=False, indent=2)
     print(f"\n  📄 Report: {C.CYAN}{output_file}{C.RESET}\n")
 
-    from app.database.checkpointer import async_pool as pool
-    await pool.close()
+    await async_pool.close()
+    await flight_mcp.close()
+    await knowledge_mcp.close()
 
 
 if __name__ == "__main__":
     base        = os.path.dirname(os.path.abspath(__file__))
-    INPUT_FILE  = os.path.join(base, "data_set", "test_cases.json")
+    INPUT_FILE  = os.path.join(base, "data_set", "flight_chatbot_test_cases_15.json")
     OUTPUT_FILE = os.path.join(
         base,
         f"report_{CANDIDATE_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

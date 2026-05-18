@@ -13,3 +13,4 @@ class FlightAgentState(TypedDict):
     search_filters:    dict
     current_search_id: Optional[str]
     action:            Optional[dict]
+    saved_flights: list[dict] | None

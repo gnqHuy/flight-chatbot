@@ -11,7 +11,6 @@ from app.database.database import init_db
 from app.database.checkpointer import async_pool
 from app.ai_orchestrator.graph.tools.mcp_client import flight_mcp, knowledge_mcp
 
-# ── Cấu hình Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -31,15 +30,15 @@ async def lifespan(app: FastAPI):
     await checkpointer.setup() 
     print("✅ Checkpointer OK")
     
-    _fg.flight_graph = await _fg.init_flight_graph(checkpointer)
+    _fg.flight_graph = _fg.builder.compile(checkpointer=checkpointer)
     print("✅ Flight graph OK")
 
     try:
         await flight_mcp.connect()
         await knowledge_mcp.connect()
-        print("✅ MCP clients ready")
+        print("✅ MCP Persistent Clients ready")
     except Exception as e:
-        print(f"⚠️  MCP clients warning: {e} (sẽ tự động retry khi gọi tool)")
+        print(f"⚠️ MCP clients warning: {e} (Sẽ tự động retry khi LLM gọi tool)")
 
     print("🚀 Server sẵn sàng nhận request!")
     
@@ -47,7 +46,11 @@ async def lifespan(app: FastAPI):
     
     print("🛑 Tắt server...")
     await async_pool.close()
-    print("[OK] Connection pool closed")
+    
+    await flight_mcp.close()
+    await knowledge_mcp.close()
+    
+    print("[OK] All connections closed")
 
 app = FastAPI(lifespan=lifespan)
 

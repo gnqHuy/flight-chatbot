@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+load_dotenv()
 
 def get_env(var_name: str, default_value: str = None, required: bool = False) -> str:
     value = os.getenv(var_name)
@@ -14,7 +14,6 @@ def get_env(var_name: str, default_value: str = None, required: bool = False) ->
 OPENAI_API_KEY = get_env("OPENAI_API_KEY", required=True)
 GOOGLE_API_KEY = get_env("GOOGLE_API_KEY", required=True)
 ANTHROPIC_API_KEY = get_env("ANTHROPIC_API_KEY", required=True)
-DUFFEL_ACCESS_TOKEN = get_env("DUFFEL_ACCESS_TOKEN", required=True)
 BACKEND_DATABASE_URL = get_env("BACKEND_DATABASE_URL", required=True)
 CHECKPOINT_DATABASE_URL = get_env("BACKEND_CHECKPOINT_DATABASE_URL", default_value=BACKEND_DATABASE_URL)
 SECRET_KEY = get_env("SECRET_KEY", required=True)
