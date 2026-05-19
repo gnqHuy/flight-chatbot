@@ -155,3 +155,38 @@ def format_duffel_offer(raw: dict) -> dict | None:
     except Exception as e:
         logger.warning(f"Lỗi parse offer: {e}", exc_info=True)
         return None
+    
+def build_search_summary(
+    search_id: str,
+    flights: list[dict],
+    origin: str,
+    destination: str,
+    departureDate: str,
+    roundTrip: bool = False,
+    returnDate: str | None = None,
+) -> str:
+    cheapest = min(flights, key=lambda f: f.get("price", 9e9))
+
+    non_stop = sum(
+        1 for f in flights
+        if all(it.get("stops", 1) == 0 for it in (f.get("itineraries") or []))
+    )
+
+    is_round_trip = bool(roundTrip and returnDate)
+    trip_type = "round_trip" if is_round_trip else "one_way"
+
+    summary = (
+        f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]\n"
+        f"search_id={search_id}\n"
+        f"trip_type={trip_type}\n"
+        f"total={len(flights)}\n"
+        f"non_stop={non_stop}\n"
+        f"cheapest_price={cheapest.get('price', 0):.0f} {cheapest.get('currency', 'VND')}\n"
+        f"cheapest_airlines={', '.join(cheapest.get('airlines') or [])}\n"
+        f"outbound={origin}→{destination} ngày {departureDate}"
+    )
+
+    if is_round_trip:
+        summary += f"\ninbound={destination}→{origin} ngày {returnDate}"
+
+    return summary

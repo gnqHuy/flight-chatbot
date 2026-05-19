@@ -124,3 +124,31 @@ def validate_filter_params(params: dict) -> tuple[bool, list[str]]:
         errors.append(f"sort_preference không hợp lệ: '{sort}'.")
 
     return len(errors) == 0, errors
+
+
+def is_round_trip_offer(f: dict, origin: str, destination: str, return_date: str | None = None) -> bool:
+    itineraries = f.get("itineraries") or []
+    if len(itineraries) < 2:
+        return False
+
+    outbound = itineraries[0]
+    inbound = itineraries[1]
+
+    outbound_ok = (
+        outbound.get("departure", {}).get("iata") == origin
+        and outbound.get("arrival", {}).get("iata") == destination
+    )
+
+    inbound_ok = (
+        inbound.get("departure", {}).get("iata") == destination
+        and inbound.get("arrival", {}).get("iata") == origin
+    )
+
+    if not outbound_ok or not inbound_ok:
+        return False
+
+    if return_date:
+        inbound_at = inbound.get("departure", {}).get("at", "")
+        return inbound_at.startswith(return_date)
+
+    return True

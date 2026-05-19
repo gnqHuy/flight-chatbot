@@ -6,21 +6,42 @@ from utils.cache_manager import same_core_params, recover_cache
 from services.duffel_service import search_flights_async
 from services.redis_service import save_flights, load_flights, exists, save_raw, load_raw
 from services.filter_service import filter_and_sort, build_filter_summary
-from utils.validators import validate_search_params, validate_filter_params
+from utils.flight_parser import build_search_summary
+from utils.validators import is_round_trip_offer, validate_search_params, validate_filter_params
 from utils.flight_analysis import build_analysis_context
 
 @mcp.tool()
-async def search_flights(origin: str, destination: str, departureDate: str, roundTrip: bool = False,
-                         returnDate: str | None = None, adults: int = 1, children: int = 0,
-                         infants: int = 0, travelClass: str | None = None,
-                         preferred_airlines: list[str] | None = None, current_search_id: str | None = None) -> str:
+async def search_flights(
+    origin: str,
+    destination: str,
+    departureDate: str,
+    roundTrip: bool = False,
+    returnDate: str | None = None,
+    adults: int = 1,
+    children: int = 0,
+    infants: int = 0,
+    travelClass: str | None = None,
+    preferred_airlines: list[str] | None = None,
+    current_search_id: str | None = None,
+) -> str:
     """Tìm chuyến bay từ Duffel API. MCP tự quyết dùng cache hay gọi mới."""
-    logger.info(f"[search_flights] CALL {origin}→{destination} {departureDate} adults={adults} children={children} infants={infants} current_search_id={current_search_id}")
+    logger.info(
+        f"[search_flights] CALL {origin}→{destination} {departureDate} "
+        f"roundTrip={roundTrip} returnDate={returnDate} "
+        f"adults={adults} children={children} infants={infants} "
+        f"current_search_id={current_search_id}"
+    )
 
     params = {
-        "origin": origin, "destination": destination, "departureDate": departureDate,
-        "roundTrip": roundTrip, "returnDate": returnDate, "adults": adults,
-        "children": children, "infants": infants, "travelClass": travelClass,
+        "origin": origin,
+        "destination": destination,
+        "departureDate": departureDate,
+        "roundTrip": roundTrip,
+        "returnDate": returnDate,
+        "adults": adults,
+        "children": children,
+        "infants": infants,
+        "travelClass": travelClass,
         "preferred_airlines": preferred_airlines or [],
     }
 
@@ -32,27 +53,35 @@ async def search_flights(origin: str, destination: str, departureDate: str, roun
     if current_search_id and current_search_id != "CLEAR":
         meta_raw = load_raw(f"{current_search_id}:meta")
         data_alive = exists(current_search_id)
+
         if meta_raw and data_alive:
             try:
                 meta = json.loads(meta_raw)
+
                 if same_core_params(params, meta):
                     flights = load_flights(current_search_id)
+
                     if flights:
                         save_flights(flights, prefix="search", override_key=current_search_id)
                         save_raw(f"{current_search_id}:meta", meta_raw, ttl=_META_TTL)
-                        cheapest = min(flights, key=lambda f: f.get("price", 9e9))
-                        non_stop = sum(1 for f in flights if all(it.get("stops", 1) == 0 for it in (f.get("itineraries") or [])))
+
                         logger.info(f"[search_flights] CACHE HIT — {len(flights)} vé. TTL reset.")
-                        return (
-                            f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]\nsearch_id={current_search_id}\ntotal={len(flights)}\n"
-                            f"non_stop={non_stop}\ncheapest_price={cheapest.get('price', 0):.0f} {cheapest.get('currency', 'VND')}\n"
-                            f"cheapest_airlines={', '.join(cheapest.get('airlines') or [])}\n"
-                            f"Hành trình: {origin}→{destination} ngày {departureDate}" + (f" | Khứ hồi về {returnDate}" if roundTrip and returnDate else "")
+
+                        return build_search_summary(
+                            search_id=current_search_id,
+                            flights=flights,
+                            origin=origin,
+                            destination=destination,
+                            departureDate=departureDate,
+                            roundTrip=roundTrip,
+                            returnDate=returnDate,
                         )
+
             except Exception as e:
                 logger.warning(f"[search_flights] Lỗi parse meta: {e} — gọi Duffel")
 
     logger.info(f"[search_flights] Gọi Duffel API: {origin}→{destination} {departureDate}")
+
     try:
         flights = await search_flights_async(params, max_offers=200)
     except Exception as e:
@@ -61,16 +90,35 @@ async def search_flights(origin: str, destination: str, departureDate: str, roun
     if not flights:
         return f"[KHÔNG TÌM THẤY CHUYẾN BAY]: Không có chuyến bay VN/VJ/QH nào cho {origin}→{destination} ngày {departureDate}."
 
+    if roundTrip and returnDate:
+        round_trip_flights = [
+            f for f in flights
+            if is_round_trip_offer(f, origin, destination, returnDate)
+        ]
+
+        if not round_trip_flights:
+            return (
+                "[DỮ LIỆU CHUYẾN BAY KHÔNG ĐẦY ĐỦ]\n"
+                f"Yêu cầu là vé khứ hồi {origin}→{destination} ngày {departureDate}, "
+                f"về ngày {returnDate}.\n"
+                f"Hệ thống nhận được {len(flights)} offer nhưng chưa có offer nào đủ "
+                "chiều đi và chiều về hợp lệ.\n"
+                "Vui lòng kiểm tra lại phần tạo request hoặc parse dữ liệu từ Duffel."
+            )
+
+        flights = round_trip_flights
+
     search_id = save_flights(flights, prefix="search")
     save_raw(f"{search_id}:meta", json.dumps(params), ttl=_META_TTL)
-    cheapest = min(flights, key=lambda f: f.get("price", 9e9))
-    non_stop = sum(1 for f in flights if all(it.get("stops", 1) == 0 for it in (f.get("itineraries") or [])))
-    
-    return (
-        f"[DỮ LIỆU CHUYẾN BAY TÌM ĐƯỢC]\nsearch_id={search_id}\ntotal={len(flights)}\nnon_stop={non_stop}\n"
-        f"cheapest_price={cheapest.get('price', 0):.0f} {cheapest.get('currency', 'VND')}\n"
-        f"cheapest_airlines={', '.join(cheapest.get('airlines') or [])}\n"
-        f"Hành trình: {origin}→{destination} ngày {departureDate}" + (f" | Khứ hồi về {returnDate}" if roundTrip and returnDate else "")
+
+    return build_search_summary(
+        search_id=search_id,
+        flights=flights,
+        origin=origin,
+        destination=destination,
+        departureDate=departureDate,
+        roundTrip=roundTrip,
+        returnDate=returnDate,
     )
 
 @mcp.tool()

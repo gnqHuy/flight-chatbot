@@ -13,6 +13,7 @@ KHÔNG check kỹ thuật (tool calls, action type — đã kiểm tra riêng).
 
 ━━━ THÔNG TIN LƯỢT CHAT ━━━
 Câu hỏi: {user_query}
+Lịch sử hội thoại: {conversation_history}
 Hành vi mong đợi: {expected_behavior}
 Hành vi cấm: {anti_preference}
 
@@ -41,6 +42,8 @@ KHÔNG coi là hallucination:
   - Bot nói "mời xem danh sách trên UI"
   - Bot diễn đạt lại thông tin tool theo ngôn ngữ tự nhiên
   - Bot hỏi thêm khi tool báo lỗi/thiếu params
+  - Bot nhắc lại thông tin trong user_query 
+  - Bot nhắc lại thông tin user đã cung cấp conversation history trước đó dù tool hay user_query không trả về
 
 ━━━ LƯU Ý ━━━
 - Không trừ điểm vì tool sai (đã kiểm tra ở lớp Technical).
@@ -116,11 +119,18 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
         )
         return resp.text
 
-    def judge_turn(user_query, expected_behavior, anti_preference,
-                   tool_results_summary, bot_response) -> TurnUXScore:
+    def judge_turn(
+        user_query,
+        conversation_history,
+        expected_behavior,
+        anti_preference,
+        tool_results_summary,
+        bot_response,
+    ) -> TurnUXScore:
         prompt = (
             UX_JUDGE_PROMPT
             .replace("{user_query}", user_query)
+            .replace("{conversation_history}", conversation_history or "(chưa có lịch sử trước đó)")
             .replace("{expected_behavior}", expected_behavior)
             .replace("{anti_preference}", anti_preference)
             .replace("{tool_results_summary}", tool_results_summary)

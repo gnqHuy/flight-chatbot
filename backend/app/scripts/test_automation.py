@@ -25,7 +25,7 @@ if sys.platform == "win32":
 CANDIDATE_ID = "openai"
 
 # Mốc thời gian cố định cho toàn bộ test run
-TEST_DATE = "2026-05-15 10:00"
+TEST_DATE = "2026-05-19 10:00"
 
 from .test_config    import C, CANDIDATES, JUDGE_LABEL
 from .test_judge     import build_judge_chains
@@ -44,6 +44,10 @@ CANDIDATE = next(c for c in CANDIDATES if c["id"] == CANDIDATE_ID)
 # Run 1 turn
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Run 1 turn
+# ─────────────────────────────────────────────────────────────────────────────
+
 async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
     config = {
         "configurable": {
@@ -57,18 +61,30 @@ async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
         "tags": [CANDIDATE_ID],
     }
 
+    current_state = await graph.aget_state(config)
+    old_msg_count = len(current_state.values.get("messages", [])) if current_state.values else 0
+
     inputs = {"messages": [HumanMessage(content=user_msg)]}
 
-    # Retry tối đa 3 lần khi gặp 503
     for attempt in range(3):
         try:
             t0    = time.time()
             final = await graph.ainvoke(inputs, config=config)
-            msgs  = final.get("messages", [])
+            
+            all_msgs = final.get("messages", [])
+            
+            new_msgs = all_msgs[old_msg_count:]
+
+            # --- DÒNG CẦN THÊM VÀO ĐỂ DEBUG ---
+            print(f"\n    [DEBUG] old_count={old_msg_count}, total={len(all_msgs)}")
+            for i, m in enumerate(new_msgs):
+                print(f"    [DEBUG] msg[{i}]: {type(m).__name__} | tools: {getattr(m, 'tool_calls', 'N/A')}")
+            # ----------------------------------
+
             return {
-                "tool_calls":   get_tool_calls(msgs),
-                "tool_results": get_tool_results(msgs),
-                "ai_response":  get_ai_response(msgs),
+                "tool_calls":   get_tool_calls(new_msgs),
+                "tool_results": get_tool_results(new_msgs),
+                "ai_response":  get_ai_response(new_msgs),
                 "search_id":    final.get("current_search_id"),
                 "action":       final.get("action"),
                 "elapsed":      round(time.time() - t0, 1),
@@ -77,6 +93,7 @@ async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
             if "503" in str(e) or "UNAVAILABLE" in str(e):
                 wait = 10 * (attempt + 1)
                 print(f"    {C.YELLOW}⚠ 503 UNAVAILABLE, retry sau {wait}s... (lần {attempt+1}/3){C.RESET}")
+                import asyncio
                 await asyncio.sleep(wait)
                 continue
             raise
@@ -181,13 +198,24 @@ async def main(input_file: str, output_file: str):
                 bot_response = r["ai_response"].strip() or "(không có phản hồi)"
                 tool_summary = build_tool_results_summary(r["tool_results"]) or "(tool không trả về dữ liệu)"
                 try:
-                    ux_res = judge_chains["turn"](
-                        user_query=query,
-                        expected_behavior=exp_beh.strip() or "(không có mô tả)",
-                        anti_preference=anti.strip() or "(không có)",
-                        tool_results_summary=tool_summary,
-                        bot_response=bot_response,
-                    )
+                    ux_res = None
+                    for judge_attempt in range(3):
+                        try:
+                            ux_res = judge_chains["turn"](
+                                user_query=query,
+                                conversation_history=tc_result["conv_history"],
+                                expected_behavior=exp_beh.strip() or "(không có mô tả)",
+                                anti_preference=anti.strip() or "(không có)",
+                                tool_results_summary=tool_summary,
+                                bot_response=bot_response,
+                            )
+                            break
+                        except Exception as je:
+                            if "503" in str(je) or "UNAVAILABLE" in str(je):
+                                print(f"    {C.YELLOW}⚠ Judge 503, retry sau 10s...{C.RESET}")
+                                await asyncio.sleep(10)
+                            else:
+                                raise je
                     ux = {
                         "score":               ux_res.score,
                         "reason":              ux_res.reason,
@@ -313,7 +341,7 @@ async def main(input_file: str, output_file: str):
 
 if __name__ == "__main__":
     base        = os.path.dirname(os.path.abspath(__file__))
-    INPUT_FILE  = os.path.join(base, "data_set", "flight_chatbot_test_cases_15.json")
+    INPUT_FILE  = os.path.join(base, "data_set", "test_cases_10.json")
     OUTPUT_FILE = os.path.join(
         base,
         f"report_{CANDIDATE_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

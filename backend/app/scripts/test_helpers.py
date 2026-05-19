@@ -31,13 +31,24 @@ def get_tool_results(messages: list) -> list[str]:
     ]
 
 
-def get_ai_response(messages: list) -> str:
-    for msg in reversed(messages):
-        if getattr(msg, "type", "") == "ai":
-            c   = getattr(msg, "content", "")
-            tcs = getattr(msg, "tool_calls", [])
-            if isinstance(c, str) and c.strip() and not (tcs and not c.strip()):
-                return c
+def get_ai_response(new_msgs: list) -> str:
+    """Lấy câu trả lời text cuối cùng của AI, hỗ trợ cả định dạng String (OpenAI) và List (Gemini)."""
+    for msg in reversed(new_msgs):
+        if getattr(msg, "type", "") == "ai" or type(msg).__name__ == "AIMessage":
+            content = getattr(msg, "content", "")
+            
+            if isinstance(content, str):
+                return content
+            
+            elif isinstance(content, list):
+                texts = []
+                for block in content:
+                    if isinstance(block, dict) and "text" in block:
+                        texts.append(block["text"])
+                    elif isinstance(block, str):
+                        texts.append(block)
+                return " ".join(texts)
+                
     return ""
 
 
