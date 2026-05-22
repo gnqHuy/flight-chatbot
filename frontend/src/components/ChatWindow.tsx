@@ -45,7 +45,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
 
         const latestActionMsg = [...history]
           .reverse()
-          .find((msg) => msg.action && msg.action.type === 'flight_list');
+          .find((msg) => msg.action && ['flight_list', 'apply_filters'].includes(msg.action.type));
 
         if (latestActionMsg && onActionDetected) {
           onActionDetected(latestActionMsg.action);
@@ -150,11 +150,10 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
 
                 <ActionRenderer
                   action={msg.action}
-                  onViewFlightList={(searchId) => {
-                    onActionDetected?.({
-                      type: 'flight_list',
-                      payload: { search_id: searchId },
-                    });
+                  onViewFlightList={() => {
+                    if (msg.action) {
+                      onActionDetected?.(msg.action);
+                    }
                   }}
                 />
               </div>

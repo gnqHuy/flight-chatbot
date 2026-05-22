@@ -15,9 +15,6 @@ export default function ChatLayout({ conversationId }: Props) {
   const [activeTab, setActiveTab] = useState<'VN' | 'VJ' | 'QH'>('VN');
   const [externalTrigger, setExternalTrigger] = useState<string>('');
 
-  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
-  const [activeSort, setActiveSort] = useState<string | null>(null);
-
   const handleActionDetected = (action: any) => {
     if (!action) return;
 
@@ -25,45 +22,19 @@ export default function ChatLayout({ conversationId }: Props) {
       if (action.payload?.search_id) {
         setCurrentSearchId(action.payload.search_id);
         setIsWorkspaceOpen(true);
-        setActiveFilters({});
-        setActiveSort(null);
       }
     }
 
     if (action.type === 'apply_filters' || action.type === 'APPLY_FILTERS') {
-      const { search_id, filters, sort } = action.payload || {};
 
-      if (search_id) setCurrentSearchId(search_id);
+      const { search_id, filtered_id } = action.payload || {};
+      if (filtered_id && filtered_id !== 'NONE') {
+        setCurrentSearchId(filtered_id);
+      } else if (search_id) {
+        setCurrentSearchId(search_id);
+      }
+      
       setIsWorkspaceOpen(true);
-
-      if (filters) {
-        setActiveFilters((prevFilters) => {
-          const newFilters = { ...prevFilters };
-          Object.keys(filters).forEach((key) => {
-            if (filters[key] === 'CLEAR' || filters[key] === null) {
-              delete newFilters[key];
-            } else {
-              newFilters[key] = filters[key];
-            }
-          });
-          return newFilters;
-        });
-
-        if (filters.preferred_airlines && Array.isArray(filters.preferred_airlines)) {
-          const firstAirline = filters.preferred_airlines[0];
-          if (['VN', 'VJ', 'QH'].includes(firstAirline)) {
-            setActiveTab(firstAirline as 'VN' | 'VJ' | 'QH');
-          }
-        }
-      }
-
-      if (sort !== undefined) {
-        if (sort === 'CLEAR' || sort === null) {
-          setActiveSort(null);
-        } else {
-          setActiveSort(sort);
-        }
-      }
     }
   };
 
@@ -124,7 +95,6 @@ export default function ChatLayout({ conversationId }: Props) {
               </div>
             </div>
 
-            {/* Danh sách vé thực tế */}
             <div className="scrollbar-thin scrollbar-thumb-gray-300 flex-1 overflow-y-auto pr-2">
               <FlightListContainer
                 conversationId={conversationId}
@@ -132,37 +102,8 @@ export default function ChatLayout({ conversationId }: Props) {
                 activeTab={activeTab}
                 onAskAI={handlePromptClick}
                 onCompareComplete={handleCompareComplete}
-                activeFilters={activeFilters}
-                activeSort={activeSort}
               />
             </div>
-
-            {/* Prompt Chips */}
-            {/* <div className="mt-4 shrink-0 border-t border-surface-border pt-4">
-              <p className="mb-3 text-[11px] font-bold tracking-widest text-slate-400 uppercase">
-                💡 Gợi ý thao tác nhanh
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handlePromptClick('Chỉ hiển thị các chuyến bay vào buổi sáng')}
-                  className="rounded-xl border border-surface-border bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-primary hover:text-primary"
-                >
-                  🌅 Bay buổi sáng
-                </button>
-                <button
-                  onClick={() => handlePromptClick('Sắp xếp danh sách ưu tiên giá rẻ nhất')}
-                  className="rounded-xl border border-surface-border bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-primary hover:text-primary"
-                >
-                  💰 Rẻ nhất lên đầu
-                </button>
-                <button
-                  onClick={() => handlePromptClick('Lọc ra các chuyến bay thẳng, không quá cảnh')}
-                  className="rounded-xl border border-surface-border bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-primary hover:text-primary"
-                >
-                  ⚡ Bay thẳng
-                </button>
-              </div>
-            </div> */}
           </div>
         )}
       </div>

@@ -12,8 +12,6 @@ type Props = {
   activeTab: 'VN' | 'VJ' | 'QH';
   onAskAI: (prompt: string) => void;
   onCompareComplete?: (botResponse: any) => void;
-  activeFilters?: Record<string, any>;
-  activeSort?: string | null;
 };
 
 const FlightListContainer = ({
@@ -22,8 +20,6 @@ const FlightListContainer = ({
   activeTab,
   onAskAI,
   onCompareComplete,
-  activeFilters = {},
-  activeSort = null,
 }: Props) => {
   const [allFlights, setAllFlights] = useState<FlightOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,10 +52,7 @@ const FlightListContainer = ({
   const displayedFlights = useMemo(() => {
     if (!allFlights || allFlights.length === 0) return [];
 
-    let result = [...allFlights];
-
-    // 1. Lọc theo Active Tab (Hãng bay)
-    result = result.filter((flight) => {
+    return allFlights.filter((flight) => {
       if (flight.airlines && flight.airlines.length > 0) {
         return flight.airlines.includes(activeTab);
       }
@@ -69,100 +62,7 @@ const FlightListContainer = ({
         firstItinerary?.segmentDetails?.[0]?.carrierCode;
       return carrierCode === activeTab;
     });
-
-    // 2. Lọc theo Active Filters (Giá, Giờ, Bay thẳng, Hạng ghế)
-    if (Object.keys(activeFilters).length > 0) {
-      result = result.filter((f) => {
-        let isMatch = true;
-
-        // 🌟 BỔ SUNG: Lọc Hạng ghế (travelClass)
-        if (isMatch && activeFilters.travelClass) {
-          if (f.cabin?.toUpperCase() !== activeFilters.travelClass.toUpperCase()) {
-            isMatch = false;
-          }
-        }
-
-        // Lọc giá
-        if (isMatch && activeFilters.maxPrice) {
-          if (Number(f.price || 0) > Number(activeFilters.maxPrice)) isMatch = false;
-        }
-
-        // Lọc bay thẳng
-        if (isMatch && activeFilters.nonStop === true) {
-          const segmentDetails = f.itineraries?.[0]?.segmentDetails || [];
-          // Chú ý: logic cũ của bạn stops < 2 hơi nguy hiểm, nên check đúng length
-          if (segmentDetails.length > 1) isMatch = false;
-        }
-
-        // Lọc giờ bay
-        if (
-          isMatch &&
-          (activeFilters.start_hour !== undefined || activeFilters.end_hour !== undefined)
-        ) {
-          const depTimeStr =
-            (f as any).departureTime || f.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at;
-          if (depTimeStr && depTimeStr.includes('T')) {
-            try {
-              const hour = parseInt(depTimeStr.split('T')[1].split(':')[0], 10);
-              if (activeFilters.start_hour !== undefined && hour < Number(activeFilters.start_hour))
-                isMatch = false;
-              if (activeFilters.end_hour !== undefined && hour > Number(activeFilters.end_hour))
-                isMatch = false;
-            } catch (e) {
-              console.error('Lỗi parse giờ bay', e);
-            }
-          }
-        }
-
-        return isMatch;
-      });
-    }
-
-    // 3. Sắp xếp (Active Sort)
-    if (activeSort) {
-      result.sort((a, b) => {
-        const priceA = Number(a.price || 0);
-        const priceB = Number(b.price || 0);
-
-        const timeA =
-          (a as any).departureTime ||
-          a.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at ||
-          '9999';
-        const timeB =
-          (b as any).departureTime ||
-          b.itineraries?.[0]?.segmentDetails?.[0]?.departure?.at ||
-          '9999';
-
-        switch (activeSort) {
-          case 'price_desc':
-            return priceB - priceA; // Giá đắt nhất lên đầu
-          case 'price_asc':
-            return priceA - priceB; // Giá rẻ nhất lên đầu
-          case 'departure_time':
-            return timeA.localeCompare(timeB);
-          case 'arrival_time':
-            const arrA =
-              (a as any).arrivalTime ||
-              a.itineraries?.[0]?.segmentDetails?.[a.itineraries[0].segmentDetails.length - 1]
-                ?.arrival?.at ||
-              '9999';
-            const arrB =
-              (b as any).arrivalTime ||
-              b.itineraries?.[0]?.segmentDetails?.[b.itineraries[0].segmentDetails.length - 1]
-                ?.arrival?.at ||
-              '9999';
-            return arrA.localeCompare(arrB);
-          default:
-            return 0;
-        }
-      });
-    } else {
-      // Mặc định luôn sắp xếp giá tăng dần nếu không có lệnh gì
-      result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-    }
-
-    return result;
-  }, [allFlights, activeTab, activeFilters, activeSort]);
+  }, [allFlights, activeTab]);
 
   const toggleFlightSelection = (flightId: string) => {
     setSelectedFlights((prev) => {
@@ -227,7 +127,7 @@ const FlightListContainer = ({
       <div className="flex h-full flex-col items-center justify-center space-y-4">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
         <p className="animate-pulse text-sm font-medium text-slate-500">
-          Đang tìm chuyến bay tốt nhất...
+          Đang tải chuyến bay...
         </p>
       </div>
     );
@@ -251,9 +151,9 @@ const FlightListContainer = ({
       <div className="flex h-full items-center justify-center text-center">
         <div className="rounded-2xl border border-slate-100 bg-white p-8 shadow-sm">
           <span className="text-4xl">📭</span>
-          <p className="mt-4 font-semibold text-slate-700">Không tìm thấy chuyến bay</p>
+          <p className="mt-4 font-semibold text-slate-700">Không có chuyến bay</p>
           <p className="mt-1 text-sm text-slate-500">
-            Không có chuyến bay nào phù hợp với bộ lọc hiện tại.
+            Hãng bay này không có vé phù hợp với yêu cầu của bạn.
           </p>
         </div>
       </div>
@@ -297,7 +197,6 @@ const FlightListContainer = ({
       {selectedFlights.length > 0 && (
         <div className="animate-fade-in-up fixed bottom-4 left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-4 sm:gap-5 rounded-2xl bg-[#1e293b] px-4 sm:px-5 py-3 shadow-2xl ring-1 ring-white/10">
           
-          {/* 1. Phần số lượng vé */}
           <div className="flex items-center gap-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-sm">
               {selectedFlights.length}
@@ -307,10 +206,8 @@ const FlightListContainer = ({
             </span>
           </div>
 
-          {/* Đường vạch chia cách */}
           <div className="h-6 w-px bg-slate-700"></div>
 
-          {/* 2. Nút Lưu vé */}
           <button
             type="button"
             onClick={(e) => {
@@ -323,7 +220,6 @@ const FlightListContainer = ({
             <span className="hidden sm:inline">Lưu vé</span>
           </button>
 
-          {/* 3. Nút Phân tích So sánh */}
           <button
             type="button"
             onClick={(e) => {
