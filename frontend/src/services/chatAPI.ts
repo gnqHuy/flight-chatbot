@@ -1,4 +1,5 @@
-import { ChatMessage, FlightOffer } from '@/types/ChatMessage'; // Nhớ import thêm FlightOffer nếu file đó chứa type
+import { ChatMessage } from '@/types/ChatMessage';
+import { FlightOffer } from '@/types/FlightOffer';
 import api from '@/utils/api';
 
 export const chatAPI = {
@@ -26,6 +27,18 @@ export const chatAPI = {
 
   getCachedFlights: async (searchId: string) => {
     const res = await api.get<{ flights: FlightOffer[] }>(`/flights/cache/${searchId}`);
+    return res.data;
+  },
+
+  deleteConversation: async (conversationId: string) => {
+    const res = await api.delete(`/conversations/${conversationId}`);
+    return res.data;
+  },
+
+  renameConversation: async (conversationId: string, newTitle: string) => {
+    const res = await api.patch(`/conversations/${conversationId}/title`, {
+      title: newTitle,
+    });
     return res.data;
   },
 };

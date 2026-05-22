@@ -14,35 +14,22 @@ import uuid
 import time
 import traceback
 from datetime import datetime
-
 from langchain_core.messages import HumanMessage
+from .test_config    import C, CANDIDATE_ID, CANDIDATES, JUDGE_ID, TEST_DATE
+from .test_judge     import build_judge_chains
+from .test_technical import technical_check
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-# ── Chọn model chạy test ──────────────────────────────────────────────────────
-# Đổi giá trị này để chạy model khác: "openai" | "gemini" | "claude"
-CANDIDATE_ID = "openai"
-
-# Mốc thời gian cố định cho toàn bộ test run
-TEST_DATE = "2026-05-19 10:00"
-
-from .test_config    import C, CANDIDATES, JUDGE_LABEL
-from .test_judge     import build_judge_chains
-from .test_technical import technical_check
 from .test_helpers   import (
     get_tool_calls, get_tool_results, get_ai_response,
     args_summary, build_tool_results_summary,
     print_technical, print_ux,
 )
 
-# Lấy config của candidate đang chạy
 CANDIDATE = next(c for c in CANDIDATES if c["id"] == CANDIDATE_ID)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Run 1 turn
-# ─────────────────────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Run 1 turn
@@ -75,12 +62,6 @@ async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
             
             new_msgs = all_msgs[old_msg_count:]
 
-            # --- DÒNG CẦN THÊM VÀO ĐỂ DEBUG ---
-            print(f"\n    [DEBUG] old_count={old_msg_count}, total={len(all_msgs)}")
-            for i, m in enumerate(new_msgs):
-                print(f"    [DEBUG] msg[{i}]: {type(m).__name__} | tools: {getattr(m, 'tool_calls', 'N/A')}")
-            # ----------------------------------
-
             return {
                 "tool_calls":   get_tool_calls(new_msgs),
                 "tool_results": get_tool_results(new_msgs),
@@ -90,15 +71,16 @@ async def run_turn(graph, thread_id: str, user_msg: str) -> dict:
                 "elapsed":      round(time.time() - t0, 1),
             }
         except Exception as e:
-            if "503" in str(e) or "UNAVAILABLE" in str(e):
+            err_str = str(e)
+            if any(k in err_str for k in ["503", "UNAVAILABLE", "429", "RateLimit", "RemoteProtocolError", "disconnected"]):
                 wait = 10 * (attempt + 1)
-                print(f"    {C.YELLOW}⚠ 503 UNAVAILABLE, retry sau {wait}s... (lần {attempt+1}/3){C.RESET}")
+                print(f"    {C.YELLOW}⚠ LLM bận/quá tải, retry sau {wait}s... (lần {attempt+1}/3){C.RESET}")
                 import asyncio
                 await asyncio.sleep(wait)
                 continue
             raise
 
-    raise RuntimeError("Gemini 503 sau 3 lần retry")
+    raise RuntimeError("LLM lỗi liên tục sau 3 lần retry")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +91,7 @@ async def main(input_file: str, output_file: str):
     print(f"\n{C.BOLD}{C.CYAN}{'═'*64}{C.RESET}")
     print(f"{C.BOLD}  FLIGHT CHATBOT — TEST AUTOMATION{C.RESET}")
     print(f"  Model    : {C.MAGENTA}{CANDIDATE['label']}{C.RESET}")
-    print(f"  Judge    : {JUDGE_LABEL}")
+    print(f"  Judge    : {JUDGE_ID}")
     print(f"  TestDate : {TEST_DATE}")
     print(f"  Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{C.CYAN}{'═'*64}{C.RESET}\n")
@@ -135,8 +117,8 @@ async def main(input_file: str, output_file: str):
     await knowledge_mcp.connect()
     print("✅ MCP Connected!")
 
-    from app.core.llm_setup import llm_openai, llm_gemini, llm_claude, llm_as_judge
-    candidate_llms = {"openai": llm_openai, "gemini": llm_gemini, "claude": llm_claude}
+    from app.core.llm_setup import llm_gemini, llm_claude, llm_deepseek, llm_as_judge
+    candidate_llms = {"gemini": llm_gemini, "claude": llm_claude, "deepseek": llm_deepseek}
     llm = candidate_llms[CANDIDATE_ID]
 
     print(f"⚙  Compile graph cho {CANDIDATE['label']}...")
@@ -211,18 +193,22 @@ async def main(input_file: str, output_file: str):
                             )
                             break
                         except Exception as je:
-                            if "503" in str(je) or "UNAVAILABLE" in str(je):
-                                print(f"    {C.YELLOW}⚠ Judge 503, retry sau 10s...{C.RESET}")
+                            err_str = str(je)
+                            if "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str or "RateLimit" in err_str:
+                                print(f"    {C.YELLOW}⚠ Judge bận/quá tải, retry sau 10s... (lần {judge_attempt+1}/3){C.RESET}")
+                                if judge_attempt == 2:
+                                    raise je
                                 await asyncio.sleep(10)
                             else:
                                 raise je
+                    
                     ux = {
                         "score":               ux_res.score,
                         "reason":              ux_res.reason,
                         "hallucination_found": ux_res.hallucination_found,
                         "hallucination_detail": ux_res.hallucination_detail,
                     }
-                    print_ux(JUDGE_LABEL, ux)
+                    print_ux(JUDGE_ID, ux)
                     tc_result["ux_scores"].append(ux_res.score)
                     stats["ux_sum"]   += ux_res.score
                     stats["ux_count"] += 1
@@ -314,7 +300,7 @@ async def main(input_file: str, output_file: str):
             "input_file":      input_file,
             "candidate":       CANDIDATE["label"],
             "candidate_id":    CANDIDATE_ID,
-            "judge":           JUDGE_LABEL,
+            "judge":           JUDGE_ID,
             "test_date":       TEST_DATE,
             "total_scenarios": len(test_cases),
             "total_turns":     total,
@@ -341,7 +327,7 @@ async def main(input_file: str, output_file: str):
 
 if __name__ == "__main__":
     base        = os.path.dirname(os.path.abspath(__file__))
-    INPUT_FILE  = os.path.join(base, "data_set", "test_cases_10.json")
+    INPUT_FILE  = os.path.join(base, "data_set", "test_cases.json")
     OUTPUT_FILE = os.path.join(
         base,
         f"report_{CANDIDATE_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

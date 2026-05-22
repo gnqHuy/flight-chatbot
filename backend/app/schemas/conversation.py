@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from sqlmodel import SQLModel
 from uuid import UUID
 from datetime import datetime
@@ -12,3 +13,6 @@ class ConversationRead(SQLModel):
     created_at: datetime
     updated_at: datetime
     is_active: bool
+
+class ConversationTitleUpdate(BaseModel):
+    title: str

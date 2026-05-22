@@ -14,6 +14,7 @@ def get_env(var_name: str, default_value: str = None, required: bool = False) ->
 OPENAI_API_KEY = get_env("OPENAI_API_KEY", required=True)
 GOOGLE_API_KEY = get_env("GOOGLE_API_KEY", required=True)
 ANTHROPIC_API_KEY = get_env("ANTHROPIC_API_KEY", required=True)
+DEEPSEEK_API_KEY = get_env("DEEPSEEK_API_KEY", required=True)
 BACKEND_DATABASE_URL = get_env("BACKEND_DATABASE_URL", required=True)
 CHECKPOINT_DATABASE_URL = get_env("BACKEND_CHECKPOINT_DATABASE_URL", default_value=BACKEND_DATABASE_URL)
 SECRET_KEY = get_env("SECRET_KEY", required=True)

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from app.api.deps import get_current_user
 from app.database.database import get_session
 from app.database.models.user import User
-from app.schemas.conversation import ConversationRead
+from app.schemas.conversation import ConversationRead, ConversationTitleUpdate
 from app.schemas.message import MessageCreateBody, MessageRead
 from app.schemas.chat_response import ChatResponse, ResumeRequest
 from app.repositories.conversation_repo import ConversationRepository
@@ -124,3 +124,15 @@ async def resume_graph(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khi tiếp tục luồng AI: {str(e)}"
         )
+    
+@router.patch("/{conversation_id}/title", response_model=ConversationRead)
+def update_conversation_title(
+    conversation_id: UUID,
+    body: ConversationTitleUpdate, 
+    db: Session = Depends(get_session)
+):
+    conv_repo = ConversationRepository(db)
+    msg_repo = MessageRepository(db)
+    service = ConversationService(conv_repo, msg_repo)
+    
+    return service.update_conversation_title(conversation_id, body.title)

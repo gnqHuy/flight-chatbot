@@ -15,11 +15,9 @@ type Props = {
 };
 
 const suggestions = [
-  'What can I ask you to do?',
-  'Which one of my projects is performing the best?',
-  'Help me plan the next steps',
-  'What projects should I be concerned about right now?',
-  'Summarize my recent conversations',
+  'Tìm vé máy bay từ Hà Nội đi Đà Nẵng vào ngày mai',
+  'Chính sách hoàn hủy vé',
+  'Khuyến mãi vé máy bay tháng này',
 ];
 
 const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: Props) => {
@@ -125,7 +123,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
   const isEmptyState = !conversationId || messages.length === 0;
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-[80%] flex-col overflow-hidden bg-transparent">
+    <div className="relative mx-auto flex h-full w-full flex-col overflow-hidden bg-transparent">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(circle_at_45%_85%,rgba(244,114,182,0.22),transparent_55%),radial-gradient(circle_at_60%_80%,rgba(99,102,241,0.18),transparent_60%)]" />
       <div className="relative flex-1 overflow-hidden">
         {isLoadingHistory ? (
@@ -135,7 +133,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
         ) : isEmptyState ? (
           <div className="flex h-full flex-col items-center justify-center px-6">
             <Sparkles size={34} className="mb-8 text-slate-900" />
-            <h2 className="text-2xl font-medium text-slate-900">Ask our AI something</h2>
+            <h2 className="text-2xl font-medium text-slate-900">Ask our Chatbot something</h2>
           </div>
         ) : (
           <div className="scrollbar-thin scrollbar-thumb-gray-200 h-full space-y-6 overflow-y-auto px-6 py-6">
@@ -178,7 +176,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
         {isEmptyState && (
           <div className="mx-auto mb-7 w-full max-w-4xl">
             <p className="mb-3 text-sm font-medium text-slate-700">
-              Suggestions on what to ask Our AI
+              Suggestions on what to ask Chatbot
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -211,7 +209,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
             className="flex-1 bg-transparent px-4 py-4 text-sm text-slate-800 outline-none disabled:cursor-not-allowed disabled:opacity-60"
             placeholder={
               conversationId
-                ? 'Ask me anything about your projects'
+                ? 'Ask me anything about your journey...'
                 : 'Chọn một cuộc hội thoại...'
             }
             value={input}

@@ -4,6 +4,7 @@ import React from 'react';
 import { Role } from '@/types/enums/Role';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Bot, User } from 'lucide-react';
 
 export interface MessageItemProps {
   role: Role;
@@ -19,8 +20,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
     <div className={`mb-5 flex w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       
       {/* Avatar */}
-      <div className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-sm ${isUser ? 'ml-3 bg-brand-pink' : 'mr-3 bg-primary'}`}>
-        {isUser ? 'ME' : 'AI'}
+      <div 
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow-sm ${
+          isUser ? 'ml-3 text-black bg-white' : 'mr-3 text-white bg-primary'
+        }`}
+      >
+        {isUser ? <User size={20} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2.5} />}
       </div>
 
       <div className={`flex max-w-[75%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>

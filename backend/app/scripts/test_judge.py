@@ -1,10 +1,12 @@
 """
 app/scripts/test_judge.py
 Judge prompts, Pydantic models, và chains.
-1 judge model (Gemini 2.5 Pro) đánh giá cả 3 candidates.
+Hỗ trợ 2 judge model qua SDK trực tiếp để né LangSmith.
+Model được chọn dựa trên biến JUDGE_ID từ test_config.
 """
 from pydantic import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate
+
+from app.scripts.test_config import JUDGE_ID
 
 
 UX_JUDGE_PROMPT = """Bạn là Chuyên gia UX QA cho hệ thống AI Chatbot đặt vé máy bay.
@@ -81,27 +83,8 @@ class ScenarioUXScore(BaseModel):
 
 
 def build_judge_chains(_judge_llm_unused=None) -> dict:
-    """
-    Gọi Gemini trực tiếp qua google.genai SDK (không qua LangChain).
-    LangSmith không trace → không tính cost vào project.
-    """
     import json as _json
     import os
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    MODEL  = "gemini-2.5-pro"
-
-    JSON_TURN_SUFFIX = """
-
-TRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
-{"score": <1-5>, "reason": "<lý do>", "hallucination_found": <true|false>, "hallucination_detail": "<mô tả hoặc rỗng>"}"""
-
-    JSON_SCENARIO_SUFFIX = """
-
-TRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
-{"score": <1-5>, "reason": "<đánh giá tổng thể>"}"""
 
     def _parse(text: str) -> dict:
         text = text.strip()
@@ -111,52 +94,133 @@ TRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
                 text = text[4:]
         return _json.loads(text.strip())
 
-    def _call(prompt: str) -> str:
-        resp = client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0),
-        )
-        return resp.text
+    # =========================================================================
+    # CẤU HÌNH CHO OPENAI (Dùng cho GPT-4o / GPT-4.1)
+    # =========================================================================
+    if "gpt" in JUDGE_ID.lower():
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        MODEL = JUDGE_ID
 
-    def judge_turn(
-        user_query,
-        conversation_history,
-        expected_behavior,
-        anti_preference,
-        tool_results_summary,
-        bot_response,
-    ) -> TurnUXScore:
-        prompt = (
-            UX_JUDGE_PROMPT
-            .replace("{user_query}", user_query)
-            .replace("{conversation_history}", conversation_history or "(chưa có lịch sử trước đó)")
-            .replace("{expected_behavior}", expected_behavior)
-            .replace("{anti_preference}", anti_preference)
-            .replace("{tool_results_summary}", tool_results_summary)
-            .replace("{bot_response}", bot_response)
-            + JSON_TURN_SUFFIX
-        )
-        data = _parse(_call(prompt))
-        return TurnUXScore(
-            score=int(data.get("score", 0)),
-            reason=str(data.get("reason", "")),
-            hallucination_found=bool(data.get("hallucination_found", False)),
-            hallucination_detail=str(data.get("hallucination_detail", "")),
-        )
+        JSON_TURN_SUFFIX = """\n\nTRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
+{"score": <1-5>, "reason": "<lý do>", "hallucination_found": <true|false>, "hallucination_detail": "<mô tả hoặc rỗng>"}"""
+        JSON_SCENARIO_SUFFIX = """\n\nTRẢ VỀ JSON THUẦN TÚY (không markdown), đúng format:
+{"score": <1-5>, "reason": "<đánh giá tổng thể>"}"""
 
-    def judge_scenario(description, model_label, conversation_history) -> ScenarioUXScore:
-        prompt = (
-            SCENARIO_JUDGE_PROMPT
-            .replace("{description}", description)
-            .replace("{model_label}", model_label)
-            .replace("{conversation_history}", conversation_history)
-            + JSON_SCENARIO_SUFFIX
-        )
-        data = _parse(_call(prompt))
-        return ScenarioUXScore(
-            score=int(data.get("score", 0)),
-            reason=str(data.get("reason", "")),
-        )
+        def _call_openai(prompt: str) -> str:
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                response_format={"type": "json_object"}
+            )
+            return response.choices[0].message.content
 
-    return {"turn": judge_turn, "scenario": judge_scenario}
+        def judge_turn(user_query, conversation_history, expected_behavior, anti_preference, tool_results_summary, bot_response) -> TurnUXScore:
+            prompt = (
+                UX_JUDGE_PROMPT
+                .replace("{user_query}", user_query)
+                .replace("{conversation_history}", conversation_history or "(chưa có lịch sử trước đó)")
+                .replace("{expected_behavior}", expected_behavior)
+                .replace("{anti_preference}", anti_preference)
+                .replace("{tool_results_summary}", tool_results_summary)
+                .replace("{bot_response}", bot_response)
+                + JSON_TURN_SUFFIX
+            )
+            data = _parse(_call_openai(prompt))
+            return TurnUXScore(
+                score=int(data.get("score", 0)),
+                reason=str(data.get("reason", "")),
+                hallucination_found=bool(data.get("hallucination_found", False)),
+                hallucination_detail=str(data.get("hallucination_detail", "")),
+            )
+
+        def judge_scenario(description, model_label, conversation_history) -> ScenarioUXScore:
+            prompt = (
+                SCENARIO_JUDGE_PROMPT
+                .replace("{description}", description)
+                .replace("{model_label}", model_label)
+                .replace("{conversation_history}", conversation_history)
+                + JSON_SCENARIO_SUFFIX
+            )
+            data = _parse(_call_openai(prompt))
+            return ScenarioUXScore(
+                score=int(data.get("score", 0)),
+                reason=str(data.get("reason", "")),
+            )
+
+        return {"turn": judge_turn, "scenario": judge_scenario}
+
+    # =========================================================================
+    # CẤU HÌNH CHO GOOGLE GENAI (Dùng cho Gemini 2.5 Pro)
+    # =========================================================================
+    else:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+        MODEL = JUDGE_ID
+
+        turn_schema = {
+            "type": "OBJECT",
+            "properties": {
+                "score": {"type": "INTEGER", "description": "Điểm UX 1-5"},
+                "reason": {"type": "STRING", "description": "Lý do ngắn gọn về UX"},
+                "hallucination_found": {"type": "BOOLEAN", "description": "True nếu phát hiện hallucination"},
+                "hallucination_detail": {"type": "STRING", "description": "Mô tả hallucination nếu có, nếu không thì để chuỗi rỗng"},
+            },
+            "required": ["score", "reason", "hallucination_found", "hallucination_detail"],
+        }
+
+        scenario_schema = {
+            "type": "OBJECT",
+            "properties": {
+                "score": {"type": "INTEGER", "description": "Điểm tổng thể 1-5"},
+                "reason": {"type": "STRING", "description": "Đánh giá tổng thể"},
+            },
+            "required": ["score", "reason"],
+        }
+
+        def _call_gemini(prompt: str, schema: dict) -> str:
+            resp = client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0,
+                    response_mime_type="application/json",
+                    response_schema=schema
+                ),
+            )
+            return resp.text
+
+        def judge_turn(user_query, conversation_history, expected_behavior, anti_preference, tool_results_summary, bot_response) -> TurnUXScore:
+            prompt = (
+                UX_JUDGE_PROMPT
+                .replace("{user_query}", user_query)
+                .replace("{conversation_history}", conversation_history or "(chưa có lịch sử trước đó)")
+                .replace("{expected_behavior}", expected_behavior)
+                .replace("{anti_preference}", anti_preference)
+                .replace("{tool_results_summary}", tool_results_summary)
+                .replace("{bot_response}", bot_response)
+            )
+            data = _parse(_call_gemini(prompt, turn_schema))
+            return TurnUXScore(
+                score=int(data.get("score", 0)),
+                reason=str(data.get("reason", "")),
+                hallucination_found=bool(data.get("hallucination_found", False)),
+                hallucination_detail=str(data.get("hallucination_detail", "")),
+            )
+
+        def judge_scenario(description, model_label, conversation_history) -> ScenarioUXScore:
+            prompt = (
+                SCENARIO_JUDGE_PROMPT
+                .replace("{description}", description)
+                .replace("{model_label}", model_label)
+                .replace("{conversation_history}", conversation_history)
+            )
+            data = _parse(_call_gemini(prompt, scenario_schema))
+            return ScenarioUXScore(
+                score=int(data.get("score", 0)),
+                reason=str(data.get("reason", "")),
+            )
+
+        return {"turn": judge_turn, "scenario": judge_scenario}

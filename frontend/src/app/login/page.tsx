@@ -125,7 +125,7 @@ export default function LoginPage() {
         <div className="space-y-5 rounded-3xl p-6 text-[12px] text-white">
           <div className="flex items-center gap-3">
             <div className="max-w-[90%] rounded-3xl rounded-tl-none p-5 text-[13px] text-white/90">
-              <p className="mb-2">
+              <p className="mb-1">
                 Xin chào! Tôi là trợ lý AI hỗ trợ tìm kiếm và tư vấn vé máy bay thông minh. Bạn có
                 thể trò chuyện với tôi bằng ngôn ngữ tự nhiên để tìm chuyến bay phù hợp, so sánh các
                 lựa chọn và tra cứu thông tin hàng không một cách nhanh chóng.
@@ -158,7 +158,7 @@ export default function LoginPage() {
                   mãi vé máy bay đang còn hiệu lực theo nhu cầu của bạn.
                 </li>
               </ol><br/>
-              <p className="mt-2 text-white/80">
+              <p className="mt-1 text-white/80">
                 Bạn chỉ cần nhập yêu cầu bằng ngôn ngữ tự nhiên, hệ thống sẽ tự động phân tích, tìm
                 kiếm dữ liệu phù hợp và đưa ra phản hồi trực quan ngay trong cuộc trò chuyện.
               </p>
@@ -204,7 +204,7 @@ export default function LoginPage() {
             </h2>
             <p className="mt-3 text-sm text-gray-600">
               {isLoginView
-                ? 'Truy cập chatbot đặt vé máy bay của bạn'
+                ? 'Truy cập Flight Chatbot ngay'
                 : 'Tham gia cùng chúng tôi để trải nghiệm ngay'}
             </p>
           </div>

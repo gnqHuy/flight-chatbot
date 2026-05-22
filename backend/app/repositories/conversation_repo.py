@@ -50,3 +50,13 @@ class ConversationRepository:
             convo.is_active = False
             self.session.add(convo)
             self.session.commit()
+
+    def update_title(self, conversation_id: UUID, new_title: str) -> Conversation | None:
+        convo = self.get_by_id(conversation_id)
+        if convo:
+            convo.title = new_title
+            convo.updated_at = datetime.now(timezone.utc)
+            self.session.add(convo)
+            self.session.commit()
+            self.session.refresh(convo)
+        return convo

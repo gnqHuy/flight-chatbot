@@ -8,17 +8,20 @@ import asyncio
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-TEST_DATE = "2026-05-15 10:00"
+TEST_DATE = "2026-05-20 10:00"
 
 CANDIDATES = [
-    {"id": "openai", "label": "GPT-4o-mini",     "llm_key": "llm_openai"},
-    {"id": "gemini", "label": "Gemini 2.0 Flash", "llm_key": "llm_gemini"},
+    {"id": "gemini", "label": "Gemini 2.5 Flash", "llm_key": "llm_gemini"},
     {"id": "claude", "label": "Claude Haiku",      "llm_key": "llm_claude"},
+    {"id": "deepseek", "label": "DeepSeek V4",      "llm_key": "llm_deepseek"},
 ]
 
-JUDGE_LABEL = "Gemini 2.5 Pro"
+# ── Chọn model chạy test ──────────────────────────────────────────────────────
+# Đổi giá trị này để chạy model khác: "gemini" | "claude" | "deepseek"
+CANDIDATE_ID = "gemini"
 
-
+# Đổi giá trị này để chạy model judge khác: "gemini-2.5-pro" | "gpt-4.1"
+JUDGE_ID = "gpt-4.1"
 class C:
     GREEN   = "\033[92m"
     RED     = "\033[91m"

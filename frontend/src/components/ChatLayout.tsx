@@ -99,7 +99,7 @@ export default function ChatLayout({ conversationId }: Props) {
         {isWorkspaceOpen && currentSearchId && (
           <div className="animate-in fade-in flex h-full w-full flex-col p-6 duration-500">
             {/* Header & Tabs */}
-            <div className="mb-4 shrink-0">
+            <div className="mb-2 shrink-0">
               <h2 className="mb-4 text-2xl font-bold tracking-tight text-slate-800">
                 Danh sách chuyến bay
               </h2>
@@ -138,7 +138,7 @@ export default function ChatLayout({ conversationId }: Props) {
             </div>
 
             {/* Prompt Chips */}
-            <div className="mt-4 shrink-0 border-t border-surface-border pt-4">
+            {/* <div className="mt-4 shrink-0 border-t border-surface-border pt-4">
               <p className="mb-3 text-[11px] font-bold tracking-widest text-slate-400 uppercase">
                 💡 Gợi ý thao tác nhanh
               </p>
@@ -162,7 +162,7 @@ export default function ChatLayout({ conversationId }: Props) {
                   ⚡ Bay thẳng
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Menu, PanelLeft, SquarePen, MessageSquare, Trash2, Edit } from 'lucide-react';
+import { Menu, PanelLeft, SquarePen, MessageSquare, Trash2, Edit, Check } from 'lucide-react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import UserMenu from './UserMenu';
 import { Conversation } from '@/types/Conversation';
@@ -18,6 +18,10 @@ const ChatSidebar = ({ onToggle }: Props) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationList, setConversationList] = useState<Conversation[]>([]);
+  
+  // State quản lý edit title
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
 
   const router = useRouter();
   const params = useParams();
@@ -68,11 +72,8 @@ const ChatSidebar = ({ onToggle }: Props) => {
   const handleNewChat = async () => {
     try {
       setIsLoading(true);
-
       const newChat = await chatAPI.createConversation('New Chat');
-
       setConversationList((prev) => [newChat, ...prev]);
-
       router.push(`/chat/${newChat.id}`);
     } catch (error) {
       console.error('Lỗi khi tạo chat mới:', error);
@@ -82,8 +83,57 @@ const ChatSidebar = ({ onToggle }: Props) => {
   };
 
   const handleSelectChat = (id: string) => {
-    if (currentId === id) return;
+    if (currentId === id || editingId === id) return;
     router.push(`/chat/${id}`);
+  };
+
+  // --- ACTIONS: DELETE & RENAME ---
+  const handleDeleteChat = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Bạn có chắc muốn xoá cuộc trò chuyện này?')) return;
+    try {
+      await chatAPI.deleteConversation(id);
+      setConversationList((prev) => prev.filter((c) => c.id !== id));
+      if (currentId === id) {
+        router.push('/'); // Hoặc '/chat' tùy route gốc của bạn
+      }
+    } catch (error) {
+      console.error('Lỗi khi xoá chat:', error);
+    }
+  };
+
+  const handleStartEdit = (e: React.MouseEvent, id: string, currentTitle: string) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditTitle(currentTitle || 'New Conversation');
+  };
+
+  const handleSaveEdit = async (e?: React.MouseEvent | React.KeyboardEvent, id?: string) => {
+    e?.stopPropagation();
+    const targetId = id || editingId;
+    
+    if (!targetId || !editTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    try {
+      await chatAPI.renameConversation(targetId, editTitle);
+      setConversationList((prev) =>
+        prev.map((c) => (c.id === targetId ? { ...c, title: editTitle } : c))
+      );
+      setEditingId(null);
+    } catch (error) {
+      console.error('Lỗi khi đổi tên chat:', error);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit(e, id);
+    } else if (e.key === 'Escape') {
+      setEditingId(null);
+    }
   };
 
   return (
@@ -124,18 +174,18 @@ const ChatSidebar = ({ onToggle }: Props) => {
         onClick={handleNewChat}
         disabled={isLoading}
         className={`
-          m-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3
+          m-4  items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3
           text-sm font-medium text-gray-700 shadow-sm
           transition-all duration-300 ease-out
           hover:bg-gray-100 hover:text-primary
           disabled:cursor-not-allowed disabled:opacity-70
-          ${!isSidebarOpen ? 'h-12 w-12 justify-center px-0' : ''}
+          ${!isSidebarOpen ? 'h-12 w-12 justify-center px-0 block' : 'flex'}
         `}
       >
         {isLoading ? (
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         ) : (
-          <SquarePen size={20} />
+          <SquarePen size={21} />
         )}
 
         <span
@@ -158,6 +208,7 @@ const ChatSidebar = ({ onToggle }: Props) => {
             <div className="scrollbar-thin scrollbar-thumb-slate-200 flex flex-col gap-1 px-3">
               {conversationList.map((conversation) => {
                 const isActive = currentId === conversation.id;
+                const isEditing = editingId === conversation.id;
 
                 return (
                   <div
@@ -185,14 +236,27 @@ const ChatSidebar = ({ onToggle }: Props) => {
                         `}
                       />
 
-                      <span
-                        className={`
-                          truncate transition-all duration-300
-                          ${isActive ? 'font-medium' : 'font-normal'}
-                        `}
-                      >
-                        {conversation.title || 'New Conversation'}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, conversation.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={() => handleSaveEdit(undefined, conversation.id)}
+                          className="w-[55%] bg-transparent outline-none border-b border-primary/50 text-slate-900"
+                        />
+                      ) : (
+                        <span
+                          className={`
+                            truncate transition-all duration-300
+                            ${isActive ? 'font-medium' : 'font-normal'}
+                          `}
+                        >
+                          {conversation.title || 'New Conversation'}
+                        </span>
+                      )}
                     </button>
 
                     <div
@@ -207,13 +271,28 @@ const ChatSidebar = ({ onToggle }: Props) => {
                         }
                       `}
                     >
-                      <button className="text-primary transition-colors hover:text-slate-600">
+                      <button
+                        onClick={(e) => handleDeleteChat(e, conversation.id)}
+                        className="text-primary transition-colors hover:text-red-500"
+                      >
                         <Trash2 size={15} />
                       </button>
 
-                      <button className="text-primary transition-colors hover:text-slate-600">
-                        <Edit size={15} />
-                      </button>
+                      {isEditing ? (
+                        <button
+                          onClick={(e) => handleSaveEdit(e, conversation.id)}
+                          className="text-primary transition-colors hover:text-green-600"
+                        >
+                          <Check size={15} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => handleStartEdit(e, conversation.id, conversation.title)}
+                          className="text-primary transition-colors hover:text-slate-600"
+                        >
+                          <Edit size={15} />
+                        </button>
+                      )}
 
                       <svg
                         viewBox="20 0 80 300"
@@ -232,7 +311,7 @@ const ChatSidebar = ({ onToggle }: Props) => {
                             fill="#f3f4f6"
                           />
 
-                          <circle cx="150" cy="60" r="14" fill="#6366f1" />
+                          <circle className='shadow-lg' cx="150" cy="60" r="14" fill="#3333FF" />
                         </g>
                       </svg>
                     </div>

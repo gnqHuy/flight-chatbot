@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import FlightOfferCard from './FlightOfferCard';
 import { FlightOffer } from '@/types/FlightOffer';
 import { chatAPI } from '@/services/chatAPI';
+import { Heart, Scale, Loader2 } from 'lucide-react';
 
 type Props = {
   conversationId: string;
@@ -11,7 +12,6 @@ type Props = {
   activeTab: 'VN' | 'VJ' | 'QH';
   onAskAI: (prompt: string) => void;
   onCompareComplete?: (botResponse: any) => void;
-  // 🌟 MỚI: Nhận thêm 2 Props từ ChatLayout
   activeFilters?: Record<string, any>;
   activeSort?: string | null;
 };
@@ -261,7 +261,7 @@ const FlightListContainer = ({
   }
 
   return (
-    <div className="relative flex flex-col gap-3 pb-24">
+    <div className="relative flex flex-col gap-2 pb-24">
       {displayedFlights.map((flight, idx) => {
         const flightId = flight.id || `flight-${idx}`;
         const isSelected = selectedFlights.includes(flightId);
@@ -295,25 +295,35 @@ const FlightListContainer = ({
       })}
 
       {selectedFlights.length > 0 && (
-        <div className="animate-fade-in-up fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-slate-800 px-6 py-3 shadow-xl ring-1 ring-white/10">
-          <div className="flex items-center gap-2 border-r border-slate-600 pr-4">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+        <div className="animate-fade-in-up fixed bottom-4 left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-4 sm:gap-5 rounded-2xl bg-[#1e293b] px-4 sm:px-5 py-3 shadow-2xl ring-1 ring-white/10">
+          
+          {/* 1. Phần số lượng vé */}
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-sm">
               {selectedFlights.length}
             </span>
-            <span className="text-sm font-medium text-white">vé được chọn</span>
+            <span className="whitespace-nowrap text-sm font-medium text-slate-200">
+              vé được chọn
+            </span>
           </div>
 
+          {/* Đường vạch chia cách */}
+          <div className="h-6 w-px bg-slate-700"></div>
+
+          {/* 2. Nút Lưu vé */}
           <button
             type="button"
             onClick={(e) => {
               e.preventDefault();
               handleSave();
             }}
-            className="flex items-center gap-1 text-sm font-medium text-slate-200 transition-colors hover:text-white"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
           >
-            🤍 Lưu vé
+            <Heart size={18} strokeWidth={2.5} className="transition-transform group-hover:scale-110" />
+            <span className="hidden sm:inline">Lưu vé</span>
           </button>
 
+          {/* 3. Nút Phân tích So sánh */}
           <button
             type="button"
             onClick={(e) => {
@@ -321,11 +331,18 @@ const FlightListContainer = ({
               handleCompare();
             }}
             disabled={isComparing}
-            className={`rounded-full px-4 py-2 text-sm font-bold text-white shadow transition-colors ${
-              isComparing ? 'cursor-not-allowed bg-slate-500' : 'bg-blue-600 hover:bg-blue-500'
+            className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all duration-200 ${
+              isComparing 
+                ? 'cursor-not-allowed bg-slate-600' 
+                : 'bg-blue-600 hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-blue-500/30'
             }`}
           >
-            {isComparing ? '⏳ Đang phân tích...' : '⚖️ Phân tích So sánh'}
+            {isComparing ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Scale size={18} strokeWidth={2.5} />
+            )}
+            <span>{isComparing ? 'Đang phân tích...' : 'Phân tích so sánh'}</span>
           </button>
         </div>
       )}

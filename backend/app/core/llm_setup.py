@@ -14,15 +14,9 @@ app/core/llm_setup.py
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
-from app.core.config import OPENAI_API_KEY, GOOGLE_API_KEY, ANTHROPIC_API_KEY
+from app.core.config import DEEPSEEK_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, ANTHROPIC_API_KEY
 
 # ── 3 Candidate models ────────────────────────────────────────────────────────
-llm_openai = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0,
-    api_key=OPENAI_API_KEY,
-)
-
 llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0,
@@ -30,17 +24,25 @@ llm_gemini = ChatGoogleGenerativeAI(
 )
 
 llm_claude = ChatAnthropic(
-    model="claude-haiku-4-5-20251001",
+    model="claude-haiku-3-5",
     temperature=0,
     api_key=ANTHROPIC_API_KEY,
 )
 
+llm_deepseek = ChatOpenAI(
+    model="deepseek-chat",
+    temperature=0,
+    api_key=DEEPSEEK_API_KEY,
+    base_url="https://api.deepseek.com",
+    max_tokens=4095
+)
+
 # Default dùng trong production
-llm = llm_openai
+llm = llm_gemini
 
 # ── 1 Judge model ─────────────────────────────────────────────────────────────
-llm_as_judge = ChatGoogleGenerativeAI(
-    model="gemini-2.5-pro",
+llm_as_judge = ChatOpenAI(
+    model="gpt-5",
     temperature=0,
-    google_api_key=GOOGLE_API_KEY,
+    api_key=OPENAI_API_KEY,
 )
