@@ -147,17 +147,31 @@ async def get_filtered_flights(search_id: str, maxPrice: int | None = None, pref
     return f"[BỘ LỌC ĐƯỢC ÁP DỤNG]\nfiltered_id={filtered_id or 'NONE'}\noriginal_count={original_count}\nfiltered_count={len(filtered)}\nsummary={summary}"
 
 @mcp.tool()
-async def analyze_flights(search_id: str, target_flight_numbers: list[str] | None = None, target_airline_codes: list[str] | None = None) -> str:
+async def analyze_flights(
+    current_search_id: str, 
+    compare_flights: list[str] | None = None, 
+    compare_airlines: list[str] | None = None
+) -> str:
     """Build structured analysis context cho LLM. Tự động recover cache nếu hết hạn."""
-    flights = load_flights(search_id)
+    flights = load_flights(current_search_id)
     if not flights:
-        flights = await recover_cache(search_id)
+        flights = await recover_cache(current_search_id)
         if not flights:
             return "[THÔNG TIN CẦN BỔ SUNG]: Phiên tìm kiếm đã hết hạn và không thể khôi phục tự động. Vui lòng tìm vé lại nhé."
 
+    offer_ids = []
+    flight_nums = []
+    if compare_flights:
+        for item in compare_flights:
+            if str(item).startswith("off_"):
+                offer_ids.append(item)
+            else:
+                flight_nums.append(item)
+
     context = build_analysis_context(
         flights=flights, 
-        target_flights=target_flight_numbers,
-        target_airlines=([c.upper() for c in target_airline_codes if c] if target_airline_codes else None)
+        target_flights=flight_nums if flight_nums else None,
+        target_airlines=([c.upper() for c in compare_airlines if c] if compare_airlines else None),
+        target_offer_ids=offer_ids if offer_ids else None
     )
     return f"[DỮ LIỆU SO SÁNH CHUYẾN BAY]\n{context}"

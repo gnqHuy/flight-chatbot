@@ -28,9 +28,9 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
         {isUser ? <User size={20} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2.5} />}
       </div>
 
-      <div className={`flex max-w-[75%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex max-w-[85%] sm:max-w-[75%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div
-          className={`rounded-2xl px-5 py-3 shadow-sm ${
+          className={`rounded-2xl px-5 py-3 shadow-sm overflow-hidden ${
             isUser
               ? 'rounded-tr-sm bg-primary text-white'
               : 'rounded-tl-sm border border-surface-border bg-surface-muted text-slate-800'
@@ -43,7 +43,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400"></span>
             </div>
           ) : (
-            <div className={`text-[14px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}>
+            <div className={`text-[18px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -66,6 +66,36 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
                       {...props}
                     />
                   ),
+                  
+                  // ==========================================
+                  // TÙY BIẾN HIỂN THỊ BẢNG (TABLE) CỰC ĐẸP
+                  // ==========================================
+                  table: ({ node, ...props }) => (
+                    <div className={`my-4 w-full overflow-x-auto rounded-xl border shadow-sm ${
+                      isUser ? 'border-white/20 bg-white/10' : 'border-slate-200 bg-white'
+                    }`}>
+                      <table className="w-full text-left text-[18px]" {...props} />
+                    </div>
+                  ),
+                  thead: ({ node, ...props }) => (
+                    <thead className={isUser ? 'bg-white/10' : 'bg-slate-50'} {...props} />
+                  ),
+                  th: ({ node, ...props }) => (
+                    <th 
+                      className={`border-b px-4 py-3 font-semibold whitespace-nowrap ${
+                        isUser ? 'border-white/20 text-white' : 'border-slate-200 text-slate-700'
+                      }`} 
+                      {...props} 
+                    />
+                  ),
+                  td: ({ node, ...props }) => (
+                    <td 
+                      className={`border-b px-4 py-3 align-top last:border-b-0 ${
+                        isUser ? 'border-white/10' : 'border-slate-100'
+                      }`} 
+                      {...props} 
+                    />
+                  ),
                 }}
               >
                 {text}
@@ -74,7 +104,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
           )}
         </div>
         {timestamp && (
-          <span className="mt-1.5 px-1 text-[11px] font-medium text-slate-400">{timestamp}</span>
+          <span className="mt-1.5 px-1 text-[14px] font-medium text-slate-400">{timestamp}</span>
         )}
       </div>
     </div>

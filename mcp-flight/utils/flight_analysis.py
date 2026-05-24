@@ -90,20 +90,38 @@ def format_flights_to_text(flights: list[dict]) -> str:
 
     return "\n\n".join(parts)
 
-
-# mcp-flight/utils/flight_analysis.py (Chỉ sửa phần build_analysis_context)
-
 def build_analysis_context(
     flights: list[dict],
     target_flights: list[str] | None = None,
     target_airlines: list[str] | None = None,
+    target_offer_ids: list[str] | None = None,
 ) -> str:
     """
     Build structured analysis context cho LLM (Chỉ thuần thông tin vé).
     """
     sections: list[str] = []
 
-    # Lọc theo airlines
+    if target_offer_ids:
+        targets_id_set = {oid.strip() for oid in target_offer_ids}
+        matched_offers: list[dict] = []
+        
+        for f in flights:
+            if f.get("id") in targets_id_set or f.get("offerId") in targets_id_set:
+                matched_offers.append(f)
+                
+        if matched_offers:
+            sections.append(
+                f"[CHI TIẾT {len(matched_offers)} VÉ ĐƯỢC CHỌN ĐỂ SO SÁNH]\n"
+                + format_flights_to_text(matched_offers)
+            )
+        else:
+            sections.append(
+                f"[KHÔNG TÌM THẤY]: Không có dữ liệu cho các mã hệ thống {target_offer_ids}. "
+                f"(Hệ thống có {len(flights)} vé)"
+            )
+        
+        return "\n\n".join(sections)
+
     if target_airlines:
         airline_flights = [
             f for f in flights
@@ -121,8 +139,6 @@ def build_analysis_context(
                 "[VÉ MINH HỌA CỦA CÁC HÃNG]\n" + format_flights_to_text(examples)
             )
 
-
-    # Lọc theo flight numbers
     if target_flights:
         targets_upper = {fn.strip().upper().replace(" ", "").replace("-", "") for fn in target_flights}
         matched: list[dict] = []
@@ -143,8 +159,7 @@ def build_analysis_context(
                 f"(Hệ thống có {len(flights)} vé)"
             )
 
-    # Không có target cụ thể — trả summary tổng quan
-    if not target_flights and not target_airlines:
+    if not target_flights and not target_airlines and not target_offer_ids:
         total      = len(flights)
         cheapest   = min(flights, key=lambda x: x.get("price", 9e9), default=None)
         fastest    = None

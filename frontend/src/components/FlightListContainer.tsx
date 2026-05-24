@@ -77,43 +77,35 @@ const FlightListContainer = ({
     });
   };
 
-  const handleCompare = async () => {
+  const handleCompare = () => {
     if (selectedFlights.length === 0) return;
 
-    if (!conversationId) {
-      alert('Lỗi hệ thống: Không tìm thấy ID phiên chat để tiếp tục!');
-      return;
-    }
-
     setIsComparing(true);
-
-    try {
-      const response = await fetch(
-        `http://localhost:8000/api/v1/conversations/${conversationId}/resume`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            selected_flight_ids: selectedFlights,
-          }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Lỗi gọi API Resume');
-
-      const data = await response.json();
-
-      if (onCompareComplete) {
-        onCompareComplete(data);
+    
+    const flightDetails = selectedFlights.map((id, index) => {
+      const flight = allFlights.find((f) => (f.id || (f as any).offerId) === id);
+      
+      if (flight) {
+        const firstItinerary = flight.itineraries?.[0];
+        
+        const flightNumber = firstItinerary?.flightNumber;
+        const carrierCode = firstItinerary?.segmentDetails?.[0]?.carrierCode;
+        const displayCode = flightNumber || carrierCode || 'Chuyến bay';
+        
+        const price = flight.price ? Number(flight.price).toLocaleString('vi-VN') : 'N/A';
+        
+        return `${index + 1}. Vé ${displayCode} (Giá: ${price}đ) - Mã hệ thống: ${id}`;
       }
+      
+      return `- Mã hệ thống: ${id}`;
+    });
 
-      setSelectedFlights([]);
-    } catch (error) {
-      console.error('Lỗi khi resume phân tích:', error);
-      alert('Có lỗi xảy ra khi phân tích vé. Vui lòng thử lại.');
-    } finally {
-      setIsComparing(false);
-    }
+    const promptMessage = `Hãy phân tích chi tiết và so sánh ưu nhược điểm của các chuyến bay tôi vừa chọn dưới đây:\n\n${flightDetails.join('\n')}`;
+    
+    onAskAI(promptMessage);
+
+    setSelectedFlights([]);
+    setIsComparing(false);
   };
 
   const handleSave = () => {
@@ -238,7 +230,7 @@ const FlightListContainer = ({
             ) : (
               <Scale size={18} strokeWidth={2.5} />
             )}
-            <span>{isComparing ? 'Đang phân tích...' : 'Phân tích so sánh'}</span>
+            <span>{isComparing ? 'Đang gửi...' : 'Phân tích so sánh'}</span>
           </button>
         </div>
       )}

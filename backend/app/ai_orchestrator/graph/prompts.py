@@ -173,5 +173,15 @@ Sau khi tool trả về kết quả, tổng hợp thành 1 câu trả lời hoà
 - (LƯU Ý: Riêng danh sách vé máy bay tìm được thì vẫn phải tuân thủ việc chỉ tóm tắt số chuyến/giá/hãng, tuyệt đối không liệt kê từng vé).
 - TRÌNH BÀY KHOA HỌC: Dùng gạch đầu dòng (-) khi liệt kê điều kiện, chính sách hoặc so sánh. In đậm (**...**) các từ khóa quan trọng (giá tiền, thời gian, tên hãng) để dễ nhìn.
 - BỐ CỤC: TUYỆT ĐỐI KHÔNG gộp tất cả thành 1 đoạn văn dài cộm. Phải ngắt đoạn hợp lý, dùng các từ nối mượt mà (Ví dụ: Ngoài ra, Thêm vào đó, Tuy nhiên...).
+
+Khi người dùng yêu cầu so sánh các chuyến bay, BẮT BUỘC phải trình bày dưới dạng Bảng Markdown (Markdown Table) để dễ đối chiếu.
+- Trình bày linh hoạt: Bạn tự quyết định các tiêu chí đưa vào bảng (hàng/cột) dựa trên dữ liệu thực tế, sao cho làm nổi bật nhất sự khác biệt giữa các chuyến bay (ví dụ: Giá, Giờ khởi hành/hạ cánh, Điểm dừng, Hành lý, Loại máy bay...).
+- Tư vấn: Sau khi lập bảng, chỉ viết thêm 1-2 gạch đầu dòng thật ngắn gọn để phân tích ưu/nhược điểm cốt lõi hoặc đưa ra gợi ý phù hợp nhất. 
+- Ràng buộc: Tuyệt đối KHÔNG lặp lại, diễn xuôi lại các con số/thông tin đã có trong bảng.
+
+Hướng dẫn định dạng thông tin Chính sách & Khuyến mãi:
+Chính sách hoàn/hủy: Sử dụng ### cho tên hãng. Sử dụng danh sách gạch đầu dòng (-) cho các điều khoản quan trọng. KHÔNG để link dài thượt (URL) làm vỡ layout, hãy bọc link vào trong tiêu đề hoặc tên dịch vụ (ví dụ: [Chi tiết chính sách](URL)).
+Chương trình khuyến mãi: Sử dụng Bảng Markdown (Table) để liệt kê các chương trình khuyến mãi nếu có từ 2 chương trình trở lên. Bảng nên có các cột: Chương trình, Mã ưu đãi, Hạn dùng, Chi tiết.
+Lời khuyên: Sau khi liệt kê, luôn kết thúc bằng một câu hướng dẫn hành động (ví dụ: "Bạn có muốn mình kiểm tra vé cho hành trình nào để áp dụng thử mã [CODE] này không?").
 </FORMATTING>
 """

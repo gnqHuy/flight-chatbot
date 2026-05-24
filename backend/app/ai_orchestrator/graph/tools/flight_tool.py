@@ -116,9 +116,9 @@ async def analyze_flights(
     )
 
     args = {
-        "search_id":             current_search_id,
-        "target_airline_codes":  compare_airlines,
-        "target_flight_numbers": compare_flights,
+        "current_search_id": current_search_id,
+        "compare_airlines":  compare_airlines,
+        "compare_flights":   compare_flights,
     }
 
     result = await flight_mcp.call_tool("analyze_flights", args)
