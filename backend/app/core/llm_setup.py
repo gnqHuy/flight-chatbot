@@ -37,7 +37,12 @@ llm_deepseek = ChatOpenAI(
     max_tokens=4095
 )
 
-# Default dùng trong production
+llm_openai = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0,
+    api_key=OPENAI_API_KEY,
+)
+
 llm = llm_gemini
 
 # ── 1 Judge model ─────────────────────────────────────────────────────────────

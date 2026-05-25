@@ -68,14 +68,12 @@ class ChatService:
         except Exception as e:
             logger.warning(f"[chat_service] Không lấy được state: {e}")
 
-        # Inject search_id từ ui_context nếu có
         if ui_context and ui_context.get("active_search_id"):
             new_sid = ui_context["active_search_id"]
             old_sid = current_state.get("current_search_id")
             logger.info(
                 f"[chat_service] ui_context inject search_id: {old_sid} → {new_sid}"
             )
-            # BUG 5 FIX: chỉ update đúng field, không overwrite toàn bộ state
             await _fg.flight_graph.aupdate_state(
                 config,
                 {"current_search_id": new_sid}
@@ -133,12 +131,31 @@ class ChatService:
         messages = final_state.get("messages", [])
 
         bot_content = "Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu."
+        
         for msg in reversed(messages):
             msg_type = getattr(msg, "type", "")
-            content  = getattr(msg, "content", "")
-            if msg_type == "ai" and isinstance(content, str) and content.strip():
-                if not (hasattr(msg, "tool_calls") and msg.tool_calls and not content.strip()):
-                    bot_content = content
+            raw_content = getattr(msg, "content", "")
+
+            parsed_content = ""
+            if isinstance(raw_content, str):
+                parsed_content = raw_content
+            elif isinstance(raw_content, list):
+                blocks = []
+                for block in raw_content:
+                    if isinstance(block, str):
+                        blocks.append(block)
+                    elif isinstance(block, dict) and "text" in block:
+                        blocks.append(str(block["text"]))
+                parsed_content = "\n".join(blocks)
+
+            if msg_type == "ai":
+                has_tools = bool(getattr(msg, "tool_calls", []))
+                
+                if parsed_content.strip():
+                    bot_content = parsed_content.strip()
+                    break
+                elif not has_tools:
+                    bot_content = parsed_content
                     break
 
         current_search_id = (
