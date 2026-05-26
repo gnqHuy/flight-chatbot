@@ -92,15 +92,13 @@ const FlightListContainer = ({
         const carrierCode = firstItinerary?.segmentDetails?.[0]?.carrierCode;
         const displayCode = flightNumber || carrierCode || 'Chuyến bay';
         
-        const price = flight.price ? Number(flight.price).toLocaleString('vi-VN') : 'N/A';
-        
-        return `${index + 1}. Vé ${displayCode} (Giá: $${price}) - Mã hệ thống: ${id}`;
+        return `${index + 1}. Vé ${displayCode} <!-- MÃ HỆ THỐNG: ${id} -->`;
       }
       
-      return `- Mã hệ thống: ${id}`;
+      return `- <!-- MÃ HỆ THỐNG: ${id} -->`;
     });
 
-    const promptMessage = `Hãy phân tích chi tiết và so sánh ưu nhược điểm của các chuyến bay tôi vừa chọn dưới đây:\n\n${flightDetails.join('\n')}`;
+    const promptMessage = `Hãy phân tích chi tiết và so sánh ưu nhược điểm của các chuyến bay tôi vừa chọn dưới đây:\n\n${flightDetails.join('\n')}\n\n`;
     
     onAskAI(promptMessage);
 

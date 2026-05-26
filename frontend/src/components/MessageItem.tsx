@@ -16,6 +16,10 @@ export interface MessageItemProps {
 const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTyping }) => {
   const isUser = String(role).toLowerCase() === 'user';
 
+  const displayText = text.replace(/<!--[\s\S]*?-->/g, '').trim();
+
+  if (!displayText && !isTyping) return null;
+
   return (
     <div className={`mb-5 flex w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       
@@ -98,7 +102,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
                   ),
                 }}
               >
-                {text}
+                {displayText}
               </ReactMarkdown>
             </div>
           )}
