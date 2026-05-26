@@ -10,15 +10,23 @@ logger = logging.getLogger(__name__)
 
 def _extract_context(messages: list[AnyMessage]) -> tuple[str | None, dict | None]:
     """
-    Duyệt tool messages, extract search_id và action.
+    Duyệt tool messages của LƯỢT CHAT HIỆN TẠI, extract search_id và action.
     """
+    current_turn_messages = []
+    for msg in reversed(messages):
+        current_turn_messages.append(msg)
+        if getattr(msg, "type", "") == "human":
+            break
+    current_turn_messages.reverse()
+
     tool_results = []
-    for msg in messages:
+    for msg in current_turn_messages:
         if getattr(msg, "type", "") != "tool":
             continue
         content = getattr(msg, "content", "")
         if not isinstance(content, str):
             continue
+            
         entry = {}
         for line in content.splitlines():
             line = line.strip()
@@ -35,7 +43,7 @@ def _extract_context(messages: list[AnyMessage]) -> tuple[str | None, dict | Non
             logger.debug(f"[extract_context] Tool result parsed: {entry}")
 
     if not tool_results:
-        logger.debug("[extract_context] Không tìm thấy search_id hay filtered_id trong tool messages")
+        logger.debug("[extract_context] Không tìm thấy search_id/filtered_id trong tool messages LƯỢT NÀY")
         return None, None
 
     # Ưu tiên filtered_id
