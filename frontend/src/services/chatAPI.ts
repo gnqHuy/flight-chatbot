@@ -41,4 +41,14 @@ export const chatAPI = {
     });
     return res.data;
   },
+
+  saveFlight: async (threadId: string, searchId: string, flightNumber: string) => {
+    const res = await api.post(`/flights/save?thread_id=${threadId}&search_id=${searchId}&flight_number=${flightNumber}`);
+    return res.data;
+  },
+  
+  getSavedFlights: async (threadId: string) => {
+    const res = await api.get<{ flights: FlightOffer[] }>(`/flights/saved/${threadId}`);
+    return res.data;
+  },
 };

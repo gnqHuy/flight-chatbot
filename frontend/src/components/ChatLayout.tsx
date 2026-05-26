@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import ChatWindow from './ChatWindow';
 import FlightListContainer from './FlightListContainer';
-import { X, Ticket } from 'lucide-react'; // Bổ sung import icon
+import { X, Ticket, Heart } from 'lucide-react'; // Bổ sung import icon
+import SavedFlightsPanel from './SavedFlightsPanel';
+
 
 type Props = {
   conversationId: string;
@@ -15,6 +17,8 @@ export default function ChatLayout({ conversationId }: Props) {
 
   const [activeTab, setActiveTab] = useState<'VN' | 'VJ' | 'QH'>('VN');
   const [externalTrigger, setExternalTrigger] = useState<string>('');
+
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   const handleActionDetected = (action: any) => {
     if (!action) return;
@@ -59,6 +63,19 @@ export default function ChatLayout({ conversationId }: Props) {
           <span>Xem danh sách vé</span>
         </button>
       )} */}
+
+      <div className={`absolute top-5 z-20 flex items-center gap-3${
+          isWorkspaceOpen ? ' right-20' : ' right-6'
+        }`}>
+        {/* NÚT MỞ GIỎ HÀNG (LUÔN HIỆN) */}
+        <button
+          onClick={() => setIsCartOpen(true)}
+          title="Xem vé đã lưu"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-rose-500 shadow-md transition-all hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-lg"
+        >
+          <Heart size={20} strokeWidth={2.5} />
+        </button>
+      </div>
 
       {/* KHUNG CHAT (Bên trái) */}
       <div
@@ -136,6 +153,13 @@ export default function ChatLayout({ conversationId }: Props) {
           </div>
         )}
       </div>
+
+      <SavedFlightsPanel
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        conversationId={conversationId}
+        onAskAI={handlePromptClick}
+      />
     </div>
   );
 }
