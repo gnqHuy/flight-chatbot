@@ -1,7 +1,7 @@
 from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-from app.core.enums import ChatIntent, ChatRole, ComponentType
+from app.core.enums import ChatRole, ComponentType
 
 class ClientAction(BaseModel):
     type: ComponentType = ComponentType.NONE

@@ -6,16 +6,22 @@ import { Role } from '@/types/enums/Role';
 import { useState, useRef, useEffect } from 'react';
 import MessageItem from './MessageItem';
 import ActionRenderer from './ActionRenderer';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 type Props = {
+  isWorkspaceOpen?: boolean;
   conversationId?: string;
-  // Callback để báo cho Layout (Component Cha) biết có Action mới (ví dụ: mở danh sách vé)
   onActionDetected?: (action: any) => void;
-  // Hàm này dùng để Component con (như Prompt Chips) có thể ép ChatWindow gửi tin nhắn
   externalInputTrigger?: string;
 };
 
-const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: Props) => {
+const suggestions = [
+  'Tìm vé máy bay từ Hà Nội đi Đà Nẵng vào ngày mai',
+  'Chính sách hoàn hủy vé',
+  'Khuyến mãi vé máy bay tháng này',
+];
+
+const ChatWindow = ({ isWorkspaceOpen, conversationId, onActionDetected, externalInputTrigger }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -32,19 +38,18 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
         setMessages([]);
         return;
       }
+
       try {
         setIsLoadingHistory(true);
         const history = await chatAPI.getHistory(conversationId);
         setMessages(history);
 
-        if (history.length > 0) {
-          const latestActionMsg = [...history]
-            .reverse()
-            .find((msg) => msg.action && msg.action.type === 'flight_list');
+        const latestActionMsg = [...history]
+          .reverse()
+          .find((msg) => msg.action && ['flight_list', 'apply_filters'].includes(msg.action.type));
 
-          if (latestActionMsg && onActionDetected) {
-            onActionDetected(latestActionMsg.action);
-          }
+        if (latestActionMsg && onActionDetected) {
+          onActionDetected(latestActionMsg.action);
         }
       } catch (error) {
         console.error(error);
@@ -52,8 +57,9 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
         setIsLoadingHistory(false);
       }
     };
+
     fetchHistory();
-  }, [conversationId]);
+  }, [conversationId, onActionDetected]);
 
   useEffect(() => {
     if (externalInputTrigger) {
@@ -61,7 +67,6 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
     }
   }, [externalInputTrigger]);
 
-  // Hàm gửi tin nhắn
   const handleSend = async (messageText?: string) => {
     const textToSend = typeof messageText === 'string' ? messageText : input;
     if (!textToSend.trim() || !conversationId) return;
@@ -98,92 +103,131 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
       if (data.action && onActionDetected) {
         onActionDetected(data.action);
       }
-    } catch (err) {
-      const errorMsg: ChatMessage = {
-        conversation_id: conversationId,
-        message_id: (Date.now() + 2).toString(),
-        content: 'Lỗi kết nối server. Vui lòng thử lại.',
-        role: Role.ASSISTANT,
-        intent: 'error',
-        action: null,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          conversation_id: conversationId,
+          message_id: (Date.now() + 2).toString(),
+          content: 'Lỗi kết nối server. Vui lòng thử lại.',
+          role: Role.ASSISTANT,
+          intent: 'error',
+          action: null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setIsSending(false);
     }
   };
 
+  const isEmptyState = !conversationId || messages.length === 0;
+
   return (
-    <div className="mx-auto flex h-full w-full flex-col overflow-hidden bg-white py-4 shadow-sm">
-      <div className="scrollbar-thin scrollbar-thumb-gray-200 flex-1 space-y-6 overflow-y-auto px-6">
+    <div className={`relative mx-auto flex h-full flex-col overflow-hidden bg-transparent${
+          isWorkspaceOpen ? ' w-full' : ' w-[85%]'
+        }`}>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(circle_at_45%_85%,rgba(244,114,182,0.18),rgba(243,244,246,0)_55%),radial-gradient(circle_at_60%_80%,rgba(99,102,241,0.14),rgba(243,244,246,0)_60%)]" />
+      <div className="relative flex-1 overflow-hidden">
         {isLoadingHistory ? (
           <div className="flex h-full items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-gray-400">
-            <div className="text-center">
-              <span className="text-4xl">✈️</span>
-              <p className="mt-2 text-sm font-medium">Bắt đầu trò chuyện để tìm vé máy bay</p>
-            </div>
+        ) : isEmptyState ? (
+          <div className="flex h-full flex-col items-center justify-center px-6">
+            <Sparkles size={34} className="mb-8 text-slate-900" />
+            <h2 className="text-2xl font-medium text-slate-900">Ask our Chatbot something</h2>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.message_id} className="flex w-full flex-col">
-              <MessageItem
-                role={msg.role}
-                text={msg.content}
-                timestamp={new Date(msg.created_at).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              />
-              <ActionRenderer
-                action={msg.action}
-                onViewFlightList={(searchId) => {
-                  if (onActionDetected) {
-                    onActionDetected({
-                      type: 'flight_list',
-                      payload: { search_id: searchId },
-                    });
-                  }
-                }}
-              />
-            </div>
-          ))
-        )}
+          <div className="scrollbar-thin scrollbar-thumb-gray-200 h-full space-y-6 overflow-y-auto px-6 py-6">
+            {messages.map((msg) => (
+              <div key={msg.message_id} className="flex w-full flex-col">
+                <MessageItem
+                  role={msg.role}
+                  text={msg.content}
+                  timestamp={new Date(msg.created_at).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                />
 
-        {isSending && (
-          <div className="flex items-center gap-2 text-sm text-gray-400 italic">
-            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
-            AI đang xử lý...
+                <ActionRenderer
+                  action={msg.action}
+                  onViewFlightList={() => {
+                    if (msg.action) {
+                      onActionDetected?.(msg.action);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+
+            {isSending && (
+              <div className="flex items-center gap-2 text-[13px] text-slate-400 italic">
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-slate-400" />
+                AI đang xử lý...
+              </div>
+            )}
+
+            <div ref={bottomRef} />
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
-      <div className="mt-4 flex gap-2 border-t border-gray-100 px-6 pt-4">
-        <input
-          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-black transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none disabled:bg-gray-100"
-          placeholder={
-            conversationId
-              ? 'Nhập yêu cầu của bạn (VD: Tìm vé Hà Nội - Đà Lạt ngày mai)'
-              : 'Chọn một cuộc hội thoại...'
-          }
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          disabled={!conversationId || isLoadingHistory || isSending}
-        />
+      <div className="relative z-10 px-6 pb-6">
+        {isEmptyState && (
+          <div className="mx-auto mb-7 w-full max-w-4xl">
+            <p className="mb-3 text-sm font-medium text-slate-700">
+              Suggestions on what to ask Chatbot
+            </p>
 
-        <button
-          onClick={() => handleSend()}
-          disabled={!conversationId || isLoadingHistory || isSending || !input.trim()}
-          className="rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-        >
-          Gửi
-        </button>
+            <div className="flex flex-wrap gap-3">
+              {suggestions.map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setInput(item)}
+                  className="
+                    rounded-xl
+                    border border-white/70
+                    bg-white/60
+                    px-4 py-3
+                    text-left text-sm text-slate-900
+                    shadow-sm
+                    backdrop-blur
+                    transition-all
+                    hover:bg-white
+                    hover:shadow-md
+                  "
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto flex w-full max-w-4xl items-center rounded-lg border border-slate-300 bg-white">
+          <input
+            className="flex-1 bg-transparent px-4 py-4 text-sm text-slate-800 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder={
+              conversationId
+                ? 'Ask me anything about your journey...'
+                : 'Chọn một cuộc hội thoại...'
+            }
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            disabled={!conversationId || isLoadingHistory || isSending}
+          />
+
+          <button
+            onClick={() => handleSend()}
+            disabled={!conversationId || isLoadingHistory || isSending || !input.trim()}
+            className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center text-slate-400 transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ArrowRight size={28} />
+          </button>
+        </div>
       </div>
     </div>
   );

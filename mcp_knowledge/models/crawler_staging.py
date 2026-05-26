@@ -1,0 +1,28 @@
+from sqlmodel import Relationship, SQLModel, Field
+from sqlalchemy import Column, Text, JSON, Enum as SaEnum
+from typing import Optional
+from datetime import datetime, timezone
+from models.enums import StagingStatus
+
+class CrawlerStaging(SQLModel, table=True):
+    __tablename__ = "crawler_staging"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    url_id: int = Field(foreign_key="crawler_urls.id", index=True)
+    airline_id: int = Field(foreign_key="airlines.id")
+
+    pipeline_run_id: Optional[str] = Field(default=None, index=True)
+    content_hash:   Optional[str]  = Field(default=None, max_length=32) 
+    
+    raw_text: Optional[str] = Field(default=None, sa_column=Column(Text))
+    formatted_data: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    
+    status: StagingStatus = Field(
+        default=StagingStatus.PENDING, 
+        sa_column=Column(SaEnum(StagingStatus), nullable=False, index=True)
+    )
+    
+    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    url_obj: Optional["CrawlerUrl"] = Relationship(back_populates="stagings")

@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, full_name: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -41,7 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const formData = new FormData();
-
     formData.append('username', email);
     formData.append('password', password);
 
@@ -50,11 +50,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     localStorage.setItem('accessToken', data.access_token);
-
     const userRes = await api.get<User>('/auth/me');
     setUser(userRes.data);
-
     router.push('/');
+  };
+
+  const signup = async (email: string, password: string, full_name: string) => {
+    await api.post('/auth/register', {
+      email,
+      password,
+      full_name,
+    });
+
+    await login(email, password);
   };
 
   const logout = () => {
@@ -64,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

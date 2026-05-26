@@ -1,18 +1,39 @@
-version: "3.8"
-
 services:
-  postgres:
+  backend_db:
     image: pgvector/pgvector:pg15
-    container_name: flight_chatbot_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: flight_chatbot
+    container_name: flight_backend_db
+    env_file:
+      - ./docker/backend_db.env
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - backend_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    networks:
+      - ota_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d backend_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  knowledge_db:
+    image: pgvector/pgvector:pg15
+    container_name: flight_knowledge_db
+    env_file:
+      - ./docker/knowledge_db.env
+    ports:
+      - "55433:5432"
+    volumes:
+      - knowledge_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - ota_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowledge_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -22,7 +43,100 @@ services:
     volumes:
       - redisdata:/data
     restart: unless-stopped
+    networks:
+      - ota_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  knowledge_mcp:
+    build:
+      context: ./mcp_knowledge
+      dockerfile: Dockerfile
+    container_name: flight_mcp_knowledge
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./mcp_knowledge/.env
+    volumes:
+      - ./mcp_knowledge:/app
+    depends_on:
+      knowledge_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - ota_network
+
+  mcp_flight:
+    build:
+      context: ./mcp-flight
+      dockerfile: Dockerfile
+    container_name: flight_mcp_flight
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./mcp-flight/.env
+    volumes:
+      - ./mcp-flight:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - ota_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flight_backend_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      knowledge_mcp:
+        condition: service_started
+      mcp_flight:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - ota_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: flight_frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env.local
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - ota_network
 
 volumes:
-  pgdata:
+  backend_pgdata:
+  knowledge_pgdata:
   redisdata:
+
+networks:
+  ota_network:
+    driver: bridge

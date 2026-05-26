@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Role } from '@/types/enums/Role';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Bot, User } from 'lucide-react';
 
 export interface MessageItemProps {
   role: Role;
@@ -18,21 +18,22 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
 
   return (
     <div className={`mb-5 flex w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`relative h-9 w-9 shrink-0 ${isUser ? 'ml-3' : 'mr-3'}`}>
-        <Image
-          src={isUser ? '/assets/user.svg' : '/assets/chatbot.svg'}
-          alt={isUser ? 'User' : 'Bot'}
-          fill
-          className="rounded-full border border-slate-100 object-cover shadow-sm"
-        />
+      
+      {/* Avatar */}
+      <div 
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow-sm ${
+          isUser ? 'ml-3 text-black bg-white' : 'mr-3 text-white bg-primary'
+        }`}
+      >
+        {isUser ? <User size={20} strokeWidth={2.5} /> : <Bot size={20} strokeWidth={2.5} />}
       </div>
 
-      <div className={`flex max-w-[70%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex max-w-[85%] sm:max-w-[75%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div
-          className={`rounded-2xl px-5 py-3 shadow-sm ${
+          className={`rounded-2xl px-5 py-3 shadow-sm overflow-hidden ${
             isUser
-              ? 'rounded-tr-sm bg-blue-600 text-white'
-              : 'rounded-tl-sm border border-slate-200 bg-[#F1F5F9] text-slate-800'
+              ? 'rounded-tr-sm bg-primary text-white'
+              : 'rounded-tl-sm border border-surface-border bg-surface-muted text-slate-800'
           }`}
         >
           {isTyping ? (
@@ -42,9 +43,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400"></span>
             </div>
           ) : (
-            <div
-              className={`text-[15px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}
-            >
+            <div className={`text-[16px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -54,21 +53,47 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
                     <a
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`break-all underline underline-offset-2 ${isUser ? 'text-blue-200 hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}
+                      className={`break-all underline underline-offset-2 ${isUser ? 'text-blue-200 hover:text-white' : 'text-primary hover:text-primary-hover'}`}
                       {...props}
                     />
                   ),
-                  ul: ({ node, ...props }) => (
-                    <ul className="mb-3 list-outside list-disc pl-5" {...props} />
-                  ),
-                  ol: ({ node, ...props }) => (
-                    <ol className="mb-3 list-outside list-decimal pl-5" {...props} />
-                  ),
+                  ul: ({ node, ...props }) => <ul className="mb-3 list-outside list-disc pl-5" {...props} />,
+                  ol: ({ node, ...props }) => <ol className="mb-3 list-outside list-decimal pl-5" {...props} />,
                   li: ({ node, ...props }) => <li className="mb-1" {...props} />,
                   blockquote: ({ node, ...props }) => (
                     <blockquote
                       className={`my-2 border-l-4 pl-3 italic ${isUser ? 'border-blue-300' : 'border-slate-300 text-slate-600'}`}
                       {...props}
+                    />
+                  ),
+                  
+                  // ==========================================
+                  // TÙY BIẾN HIỂN THỊ BẢNG (TABLE) CỰC ĐẸP
+                  // ==========================================
+                  table: ({ node, ...props }) => (
+                    <div className={`my-4 w-full overflow-x-auto rounded-xl border shadow-sm ${
+                      isUser ? 'border-white/20 bg-white/10' : 'border-slate-200 bg-white'
+                    }`}>
+                      <table className="w-full text-left text-[16px]" {...props} />
+                    </div>
+                  ),
+                  thead: ({ node, ...props }) => (
+                    <thead className={isUser ? 'bg-white/10' : 'bg-slate-50'} {...props} />
+                  ),
+                  th: ({ node, ...props }) => (
+                    <th 
+                      className={`border-b px-4 py-3 font-semibold whitespace-nowrap ${
+                        isUser ? 'border-white/20 text-white' : 'border-slate-200 text-slate-700'
+                      }`} 
+                      {...props} 
+                    />
+                  ),
+                  td: ({ node, ...props }) => (
+                    <td 
+                      className={`border-b px-4 py-3 align-top last:border-b-0 ${
+                        isUser ? 'border-white/10' : 'border-slate-100'
+                      }`} 
+                      {...props} 
                     />
                   ),
                 }}
@@ -79,7 +104,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
           )}
         </div>
         {timestamp && (
-          <span className="mt-1.5 px-1 text-[11px] font-medium text-slate-400">{timestamp}</span>
+          <span className="mt-1.5 px-1 text-[14px] font-medium text-slate-400">{timestamp}</span>
         )}
       </div>
     </div>
