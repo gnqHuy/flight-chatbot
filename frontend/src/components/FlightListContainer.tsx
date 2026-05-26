@@ -108,11 +108,30 @@ const FlightListContainer = ({
     setIsComparing(false);
   };
 
-  const handleSave = () => {
-    if (selectedFlights.length === 0) return;
-    alert(`Đã lưu ${selectedFlights.length} vé vào danh sách yêu thích!`);
-    setSelectedFlights([]);
-  };
+  const handleSave = async () => {
+      if (selectedFlights.length === 0) return;
+      
+      try {
+        await Promise.all(selectedFlights.map(async (id) => {
+          const flight = allFlights.find((f) => (f.id || (f as any).offerId) === id);
+          if (flight) {
+            const firstItinerary = flight.itineraries?.[0];
+            const flightNumber = firstItinerary?.flightNumber;
+            
+            if (flightNumber) {
+              await chatAPI.saveFlight(conversationId, searchId, flightNumber);
+            }
+          }
+        }));
+
+        alert(`Đã lưu thành công ${selectedFlights.length} vé vào danh sách yêu thích!`);
+        setSelectedFlights([]);
+        
+      } catch (error) {
+        console.error('Lỗi khi lưu vé:', error);
+        alert('Có lỗi xảy ra khi lưu vé, vui lòng thử lại.');
+      }
+    };
 
   if (loading) {
     return (
