@@ -141,7 +141,7 @@ const ChatSidebar = ({ onToggle }: Props) => {
       className={`
         m-5 flex flex-col overflow-hidden rounded-2xl bg-white
         transition-[width,box-shadow] duration-300 ease-out
-        ${isSidebarOpen ? 'w-80' : 'w-20 items-center shadow-none'}
+        ${isSidebarOpen ? 'w-72' : 'w-20 items-center shadow-none'}
       `}
     >
       <div

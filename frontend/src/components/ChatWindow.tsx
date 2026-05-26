@@ -9,6 +9,7 @@ import ActionRenderer from './ActionRenderer';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 type Props = {
+  isWorkspaceOpen?: boolean;
   conversationId?: string;
   onActionDetected?: (action: any) => void;
   externalInputTrigger?: string;
@@ -20,7 +21,7 @@ const suggestions = [
   'Khuyến mãi vé máy bay tháng này',
 ];
 
-const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: Props) => {
+const ChatWindow = ({ isWorkspaceOpen, conversationId, onActionDetected, externalInputTrigger }: Props) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -123,8 +124,10 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
   const isEmptyState = !conversationId || messages.length === 0;
 
   return (
-    <div className="relative mx-auto flex h-full w-full flex-col overflow-hidden bg-transparent">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(circle_at_45%_85%,rgba(244,114,182,0.22),transparent_55%),radial-gradient(circle_at_60%_80%,rgba(99,102,241,0.18),transparent_60%)]" />
+    <div className={`relative mx-auto flex h-full flex-col overflow-hidden bg-transparent${
+          isWorkspaceOpen ? ' w-full' : ' w-[85%]'
+        }`}>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(circle_at_45%_85%,rgba(244,114,182,0.18),rgba(243,244,246,0)_55%),radial-gradient(circle_at_60%_80%,rgba(99,102,241,0.14),rgba(243,244,246,0)_60%)]" />
       <div className="relative flex-1 overflow-hidden">
         {isLoadingHistory ? (
           <div className="flex h-full items-center justify-center">
@@ -171,7 +174,7 @@ const ChatWindow = ({ conversationId, onActionDetected, externalInputTrigger }: 
         )}
       </div>
 
-      <div className="relative z-10 px-6 pb-8">
+      <div className="relative z-10 px-6 pb-6">
         {isEmptyState && (
           <div className="mx-auto mb-7 w-full max-w-4xl">
             <p className="mb-3 text-sm font-medium text-slate-700">

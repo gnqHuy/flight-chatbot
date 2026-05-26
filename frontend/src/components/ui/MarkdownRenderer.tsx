@@ -26,7 +26,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         // 🌟 TÙY BIẾN BẢNG (TABLE) CỰC ĐẸP
         table: ({ node, ...props }) => (
           <div className="my-5 w-full overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-            <table className="w-full text-left text-[18px]" {...props} />
+            <table className="w-full text-left text-[16px]" {...props} />
           </div>
         ),
         thead: ({ node, ...props }) => (

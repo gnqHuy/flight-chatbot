@@ -50,15 +50,15 @@ export default function ChatLayout({ conversationId }: Props) {
     <div className="flex bg-gray-100 h-screen w-full overflow-hidden text-gray-800 relative">
       
       {/* NÚT MỞ (Chỉ hiện khi Workspace đang đóng và đã có vé) */}
-      {!isWorkspaceOpen && currentSearchId && (
+      {/* {!isWorkspaceOpen && currentSearchId && (
         <button
           onClick={() => setIsWorkspaceOpen(true)}
-          className="absolute top-6 right-6 z-20 flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-blue-500/30 animate-in fade-in zoom-in duration-300"
+          className="absolute top-[50%] right- -translate-y-1/2 -rotate-90 z-20 flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-x-0.5 hover:bg-blue-500 hover:shadow-blue-500/30 animate-in fade-in zoom-in duration-300"
         >
           <Ticket size={18} />
           <span>Xem danh sách vé</span>
         </button>
-      )}
+      )} */}
 
       {/* KHUNG CHAT (Bên trái) */}
       <div
@@ -67,6 +67,7 @@ export default function ChatLayout({ conversationId }: Props) {
         }`}
       >
         <ChatWindow
+          isWorkspaceOpen={isWorkspaceOpen}
           conversationId={conversationId}
           onActionDetected={handleActionDetected}
           externalInputTrigger={externalTrigger}

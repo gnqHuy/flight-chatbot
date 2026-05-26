@@ -43,7 +43,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400"></span>
             </div>
           ) : (
-            <div className={`text-[18px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}>
+            <div className={`text-[16px] leading-relaxed ${isUser ? 'text-white' : 'text-slate-800'}`}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -74,7 +74,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ role, text, timestamp, isTypi
                     <div className={`my-4 w-full overflow-x-auto rounded-xl border shadow-sm ${
                       isUser ? 'border-white/20 bg-white/10' : 'border-slate-200 bg-white'
                     }`}>
-                      <table className="w-full text-left text-[18px]" {...props} />
+                      <table className="w-full text-left text-[16px]" {...props} />
                     </div>
                   ),
                   thead: ({ node, ...props }) => (

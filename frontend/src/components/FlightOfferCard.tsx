@@ -15,10 +15,24 @@ const FlightOfferCard: React.FC<Props> = ({ flight, onAskAI }) => {
     return new Date(time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatPrice = (price: number, currency: string) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: currency || 'VND' }).format(
-      price
-    );
+  // 🌟 CẬP NHẬT: Tự động quy đổi giá tiền sang VND
+  const formatPrice = (price: number, currency: string) => {
+    let finalPrice = price;
+    
+    // Tỷ giá giả định (Bạn có thể điều chỉnh hoặc truyền từ API/Config vào)
+    const USD_TO_VND_RATE = 25450; 
+
+    // Nếu tiền tệ không phải VND, tự động quy đổi (Ví dụ mặc định ngoại tệ là USD)
+    if (currency && currency.toUpperCase() !== 'VND') {
+      finalPrice = price * USD_TO_VND_RATE;
+    }
+
+    return new Intl.NumberFormat('vi-VN', { 
+      style: 'currency', 
+      currency: 'VND',
+      maximumFractionDigits: 0 // Bỏ số thập phân cho chuẩn tiền Việt
+    }).format(finalPrice);
+  };
 
   const formatDuration = (ptString: string) => {
     if (!ptString) return '--';

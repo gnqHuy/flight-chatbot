@@ -1,14 +1,14 @@
 """
 app/core/llm_setup.py
 
-3 Candidate models (tương đương) — xử lý chat:
+3 Candidate models — xử lý chat:
   - GPT-4o-mini   (OpenAI)
   - Gemini Flash  (Google)
   - Claude Haiku  (Anthropic)
 
-1 Judge model (mạnh hơn hẳn) — đánh giá độc lập cả 3:
+1 Judge model — đánh giá độc lập cả 3:
   - Gemini 2.5 Pro (Google)
-  Lý do chọn Gemini Pro: không tham gia làm candidate,
+  Lý do chọn Gemini Pro: không tham gia làm candidate, 
   mạnh hơn cả 3 candidates, chi phí hợp lý.
 """
 from langchain_openai import ChatOpenAI
@@ -18,7 +18,7 @@ from app.core.config import DEEPSEEK_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, AN
 
 # ── 3 Candidate models ────────────────────────────────────────────────────────
 llm_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-3.5-flash",
     temperature=0,
     google_api_key=GOOGLE_API_KEY,
 )

@@ -94,7 +94,7 @@ const FlightListContainer = ({
         
         const price = flight.price ? Number(flight.price).toLocaleString('vi-VN') : 'N/A';
         
-        return `${index + 1}. Vé ${displayCode} (Giá: ${price}đ) - Mã hệ thống: ${id}`;
+        return `${index + 1}. Vé ${displayCode} (Giá: $${price}) - Mã hệ thống: ${id}`;
       }
       
       return `- Mã hệ thống: ${id}`;
