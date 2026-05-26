@@ -7,6 +7,8 @@ Thumbs.db
 .env.local
 .env.development
 .env.production
+backend_db.env
+knowledge_db.env
 
 venv
 __pycache__/
@@ -58,8 +60,6 @@ tmp/
 .prettierrc
 
 data/
-data_set/
 dum_data/
 result/
 test_script/
-secrets/

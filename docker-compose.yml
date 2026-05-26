@@ -2,10 +2,8 @@ services:
   backend_db:
     image: pgvector/pgvector:pg15
     container_name: flight_backend_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: huy123456789
-      POSTGRES_DB: backend_db
+    env_file:
+      - ./docker/backend_db.env
     ports:
       - "5432:5432"
     volumes:
@@ -22,10 +20,8 @@ services:
   knowledge_db:
     image: pgvector/pgvector:pg15
     container_name: flight_knowledge_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: huy123456789
-      POSTGRES_DB: knowledge_db
+    env_file:
+      - ./docker/knowledge_db.env
     ports:
       - "55433:5432"
     volumes:
@@ -55,7 +51,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── MCP Knowledge Server ───────────────────────────────────────────────────
   knowledge_mcp:
     build:
       context: ./mcp_knowledge
@@ -65,21 +60,17 @@ services:
       - "5001:5001"
     env_file:
       - ./mcp_knowledge/.env
-    environment:
-      KNOWLEDGE_DATABASE_URL: "postgresql://postgres:huy123456789@knowledge_db:5432/knowledge_db"
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      APP_DATE: "${APP_DATE:-}"
     volumes:
       - ./mcp_knowledge:/app
     depends_on:
-      knowledge_db: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      knowledge_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: on-failure
     networks:
       - ota_network
 
-  # ── MCP Flight Server ──────────────────────────────────────────────────────
   mcp_flight:
     build:
       context: ./mcp-flight
@@ -89,14 +80,11 @@ services:
       - "8001:8001"
     env_file:
       - ./mcp-flight/.env
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      APP_DATE: "${APP_DATE:-}"
     volumes:
       - ./mcp-flight:/app
     depends_on:
-      redis: { condition: service_healthy }
+      redis:
+        condition: service_healthy
     restart: on-failure
     networks:
       - ota_network
@@ -110,19 +98,17 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
-    environment:
-      BACKEND_DATABASE_URL: "postgresql+psycopg2://postgres:huy123456789@backend_db:5432/backend_db"
-      FLIGHT_MCP_URL: "http://mcp_flight:8001/sse"
-      KNOWLEDGE_MCP_URL: "http://knowledge_mcp:5001/sse"
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
     volumes:
       - ./backend:/app
     depends_on:
-      backend_db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      knowledge_mcp: { condition: service_started }
-      mcp_flight: { condition: service_started }
+      backend_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      knowledge_mcp:
+        condition: service_started
+      mcp_flight:
+        condition: service_started
     restart: on-failure
     networks:
       - ota_network
@@ -134,8 +120,8 @@ services:
     container_name: flight_frontend
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+    env_file:
+      - ./frontend/.env.local
     volumes:
       - ./frontend:/app
       - /app/node_modules

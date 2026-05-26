@@ -1,0 +1,587 @@
+[
+{
+"test_id": "TC_EASY_01",
+"difficulty": "easy",
+"description": "V4 thiếu ngày về khứ hồi, bổ sung và lọc giờ bay (alias thời gian)",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé khứ hồi Hà Nội đi Đà Nẵng ngày 25/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Người dùng tìm vé khứ hồi nhưng thiếu ngày về.\n[YÊU CẦU]: Validation V4 - thiếu ngày về.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights, MCP báo lỗi thiếu ngày về, bot hỏi lại ngày về hợp lệ.",
+"anti_preference": "Tự giả định ngày về (ví dụ cộng thêm 3 ngày) mà không hỏi khách.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 2,
+"user_query": "À mình về ngày 28/05/2026 nhé.",
+"expected_behavior": "[NGỮ CẢNH]: Đã cung cấp đủ ngày về.\n[YÊU CẦU]: Tìm vé khứ hồi HAN-DAD đi 25/05 về 28/05.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights thành công, trả danh sách chuyến bay.",
+"anti_preference": "Hỏi lại ngày đi hoặc điểm xuất phát, điểm đến đã biết từ lượt trước.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 3,
+"user_query": "Lọc giúp mình các chuyến bay sáng thôi.",
+"expected_behavior": "[NGỮ CẢNH]: Sử dụng alias thời gian tự nhiên 'chuyến bay sáng'.\n[YÊU CẦU]: Lọc kết quả với start_hour/end_hour tương ứng buổi sáng.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights trên cache hiện tại.",
+"anti_preference": "Gọi lại search_flights dù chỉ lọc giờ bay. Từ chối lọc vì khách không cung cấp mốc giờ chính xác.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_EASY_02",
+"difficulty": "easy",
+"description": "V2 ngày quá khứ, sau đó hỏi chính sách (anti-hallucination)",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé Sài Gòn ra Hà Nội ngày 10/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Ngày đi trong quá khứ so với mốc hiện tại (22/05/2026).\n[YÊU CẦU]: Validation V2.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights, MCP báo lỗi ngày quá khứ, bot thông báo và yêu cầu chọn lại ngày.",
+"anti_preference": "Tự động đổi sang ngày 10 của tháng sau (10/06) mà không xin phép khách.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 2,
+"user_query": "Nhầm, mình đi ngày 26/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Cung cấp ngày đi hợp lệ trong tương lai.\n[YÊU CẦU]: Tìm vé một chiều SGN-HAN ngày 26/05.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights, trả kết quả danh sách.",
+"anti_preference": "Xóa mất điểm xuất phát và điểm đến đã cung cấp ở lượt 1, yêu cầu khách nhập lại.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 3,
+"user_query": "VietJet có cho mang đồ ăn lên máy bay không?",
+"expected_behavior": "[NGỮ CẢNH]: Hỏi thông tin chính sách của hãng cụ thể.\n[YÊU CẦU]: Tra cứu quy định mang đồ ăn của VJ.\n[XỬ LÝ MONG ĐỢI]: Gọi search_policies, giải đáp dựa trên dữ liệu tool.",
+"anti_preference": "Tự bịa câu trả lời về quy định đồ ăn của VietJet mà không gọi tool search_policies.",
+"expected_tool_calls": [
+{
+"tool": "search_policies"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_BASIC_MEDIUM_01",
+"difficulty": "basic_medium",
+"description": "V8 trẻ em không rõ tuổi, sau đó V1 thiếu điểm đi",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé đi Nha Trang ngày 26/05/2026 cho 1 người lớn và 1 bé.",
+"expected_behavior": "[NGỮ CẢNH]: Dùng từ 'bé' chưa rõ tuổi. Khách cũng thiếu điểm đi nhưng V8 chặn trước.\n[YÊU CẦU]: Validation V8 - Backend chặn không gọi tool.\n[XỬ LÝ MONG ĐỢI]: Không gọi tool nào, hỏi ngay tuổi của bé.",
+"anti_preference": "Gọi search_flights để MCP báo lỗi. Tự mặc định bé là children (2-11 tuổi) hoặc infants (<2 tuổi).",
+"expected_tool_calls": [],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 2,
+"user_query": "Bé nhà mình 5 tuổi.",
+"expected_behavior": "[NGỮ CẢNH]: Đã rõ tuổi bé (children=1). Nhưng thiếu điểm xuất phát.\n[YÊU CẦU]: Validation V1 - thiếu origin.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights, MCP báo thiếu origin, bot hỏi bạn bay từ đâu.",
+"anti_preference": "Tự giả định khách bay từ Hà Nội (HAN) hoặc Sài Gòn (SGN).",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 3,
+"user_query": "Mình bay từ Hà Nội nhé.",
+"expected_behavior": "[NGỮ CẢNH]: Đã đủ điểm đi, điểm đến, ngày đi, số người (1 adult, 1 child).\n[YÊU CẦU]: Tìm vé HAN-CXR ngày 26/05 cho 2 hành khách.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights thành công.",
+"anti_preference": "Hỏi lại tuổi của bé hoặc ngày bay.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 4,
+"user_query": "Mình muốn lấy vé khứ hồi, về ngày 30/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Thay đổi Core Param từ một chiều sang khứ hồi.\n[YÊU CẦU]: Search lại với roundTrip=true và returnDate=30/05/2026.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights để tìm vé mới.",
+"anti_preference": "Gọi filter_flights vì nghĩ chỉ thêm điều kiện, hoặc tạo search_id mới nhưng mất số lượng trẻ em 5 tuổi.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+}
+]
+},
+{
+"test_id": "TC_BASIC_MEDIUM_02",
+"difficulty": "basic_medium",
+"description": "V9 thời gian mơ hồ, sau đó test alias giờ bay và Out of scope",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé khứ hồi Đà Nẵng đi Sài Gòn cuối tháng này.",
+"expected_behavior": "[NGỮ CẢNH]: Dùng cụm từ mơ hồ 'cuối tháng này'.\n[YÊU CẦU]: Validation V9.\n[XỬ LÝ MONG ĐỢI]: Không gọi tool, hỏi khách ngày đi và ngày về cụ thể.",
+"anti_preference": "Tự động map 'cuối tháng này' thành ngày 30 hoặc 31 và gọi search_flights.",
+"expected_tool_calls": [],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 2,
+"user_query": "Đi 30/05 về 02/06/2026 nhé.",
+"expected_behavior": "[NGỮ CẢNH]: Cung cấp ngày cụ thể hợp lệ.\n[YÊU CẦU]: Tìm vé khứ hồi DAD-SGN.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights thành công.",
+"anti_preference": "Quên đây là vé khứ hồi và chỉ tìm vé một chiều cho ngày 30/05.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 3,
+"user_query": "Lọc các chuyến bay chiều đi trước 9h sáng.",
+"expected_behavior": "[NGỮ CẢNH]: Yêu cầu lọc theo khoảng thời gian cụ thể bằng ngôn ngữ tự nhiên.\n[YÊU CẦU]: Lọc end_hour='09:00'.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights, sử dụng cache cũ.",
+"anti_preference": "Gọi lại search_flights làm mất cache cũ.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 4,
+"user_query": "Sẵn tiện bạn đặt giúp mình phòng khách sạn ở Sài Gòn luôn được không?",
+"expected_behavior": "[NGỮ CẢNH]: Yêu cầu ngoài phạm vi dịch vụ (Out of scope).\n[YÊU CẦU]: Xử lý từ chối lịch sự.\n[XỬ LÝ MONG ĐỢI]: Không gọi tool, thông báo chatbot chỉ hỗ trợ đặt vé máy bay.",
+"anti_preference": "Bịa ra danh sách khách sạn ảo hoặc gọi bừa một tool không liên quan.",
+"expected_tool_calls": [],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_BASIC_MEDIUM_03",
+"difficulty": "basic_medium",
+"description": "V1 thiếu ngày đi, thuần luồng tìm kiếm, lọc và phân tích",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Cho mình giá vé khứ hồi Hà Nội đi Phú Quốc.",
+"expected_behavior": "[NGỮ CẢNH]: Yêu cầu tìm vé nhưng không có ngày đi.\n[YÊU CẦU]: Validation V1 - thiếu ngày.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights, MCP báo lỗi thiếu ngày, bot hỏi lại ngày đi/về.",
+"anti_preference": "Giả định khách đi vào ngày mai và gọi tool.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": null
+},
+{
+"turn_number": 2,
+"user_query": "Đi 25/05 về 28/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Cung cấp đủ thông tin ngày.\n[YÊU CẦU]: Tìm vé khứ hồi HAN-PQC.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights thành công.",
+"anti_preference": "Hỏi lại chặng bay Hà Nội - Phú Quốc.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 3,
+"user_query": "Chỉ lấy vé Vietnam Airlines thôi.",
+"expected_behavior": "[NGỮ CẢNH]: Lọc hãng hàng không (Soft Param).\n[YÊU CẦU]: Lọc preferred_airlines=['VN'].\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights trên kết quả cache.",
+"anti_preference": "Gọi search_flights thay vì filter_flights.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 4,
+"user_query": "So sánh 2 chuyến rẻ nhất xem chuyến nào bay giờ đẹp hơn.",
+"expected_behavior": "[NGỮ CẢNH]: Phân tích kết quả cụ thể.\n[YÊU CẦU]: So sánh 2 chuyến bay.\n[XỬ LÝ MONG ĐỢI]: Gọi analyze_flights để so sánh chi tiết.",
+"anti_preference": "Tự phân tích bằng mắt mà không dùng tool analyze_flights.",
+"expected_tool_calls": [
+{
+"tool": "analyze_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_ADV_MEDIUM_01",
+"difficulty": "advanced_medium",
+"description": "Multi-intent: search+policy song song, filter+promo song song",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé khứ hồi Hà Nội Sài Gòn đi 25/05 về 30/05/2026, hỏi luôn Vietnam Airlines có cho mang 2 kiện ký gửi không.",
+"expected_behavior": "[NGỮ CẢNH]: Yêu cầu tìm vé kết hợp hỏi chính sách.\n[YÊU CẦU]: Gọi 2 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights và search_policies đồng thời.",
+"anti_preference": "Chỉ gọi search_flights và bỏ qua câu hỏi hành lý, hoặc tự bịa thông tin hành lý ký gửi của Vietnam Airlines.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+},
+{
+"tool": "search_policies"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 2,
+"user_query": "Lọc các chuyến bay thẳng, xem luôn hãng này đang có mã giảm giá gì không.",
+"expected_behavior": "[NGỮ CẢNH]: Lọc kết quả và tra cứu khuyến mãi.\n[YÊU CẦU]: Gọi 2 tools song song cho soft param và promo.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights và get_promotions đồng thời.",
+"anti_preference": "Bịa ra mã giảm giá ảo 'VN100K' khi chưa nhận được dữ liệu từ get_promotions.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "get_promotions"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 3,
+"user_query": "So sánh xem chuyến sáng và chuyến chiều chuyến nào rẻ hơn.",
+"expected_behavior": "[NGỮ CẢNH]: So sánh các chuyến bay trong danh sách đã lọc.\n[YÊU CẦU]: Gọi phân tích.\n[XỬ LÝ MONG ĐỢI]: Gọi analyze_flights trên cache.",
+"anti_preference": "Gọi lại search_flights.",
+"expected_tool_calls": [
+{
+"tool": "analyze_flights"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 4,
+"user_query": "Hủy lọc bay thẳng đi, lấy tất cả.",
+"expected_behavior": "[NGỮ CẢNH]: Xóa điều kiện lọc (Soft Param).\n[YÊU CẦU]: Cập nhật bộ lọc.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights với nonStop=false hoặc rỗng.",
+"anti_preference": "Xóa luôn cả kết quả tìm kiếm khứ hồi trước đó.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_ADV_MEDIUM_02",
+"difficulty": "advanced_medium",
+"description": "Multi-intent: analyze+policy song song, search+info song song",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé bay từ Đà Nẵng ra Hà Nội ngày 26/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Tìm kiếm vé cơ bản.\n[YÊU CẦU]: Khởi tạo tìm kiếm.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights.",
+"anti_preference": "Tự bịa giá vé trước khi tool trả kết quả.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 2,
+"user_query": "So sánh VietJet và Bamboo xem hãng nào bay sớm hơn, và cho mình biết chính sách hủy vé của VietJet.",
+"expected_behavior": "[NGỮ CẢNH]: So sánh hãng và tra cứu chính sách hủy vé.\n[YÊU CẦU]: Gọi 2 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi analyze_flights và search_policies đồng thời.",
+"anti_preference": "Bỏ sót yêu cầu kiểm tra chính sách hủy vé.",
+"expected_tool_calls": [
+{
+"tool": "analyze_flights"
+},
+{
+"tool": "search_policies"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 3,
+"user_query": "Đổi ngày đi sang 28/05/2026, và cho mình thông tin tổng quan về Bamboo Airways.",
+"expected_behavior": "[NGỮ CẢNH]: Thay đổi Core Param và tra cứu thông tin hãng.\n[YÊU CẦU]: Khởi tạo search mới + gọi info hãng.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights và get_airline_info song song.",
+"anti_preference": "Gọi filter_flights để đổi ngày đi.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+},
+{
+"tool": "get_airline_info"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 4,
+"user_query": "Lọc riêng vé của Bamboo ra nhé.",
+"expected_behavior": "[NGỮ CẢNH]: Lọc hãng bay trên list vé ngày mới.\n[YÊU CẦU]: Cập nhật bộ lọc preferred_airlines=['QH'].\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights.",
+"anti_preference": "Sử dụng lại cache của ngày 26/05 để lọc.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_ADV_MEDIUM_03",
+"difficulty": "advanced_medium",
+"description": "Thay đổi Core Param và gọi song song filter+promo",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé từ Hải Phòng đi Đà Nẵng ngày 25/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Tìm kiếm vé một chiều.\n[YÊU CẦU]: Khởi tạo tìm kiếm.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights.",
+"anti_preference": "Tự giả định mã sân bay Hải Phòng sai.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 2,
+"user_query": "Chỉ lấy hãng VietJet và bay buổi tối, sẵn tiện check xem VietJet có promo nào không.",
+"expected_behavior": "[NGỮ CẢNH]: Lọc theo 2 điều kiện (hãng, giờ) và hỏi khuyến mãi.\n[YÊU CẦU]: Gọi 2 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights và get_promotions đồng thời.",
+"anti_preference": "Gọi tuần tự từng tool làm tốn số lượt hội thoại.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "get_promotions"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 3,
+"user_query": "Hãng này quy định hành lý xách tay thế nào?",
+"expected_behavior": "[NGỮ CẢNH]: Hỏi chính sách hãng đang hiển thị.\n[YÊU CẦU]: Tra cứu policy VJ.\n[XỬ LÝ MONG ĐỢI]: Gọi search_policies.",
+"anti_preference": "Bịa số kg hành lý xách tay mà không gọi tool.",
+"expected_tool_calls": [
+{
+"tool": "search_policies"
+}
+],
+"expected_action": null,
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 4,
+"user_query": "Đổi sang ngày 27/05/2026 xem có rẻ hơn không.",
+"expected_behavior": "[NGỮ CẢNH]: Thay đổi ngày đi (Core Param).\n[YÊU CẦU]: Khởi tạo tìm kiếm mới, làm mới toàn bộ cache.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights với ngày mới.",
+"anti_preference": "Gọi filter_flights hoặc giữ nguyên bộ lọc buổi tối mà không làm mới list theo ngày.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+}
+]
+},
+{
+"test_id": "TC_HARD_01",
+"difficulty": "hard",
+"description": "Gọi song song 3 tools, đổi khứ hồi và giữ context",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé từ Sài Gòn đi Phú Quốc ngày 26/05/2026 cho gia đình 2 người lớn và 1 em bé 10 tháng.",
+"expected_behavior": "[NGỮ CẢNH]: Cung cấp rõ em bé 10 tháng (<2 tuổi).\n[YÊU CẦU]: Không hỏi lại tuổi, truyền đúng infants=1, adults=2.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights với infants=1.",
+"anti_preference": "Hỏi lại tuổi của em bé dù đã được cho là 10 tháng, hoặc set sai thành children=1.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 2,
+"user_query": "Lọc bay thẳng, so sánh luôn giá của Vietnam Airlines với VietJet, và xem Vietnam Airlines có ưu tiên boarding cho em bé không.",
+"expected_behavior": "[NGỮ CẢNH]: Cùng lúc yêu cầu Lọc, So sánh và Hỏi chính sách.\n[YÊU CẦU]: Gọi 3 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights, analyze_flights, và search_policies đồng thời.",
+"anti_preference": "Bỏ quên bất kỳ 1 trong 3 intent (ví dụ quên trả lời về chính sách boarding cho em bé). Bịa câu trả lời policy.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "analyze_flights"
+},
+{
+"tool": "search_policies"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 3,
+"user_query": "Đổi thành vé khứ hồi, ngày về là 29/05/2026.",
+"expected_behavior": "[NGỮ CẢNH]: Thay đổi Core Param (vé khứ hồi).\n[YÊU CẦU]: Khởi tạo tìm kiếm mới với roundTrip=true.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights với chiều đi 26/05 và chiều về 29/05.",
+"anti_preference": "Sử dụng lại search_id của vé một chiều, gây lỗi hệ thống.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 4,
+"user_query": "Giữ bộ lọc bay thẳng và check khuyến mãi của Vietnam Airlines cho chuyến này.",
+"expected_behavior": "[NGỮ CẢNH]: Áp dụng lại lọc trên tập vé khứ hồi mới và hỏi promo.\n[YÊU CẦU]: Gọi 2 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights (nonStop=true) và get_promotions(VN).",
+"anti_preference": "Sử dụng lại cache từ trước khi chuyển sang khứ hồi.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "get_promotions"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+}
+]
+},
+{
+"test_id": "TC_HARD_02",
+"difficulty": "hard",
+"description": "Đổi điểm đến, 3 tools song song với yêu cầu phức tạp, dùng alias",
+"turns": [
+{
+"turn_number": 1,
+"user_query": "Tìm vé Hà Nội - Nha Trang ngày 27/05/2026 cho 1 người.",
+"expected_behavior": "[NGỮ CẢNH]: Tìm kiếm bình thường.\n[YÊU CẦU]: Gọi tool search cơ bản.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights.",
+"anti_preference": "Từ chối tìm kiếm vì không nói rõ 1 người là người lớn hay trẻ em (mặc định là người lớn).",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 2,
+"user_query": "Lọc lấy vé dưới 2 triệu, so sánh 3 chuyến rẻ nhất, và hỏi luôn quy định mang thú cưng của VietJet.",
+"expected_behavior": "[NGỮ CẢNH]: 3 intent độc lập: lọc giá, so sánh chuyến, chính sách thú cưng.\n[YÊU CẦU]: Gọi 3 tools song song.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights, analyze_flights, và search_policies đồng thời.",
+"anti_preference": "Tự kết luận chuyến bay rẻ nhất mà không dùng analyze_flights, hoặc tự bịa chính sách thú cưng.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "analyze_flights"
+},
+{
+"tool": "search_policies"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+},
+{
+"turn_number": 3,
+"user_query": "Thế chuyển điểm đến sang Đà Lạt đi, đi cùng ngày.",
+"expected_behavior": "[NGỮ CẢNH]: Đổi điểm đến (Core Param).\n[YÊU CẦU]: Tìm vé mới cho chặng HAN-DLI ngày 27/05.\n[XỬ LÝ MONG ĐỢI]: Gọi search_flights mới.",
+"anti_preference": "Gọi filter_flights thay vì search_flights.",
+"expected_tool_calls": [
+{
+"tool": "search_flights"
+}
+],
+"expected_action": "flight_list",
+"expected_search_id_behavior": "new"
+},
+{
+"turn_number": 4,
+"user_query": "Lọc vé bay sáng sớm và check xem có mã giảm giá cho chặng này không.",
+"expected_behavior": "[NGỮ CẢNH]: Lọc theo alias giờ bay và tìm promo song song.\n[YÊU CẦU]: Gọi 2 tools song song với tham số giờ sáng sớm.\n[XỬ LÝ MONG ĐỢI]: Gọi filter_flights và get_promotions.",
+"anti_preference": "Không hiểu 'sáng sớm' là alias giờ bay, từ chối lọc hoặc gọi search lại.",
+"expected_tool_calls": [
+{
+"tool": "filter_flights"
+},
+{
+"tool": "get_promotions"
+}
+],
+"expected_action": "apply_filters",
+"expected_search_id_behavior": "reuse"
+}
+]
+}
+]
