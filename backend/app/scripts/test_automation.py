@@ -327,7 +327,7 @@ async def main(input_file: str, output_file: str):
 
 if __name__ == "__main__":
     base        = os.path.dirname(os.path.abspath(__file__))
-    INPUT_FILE  = os.path.join(base, "data_set", "test_cases.json")
+    INPUT_FILE  = os.path.join(base, "datasets", "test_case.json")
     OUTPUT_FILE = os.path.join(
         base,
         f"report_{CANDIDATE_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
